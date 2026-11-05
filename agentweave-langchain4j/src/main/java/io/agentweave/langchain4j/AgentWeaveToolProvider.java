@@ -1,5 +1,6 @@
 package io.agentweave.langchain4j;
 
+import dev.langchain4j.agent.tool.SearchBehavior;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.invocation.InvocationContext;
 import dev.langchain4j.service.tool.ToolProvider;
@@ -53,6 +54,7 @@ public final class AgentWeaveToolProvider implements ToolProvider {
     private final ToolSource source;
     private final boolean dynamic;
     private final Predicate<ToolSpec> filter;
+    private final Predicate<ToolSpec> alwaysVisible;
     private final UnaryOperator<String> nameMapper;
     private final Function<InvocationContext, CallerIdentity> caller;
     private final Executor asyncExecutor;
@@ -62,6 +64,7 @@ public final class AgentWeaveToolProvider implements ToolProvider {
         this.source = b.source;
         this.dynamic = b.dynamic;
         this.filter = b.filter;
+        this.alwaysVisible = b.alwaysVisible;
         this.nameMapper = b.nameMapper;
         this.caller = b.caller;
         this.asyncExecutor = b.asyncExecutor;
@@ -92,12 +95,15 @@ public final class AgentWeaveToolProvider implements ToolProvider {
             }
             ToolSpecification specification;
             try {
-                specification = ToolSpecification.builder()
+                ToolSpecification.Builder b = ToolSpecification.builder()
                         .name(llmName)
                         .description(spec.description().isEmpty() ? null : spec.description())
                         .parameters(JsonSchemas.toJsonObjectSchema(spec.inputSchema()))
-                        .addMetadata(TOOL_NAME_METADATA, spec.name())
-                        .build();
+                        .addMetadata(TOOL_NAME_METADATA, spec.name());
+                if (alwaysVisible.test(spec)) {
+                    b.addMetadata(ToolSpecification.METADATA_SEARCH_BEHAVIOR, SearchBehavior.ALWAYS_VISIBLE);
+                }
+                specification = b.build();
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("tool '" + spec.name() + "': " + e.getMessage(), e);
             }
@@ -123,6 +129,7 @@ public final class AgentWeaveToolProvider implements ToolProvider {
         private final ToolSource source;
         private boolean dynamic;
         private Predicate<ToolSpec> filter = spec -> true;
+        private Predicate<ToolSpec> alwaysVisible = spec -> false;
         private UnaryOperator<String> nameMapper = ToolNames::sanitize;
         private Function<InvocationContext, CallerIdentity> caller = ctx -> CallerIdentity.ANONYMOUS;
         private Executor asyncExecutor = DEFAULT_ASYNC_EXECUTOR;
@@ -140,6 +147,18 @@ public final class AgentWeaveToolProvider implements ToolProvider {
         /** Offers only the tools that match (tested against the AgentWeave name and schema). */
         public Builder filter(Predicate<ToolSpec> filter) {
             this.filter = Objects.requireNonNull(filter, "filter");
+            return this;
+        }
+
+        /**
+         * Marks the matching tools {@link SearchBehavior#ALWAYS_VISIBLE}: with a LangChain4j
+         * {@code ToolSearchStrategy} configured, they are sent on every request instead of only
+         * after a tool search found them (the provider-side equivalent of
+         * {@code @Tool(searchBehavior = ALWAYS_VISIBLE)}). Other tools stay
+         * {@link SearchBehavior#SEARCHABLE}, LangChain4j's default. No effect without a strategy.
+         */
+        public Builder alwaysVisible(Predicate<ToolSpec> alwaysVisible) {
+            this.alwaysVisible = Objects.requireNonNull(alwaysVisible, "alwaysVisible");
             return this;
         }
 

@@ -10,7 +10,7 @@ parent: agentweave-architecture
 
 ## Responsibility
 
-Shows that AgentWeave plugs into a non-Spring agent framework, in three directions, against
+Shows that AgentWeave plugs into a non-Spring agent framework, in four directions, against
 **LangChain4j 1.23.0**:
 
 1. **Tools in** — any AgentWeave `ToolSource` (MCP, UTCP, A2A, local tools, a `ToolRegistry`) is
@@ -19,16 +19,23 @@ Shows that AgentWeave plugs into a non-Spring agent framework, in three directio
    an AgentWeave agent server (for example the A2A server) can serve it.
 3. **@Tool out** — LangChain4j `@Tool` methods become `LocalTools.LocalTool`s, so AgentWeave tool
    servers (MCP server, UTCP manual) can serve them.
+4. **Tool search** — an AgentWeave `CapabilityCatalog` answers LangChain4j's tool search, so a
+   model starts with one search tool and receives full schemas only for the capabilities found.
 
 ## Boundary
 
-- Depends on `agentweave-core` and `dev.langchain4j:langchain4j` only (`api` scope: LangChain4j
-  types appear in the public API). Jackson 2 is used internally, unversioned, so the version
-  LangChain4j brings governs. No dependency on any protocol module.
+- Depends on `agentweave-core`, `agentweave-discovery` and `dev.langchain4j:langchain4j` only
+  (`api` scope: their types appear in the public API). Jackson 2 is used internally, unversioned,
+  so the version LangChain4j brings governs. No dependency on any protocol module.
 - Public API (package `io.agentweave.langchain4j`):
   - `AgentWeaveToolProvider implements ToolProvider` — `from(ToolSource)`,
     `builder(ToolSource)` with `dynamic`, `filter`, `toolNames`, `callerIdentity`,
-    `callerIdentityFrom`, `asyncExecutor`; `originalName(String)`; `TOOL_NAME_METADATA`.
+    `callerIdentityFrom`, `alwaysVisible`, `asyncExecutor`; `originalName(String)`;
+    `TOOL_NAME_METADATA`.
+  - `CatalogToolSearchStrategy implements ToolSearchStrategy` — `from(CapabilityCatalog)`,
+    `builder(CapabilityCatalog)` with `toolName`, `toolDescription`, `limit`, `toolNames`,
+    `callerIdentity`, `callerIdentityFrom`, `queryCustomizer`, `alwaysVisible`, `asyncExecutor`;
+    `toolProvider()`; `DEFAULT_TOOL_NAME` (`search_capabilities`).
   - `LangChain4jAgents` — `handler(Conversation)`, `streamingHandler(StreamingConversation)`,
     `descriptor(...)`, `skill(...)`, `ARTIFACT_NAME`. `Conversation` is
     `String chat(String conversationId, String userMessage)`; `StreamingConversation` returns a
@@ -36,6 +43,18 @@ Shows that AgentWeave plugs into a non-Spring agent framework, in three directio
     as a method reference.
   - `LangChain4jTools.from(Object...)` → `List<LocalTools.LocalTool>`; `CALLER_PARAMETER`.
   - `JsonSchemas.toJsonObjectSchema(Map)` / `toMap(JsonObjectSchema)`; `ToolNames.sanitize`.
+
+Tool search over a catalog (`ToolSearchStrategy` is `@Experimental` in LangChain4j):
+
+```java
+CatalogToolSearchStrategy search = CatalogToolSearchStrategy.builder(catalog)
+        .callerIdentityFrom(ctx -> callerOf(ctx)).build();
+Assistant assistant = AiServices.builder(Assistant.class)
+        .chatModel(model)
+        .toolProvider(search.toolProvider())   // every capability, searchable
+        .toolSearchStrategy(search)            // the catalog answers the searches
+        .build();
+```
 
 Serving an agent over A2A (the server lives in `agentweave-a2a`):
 
@@ -102,6 +121,54 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
   callbacks are queued and replayed on the handler's thread, so `AgentTaskContext` is only called
   from one thread. Cancellation stops listening, but LangChain4j's stream isn't aborted.
 
+- **Tool search maps onto LangChain4j's own mechanism, not onto `DiscoveryTools`.** LangChain4j
+  1.23.0 (`dev.langchain4j.service.tool.search`, since 1.12.0) works like this:
+  - The AI Service's tools (static ones and those of non-dynamic `ToolProvider`s) are its
+    *available* tools. Each is searchable unless its specification's metadata
+    `ToolSpecification.METADATA_SEARCH_BEHAVIOR` is `SearchBehavior.ALWAYS_VISIBLE` (what
+    `@Tool(searchBehavior = ALWAYS_VISIBLE)` sets).
+  - The first request carries only the always-visible tools plus the strategy's
+    `getToolSearchTools`.
+  - `search(ToolSearchRequest)` gets the model's tool call, the searchable tools not yet found
+    and the `InvocationContext`. It returns `ToolSearchResult(foundToolNames, text)`.
+  - `ToolSearchService` stores the names in the result message's attribute `found_tools`.
+    Later requests in the loop, and later invocations while that message is in chat memory,
+    carry those tools' full specifications. A found name that isn't an available tool throws.
+
+  So `CatalogToolSearchStrategy` does this:
+  - **Search tool.** It offers one tool, `search_capabilities`, with the `DiscoveryTools` input
+    schema (`query`, `limit`, `protocols`, `sources`, `read_only`).
+  - **Search.** It parses the arguments with `DiscoveryTools.query`, so the model's filters apply.
+    The caller comes from the `InvocationContext` function, so the caller's scopes apply too. A
+    `queryCustomizer` can tighten the query per application, and `limit` is the default when the
+    model passes none. Then it calls `catalog.search`.
+  - **Found tools.** Hits are mapped to LLM names with the same mapper as the provider
+    (`ToolNames.sanitize`). Only names among the request's searchable tools are returned as found,
+    so LangChain4j never sees an unknown name. Hits that were found earlier are listed as
+    "Already available".
+  - **Fallback stages.** Hits at `BROADENED` and `ALL_SCHEMAS` become found tools, so
+    `ALL_SCHEMAS` reproduces the all-tools baseline. `NAMES_ONLY` candidates are only listed in
+    the text, without loading them, because schemas are sent only for what is selected. The model
+    can search for one by name.
+  - **Result text.** It always states confidence, stage and mode, plus matches hidden as
+    unavailable, per source. Matches hidden by permission are never mentioned.
+  - **Errors.** Invalid arguments throw `LlmVisibleToolExecutionException`, which the model
+    sees, as `SimpleToolSearchStrategy` does by default.
+  - **`toolProvider()`.** It is an `AgentWeaveToolProvider` over the catalog. Schemas come from
+    the catalog's `SchemaCache`, and calls go through `CapabilityCatalog.invoke`, which re-checks
+    permission and availability. It uses the same name mapper and caller function.
+  - **Static provider.** The provider is static (`isDynamic() == false`), because
+    `ToolService.refreshDynamicProviders` adds dynamic providers' tools as always effective,
+    which would bypass search.
+  - **Always visible.** `alwaysVisible(Predicate<ToolSpec>)` on either builder sets
+    `ALWAYS_VISIBLE`. That is the provider-side equivalent of the `@Tool` attribute.
+  - **No `DiscoverySession`.** LangChain4j's `found_tools` in chat memory already plays its role.
+    The provider lists every capability, whoever the caller, because full specifications reach
+    the model only after a permission-filtered search, and calls are re-checked.
+  - **Rejected fallback.** A dynamic `ToolProvider` exposing the three `DiscoveryTools`
+    meta-tools was the alternative if the strategy API couldn't carry this. It isn't needed, and
+    `DiscoveryTools` can still be offered through `AgentWeaveToolProvider.from(DiscoveryTools.of(catalog))`.
+
 ## Coverage and limitations
 
 - Not mapped: binary tool content (images) into LangChain4j's multimodal tool results
@@ -110,6 +177,9 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
 - `LangChain4jTools` gives text/image content only, with no structured payload. `@Tool` names
   must already match `[A-Za-z0-9_-]{1,64}`.
 - Root-level schema keywords beyond `JsonObjectSchema`'s model are dropped (see above).
+- Tool search depends on LangChain4j's `@Experimental` API. `toolProvider()` converts every
+  catalog schema to a `ToolSpecification` once per AI Service invocation, which costs CPU (not
+  tokens) on very large catalogs.
 
 ## Verification
 
@@ -125,6 +195,19 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
     descriptions, raw keywords, and root normalization.
   - `@Tool` objects through `LocalTools.invoke`.
   - Agent handlers, blocking and over a real streaming AI Service, with a fake `AgentTaskContext`.
+  - Tool search over a catalog, with a scripted model making a sequence of calls
+    (`CatalogToolSearchStrategyTest`, 8 tests):
+    - The first request offers only `search_capabilities`. The found tool's full specification
+      is in the next request, the model calls it, and the catalog tool runs. A tool never
+      searched is never offered.
+    - Found tools persist into the next invocation through chat memory.
+    - A scoped capability is found only for a caller holding the scope, and its existence
+      doesn't leak to others.
+    - `alwaysVisible` tools are in the first request.
+    - The model's filters (`read_only`, `sources`, `limit`) apply.
+    - `NAMES_ONLY` lists candidates without loading them, and `ALL_SCHEMAS` loads everything.
+    - Unavailable sources are reported, tools found earlier are not found again, and invalid
+      arguments are visible to the model.
 
 ## Sources
 
@@ -143,5 +226,10 @@ LangChain4j **1.23.0** (`dev.langchain4j:langchain4j`, `langchain4j-core`) and `
   <https://github.com/langchain4j/langchain4j/blob/1.23.0/langchain4j-core/src/main/java/dev/langchain4j/internal/JsonSchemaElementJsonUtils.java>
 - `TokenStream`:
   <https://github.com/langchain4j/langchain4j/blob/1.23.0/langchain4j/src/main/java/dev/langchain4j/service/TokenStream.java>
+- Tool search (`ToolSearchStrategy`, `ToolSearchRequest`, `ToolSearchResult`, `ToolSearchService`
+  with `found_tools`, `SimpleToolSearchStrategy`), and `SearchBehavior` /
+  `ToolSpecification.METADATA_SEARCH_BEHAVIOR`:
+  <https://github.com/langchain4j/langchain4j/tree/1.23.0/langchain4j/src/main/java/dev/langchain4j/service/tool/search>,
+  <https://github.com/langchain4j/langchain4j/blob/1.23.0/langchain4j-core/src/main/java/dev/langchain4j/agent/tool/SearchBehavior.java>
 - MCP schema mapping precedent:
   <https://github.com/langchain4j/langchain4j/blob/1.23.0/langchain4j-mcp/src/main/java/dev/langchain4j/mcp/client/ToolSpecificationHelper.java>

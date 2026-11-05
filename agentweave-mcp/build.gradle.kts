@@ -12,6 +12,8 @@ dependencies {
     testImplementation("org.assertj:assertj-core:${project.property("assertjVersion")}")
     // Embedded Jetty hosts McpToolServer.http() in the HTTP end-to-end tests.
     testImplementation(project(":agentweave-server-jetty"))
+    // The discovery meta-tools are served over MCP in McpDiscoveryToolsTest.
+    testImplementation(project(":agentweave-discovery"))
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // slf4j-simple logs to stderr, which keeps the stdio test server's stdout clean for JSON-RPC.
     testRuntimeOnly("org.slf4j:slf4j-simple:${project.property("slf4jVersion")}")

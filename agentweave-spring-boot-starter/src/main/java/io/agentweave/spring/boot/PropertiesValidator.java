@@ -101,6 +101,32 @@ final class PropertiesValidator {
         }
     }
 
+    /** Discovery needs its module (and agentweave-mcp to serve MCP) and a valid endpoint path. */
+    static void validateDiscovery(AgentWeaveDiscoveryProperties props, ClassLoader classLoader) {
+        requireModule("agentweave.discovery.enabled", AgentWeaveDiscoveryAutoConfiguration.CATALOG_CLASS,
+                "agentweave-discovery", classLoader);
+        if (props.isExposeMcp()) {
+            requireModule("agentweave.discovery.expose-mcp", AgentWeaveDiscoveryAutoConfiguration.MCP_SERVER_CLASS,
+                    "agentweave-mcp", classLoader);
+            path(new HashMap<>(), "agentweave.discovery.mcp-path", props.getMcpPath());
+        }
+    }
+
+    /** The discovery MCP path must not collide with an enabled server's path. */
+    static void validateDiscoveryPath(AgentWeaveDiscoveryProperties discovery, AgentWeaveServerProperties props) {
+        Map<String, String> paths = new HashMap<>();
+        if (props.getMcp().isEnabled()) {
+            path(paths, "agentweave.server.mcp.path", props.getMcp().getPath());
+        }
+        if (props.getUtcp().isEnabled()) {
+            path(paths, "agentweave.server.utcp (fixed)", "/utcp");
+        }
+        if (props.getA2a().isEnabled()) {
+            path(paths, "agentweave.server.a2a.path", props.getA2a().getPath());
+        }
+        path(paths, "agentweave.discovery.mcp-path", discovery.getMcpPath());
+    }
+
     private static void name(Map<String, String> seen, String key, String name) {
         if (name == null || !SOURCE_NAME.matcher(name).matches()) {
             throw invalid(key, name, "registry names must match " + SOURCE_NAME);

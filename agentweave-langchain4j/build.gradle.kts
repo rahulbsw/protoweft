@@ -1,6 +1,8 @@
 // LangChain4j adapter: AgentWeave tools into AI Services, LangChain4j agents and @Tool methods out.
 dependencies {
     api(project(":agentweave-core"))
+    // CatalogToolSearchStrategy searches a CapabilityCatalog; its types appear in the public API.
+    api(project(":agentweave-discovery"))
     api("dev.langchain4j:langchain4j:${project.property("langchain4jVersion")}")
     // Jackson 2 is already a compile dependency of LangChain4j; no version here so LangChain4j's governs.
     implementation("com.fasterxml.jackson.core:jackson-databind")
