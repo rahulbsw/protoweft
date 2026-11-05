@@ -1,28 +1,49 @@
 # Tools and the registry
 
-A **tool** is a named, callable function with a JSON Schema describing its input. Tools work the
-same whether they come from a remote MCP server, a UTCP manual, a remote A2A agent, or a method
-in your own JVM.
+A **tool** is a named, callable function with a JSON Schema describing its input. Tools look the
+same whether they come from a remote MCP server, a UTCP manual, a remote A2A agent, or a method in
+your own JVM.
 
 ## The tool model
 
 | Type | Role |
 |---|---|
-| `ToolSpec` | Name, description, and JSON input schema (as a plain `Map`). |
-| `ToolInvocation` | A tool name plus an argument map. |
+| `ToolSpec` | Name, description, JSON input schema (a plain `Map`), and protocol-neutral metadata. |
+| `ToolInvocation` | A tool name plus an argument map. Arguments may contain `null` values. |
 | `ToolOutcome` | Ordered `Content` parts, an `error` flag, and an optional structured payload. |
 | `Content` | `Text`, `Data` (base64 with a MIME type), `Json`, `Link` (by URI), or `Unmapped`. |
 | `ToolSource` | Anything that can `listTools()` and `invoke(...)`. |
-| `ToolConnector` | A `ToolSource` that is also a `ProtocolConnector`, meaning a connection to a remote peer. |
+| `ToolConnector` | A `ToolSource` that is also a `ProtocolConnector`: a connection to one remote peer. |
+
+`ToolOutcome.text()` joins all text parts with newlines, and `structuredContent()` returns the
+structured payload if there is one. `ToolOutcome.text("…")` and `ToolOutcome.failure("…")` build
+one-part outcomes.
 
 !!! note "Tool failures are outcomes, not exceptions"
-    When a tool runs and reports a failure, you get a `ToolOutcome` with `error() == true` and
-    the details in its content. An `AgentWeaveException` means the call itself couldn't be made:
-    an unknown tool, invalid arguments, a connection failure or a timeout.
+    When a tool runs and reports a failure, you get a `ToolOutcome` with `error() == true` and the
+    details in its content. An `AgentWeaveException` means the call itself couldn't be made: an
+    unknown tool, invalid arguments, a connection failure or a timeout.
+
+`Content.Unmapped` stands for a part a connector can't translate, for example an MCP embedded
+resource. It carries the protocol's type tag, so the loss is visible instead of silent.
+
+### Metadata
+
+`ToolSpec.metadata()` carries protocol-neutral hints under these keys. Connectors copy only the
+hints a peer actually set.
+
+| Key | Type | Meaning | MCP mapping |
+|---|---|---|---|
+| `ToolSpec.META_READ_ONLY` | `Boolean` | Doesn't modify its environment. | `readOnlyHint` |
+| `ToolSpec.META_DESTRUCTIVE` | `Boolean` | May perform destructive updates. | `destructiveHint` |
+| `ToolSpec.META_IDEMPOTENT` | `Boolean` | Repeated calls have no extra effect. | `idempotentHint` |
+| `ToolSpec.META_OPEN_WORLD` | `Boolean` | Interacts with external entities. | `openWorldHint` |
+| `ToolSpec.META_TITLE` | `String` | Display title. | `title` |
+| `ToolSpec.META_TAGS` | `List<String>` | Keywords, for example UTCP tool tags. | — |
 
 ## Defining local tools
 
-Annotate public methods with `@AgentTool` and scan the object:
+Annotate public instance methods with `@AgentTool` and scan the object:
 
 ```java
 public class Weather {
@@ -30,54 +51,115 @@ public class Weather {
     public record Location(@ToolParam(description = "City name") String city, Optional<String> country) {}
     public record Forecast(String city, double temperature, Unit unit) {}
 
-    @AgentTool(description = "Forecast for a location")
-    public Forecast forecast(Location location, Unit unit, int days) { ... }
+    @AgentTool(description = "Forecast for a location", readOnly = true, tags = {"weather"})
+    public Forecast forecast(Location location, Unit unit,
+                             @ToolParam(description = "Days ahead", required = false) Integer days) {
+        return new Forecast(location.city(), 21.5, unit);
+    }
 }
 
 LocalTools tools = LocalTools.builder().scan(new Weather()).build();
 ```
 
-AgentWeave generates the input schema from the parameter types:
+`@AgentTool` attributes:
 
-- `String` and `char` become `string`.
-- Integer types and `BigInteger` become `integer`; `double`, `float` and `BigDecimal` become
-  `number`.
-- `boolean` becomes `boolean`.
-- An enum becomes `string` with an `enum` list of its constant names.
-- `List`, `Set` and arrays become `array`.
-- `Map<String, T>` and records become `object`.
-- `Optional<T>` marks the parameter as optional. Every other parameter is required, unless you set
-  `@ToolParam(required = false)`.
+| Attribute | Default | Meaning |
+|---|---|---|
+| `description` | (required) | What the tool does, written for a model deciding whether to call it. |
+| `name` | the method name | Must match `[A-Za-z0-9_-]{1,64}`. |
+| `tags` | none | Keywords, published as `META_TAGS`. |
+| `readOnly` | `false` | Published as `META_READ_ONLY` (MCP `readOnlyHint`). |
+| `destructive` | `false` | Published as `META_DESTRUCTIVE` (MCP `destructiveHint`). |
 
-Arguments are bound strictly: `1.5` is rejected for an `int` parameter, and an unknown enum
-value is rejected too. Both fail with `ErrorCategory.INVALID_ARGUMENTS`.
+`@ToolParam` goes on parameters and record components: `name`, `description`, and `required`
+(default `true`).
 
-Return values are converted as follows:
+### Generated schema
+
+AgentWeave generates the input schema from the parameter types. For the `forecast` tool above:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "location": {
+      "type": "object",
+      "properties": {
+        "city": {"type": "string", "description": "City name"},
+        "country": {"type": "string"}
+      },
+      "required": ["city"]
+    },
+    "unit": {"type": "string", "enum": ["CELSIUS", "FAHRENHEIT"]},
+    "days": {"type": "integer", "description": "Days ahead"}
+  },
+  "required": ["location", "unit"]
+}
+```
+
+| Java type | JSON Schema |
+|---|---|
+| `String`, `CharSequence`, `char` | `string` |
+| `int`, `long`, `short`, `byte` (and wrappers), `BigInteger` | `integer` |
+| `double`, `float` (and wrappers), `BigDecimal` | `number` |
+| `boolean`, `Boolean` | `boolean` |
+| An enum | `string` with an `enum` list of the constant names |
+| `List<T>`, `Set<T>`, `T[]` | `array` with `items` |
+| `Map<String, T>` | `object` (with `additionalProperties` unless `T` is `Object`) |
+| A record | `object` with its components as properties |
+| `Optional<T>` | the schema of `T`; the parameter is optional |
+| `Object` | no constraint |
+
+Every parameter is required unless it is an `Optional` or has `@ToolParam(required = false)`. Any
+other type is rejected with `IllegalArgumentException` when you call `scan`, as are recursive
+records.
+
+A parameter of type `CallerIdentity` receives the authenticated caller when the tool is served over
+a protected endpoint. It doesn't appear in the schema.
+
+!!! tip "Parameter names"
+    Compile with `-parameters` so AgentWeave can read parameter names, or name every parameter with
+    `@ToolParam(name = "...")`. Without either, `scan` fails and says so.
+
+### Argument binding
+
+Arguments are converted to the parameter types. Values that can't represent the type fail the call
+with `AgentWeaveException` and `ErrorCategory.INVALID_ARGUMENTS`, for example `1.5` for an `int`, an
+unknown enum constant, or a missing required argument. Some lenient conversions are accepted:
+numeric strings for numbers, `"true"`/`"false"` for booleans, and enum names in any case.
+
+### Return values
 
 | The method returns | The outcome contains |
 |---|---|
-| `String` or a scalar | One text part |
-| A record, `Map`, collection or enum | The value as structured content, plus its JSON text |
-| A `ToolOutcome` or `Content` | That outcome or part, as returned |
+| `String`, a number, a boolean, a `char` or an enum | One text part |
+| A record, `Map`, collection or array | Its JSON as one text part, plus the value as structured content |
+| A `ToolOutcome` | That outcome, as returned |
+| A `Content` | One part, as returned |
+| `Optional<T>` | The contained value, converted as above |
 | `void` or `null` | An empty outcome |
 
-If the method throws, the result is a failure outcome carrying the exception message.
+If the method throws, the result is a failure outcome carrying the exception message. An
+`AgentWeaveException` thrown by the method propagates unchanged.
 
-A parameter of type `CallerIdentity` receives the authenticated caller when the tool is served
-over a protected endpoint. It doesn't appear in the schema.
+### Programmatic tools
 
-!!! tip "Parameter names"
-    Compile with `-parameters` so AgentWeave can read parameter names, or name each parameter with
-    `@ToolParam(name = "...")`.
-
-Tools can also be registered programmatically:
+Register tools without annotations, for example when the schema comes from elsewhere:
 
 ```java
 LocalTools tools = LocalTools.builder()
         .tool("ping", "Health check", Map.of("type", "object"),
-              (args, caller) -> ToolOutcome.text("pong"))
+              (arguments, caller) -> ToolOutcome.text("pong"))
         .build();
 ```
+
+The `ToolHandler` receives the raw argument map and the caller. As with annotated methods, an
+exception becomes a failure outcome unless it is an `AgentWeaveException`. `add(LocalTool)` and
+`addAll(List<LocalTool>)` add prepared tools, for example
+[LangChain4j `@Tool` methods](../integrations/langchain4j.md#tool-methods-out).
+
+`LocalTools` is immutable and thread-safe once built. Your tool methods must be thread-safe too:
+servers call them concurrently.
 
 ## The tool registry
 
@@ -92,9 +174,26 @@ ToolRegistry registry = new ToolRegistry()
         .register("travel", a2aConnector);   // a remote A2A agent, as one "ask" tool
 
 registry.listTools();   // local.forecast, files.read_file, weather.get_forecast, travel.ask, ...
-registry.invoke(ToolInvocation.of("files.read_file", Map.of("path", "README.md")));
+ToolOutcome out = registry.invoke(ToolInvocation.of("local.forecast",
+        Map.of("location", Map.of("city", "Oslo"), "unit", "CELSIUS")));
 ```
 
-Source names must match `[A-Za-z0-9_-]+`. Closing the registry closes every registered source.
-A registry is itself a `ToolSource`, so you can hand it to the LangChain4j adapter, serve it over
-MCP, or publish it as a UTCP manual.
+- Source names must match `[A-Za-z0-9_-]+`. Registering a name twice fails with
+  `IllegalArgumentException`.
+- The registry doesn't start connectors. Call `start()` on each connector, before or after
+  registering it, but before listing its tools.
+- A name without a known `<source>.` prefix fails with `TOOL_NOT_FOUND`.
+- `listTools()` asks every source each time; nothing is cached. If one source fails, the whole
+  listing fails.
+- `unregister(name)` removes a source without closing it. `close()` closes every registered
+  source that is `AutoCloseable`.
+- `invoke(invocation, caller)` passes a `CallerIdentity` through to the source.
+
+A registry is itself a `ToolSource`, so you can hand it to the
+[LangChain4j adapter](../integrations/langchain4j.md), serve it over [MCP](../protocols/mcp.md), or
+publish it as a [UTCP manual](../protocols/utcp.md#serving-tools-as-a-utcp-manual).
+
+!!! warning "Re-serving remote tools"
+    Serving a registry that contains remote connectors turns your application into a proxy that
+    spends those connectors' credentials on behalf of its own callers. Protect such an endpoint
+    accordingly.
