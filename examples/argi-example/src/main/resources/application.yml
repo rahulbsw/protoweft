@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: argi-bank-assistant
+  ai:
+    openai:
+      # Empty means "no key": the application still starts, model calls are rejected.
+      api-key: ${OPENAI_API_KEY:}
+      # base-url: http://localhost:11434   # any OpenAI-compatible server, e.g. Ollama
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-4o-mini}
+
+server:
+  port: 8080
+
+agentweave:
+  server:
+    a2a:
+      enabled: true                      # card at /.well-known/agent-card.json, JSON-RPC at /a2a
+  discovery:
+    enabled: true                        # a CapabilityCatalog bean over the ToolRegistry
