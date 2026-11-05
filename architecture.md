@@ -8,111 +8,151 @@ parent: agentweave-goal
 
 # AgentWeave architecture
 
-Realizes the principles in `agentweave-goal`. This spec owns the module boundaries, the core SPIs, the
-dependency edges between modules, and the per-protocol compatibility matrix with its sources.
+Realizes the principles in `agentweave-goal`. This spec owns the module boundaries, the core
+seams, the dependency edges between modules, the cross-module decisions, and the per-protocol
+compatibility matrix. Each module's own decisions live in its `SPEC.md`, linked by id.
 
 ## Drivers
 
-- Keep protocol-neutral concepts in a small core; keep each protocol's types and SDK behind a module
-  boundary (goal principles 1, 2, 9).
-- Spring Boot support must be optional and removable; other framework integrations must not need it
-  (principles 3, 4).
-- Compatibility and feature coverage must be explicit and testable, and must never over-claim
-  (principles 5, 6).
-- SDK version and wire-protocol version are separate axes and must stay separate (principle 8).
+- Keep protocol-neutral concepts in a small core, and each protocol's types and SDK behind a
+  module boundary (goal principles 1, 2, 9).
+- Spring Boot support must be optional and removable; other framework integrations must not need
+  it (principles 3, 4).
+- Compatibility and feature coverage are explicit, tested, and never over-claimed (principles
+  5, 6). SDK version and wire revision stay separate axes (principle 8).
+- Every protocol works in both directions, client and server, behind one hosting contract.
 
 ## Module layout
 
-```
-agentweave-bom                   Version alignment for consumers.                    [not yet built]
-agentweave-core                  Protocol-NEUTRAL only, zero dependencies.
-agentweave-mcp                   MCP client connector (stdio). Depends on core + MCP Java SDK 2.x. See `agentweave-mcp`.
-agentweave-a2a                   A2A connector. Depends on core + a2a-java.           [not yet built]
-agentweave-utcp                  UTCP connector. Depends on core; implemented from spec. [not yet built]
-agentweave-spring-boot-starter   OPTIONAL. Depends on core + selected connectors.     [not yet built]
-examples/mcp-client-example      Runnable demonstration of the MCP client slice.
-```
+| Layer | Module | Role | Spec |
+|---|---|---|---|
+| Core | `agentweave-core` | Protocol-neutral API; no dependencies | (this spec) |
+| Hosting | `agentweave-server` | Servlet hosting contract: `ServletEndpoint`, `ServerEndpointProvider`, `InboundAuthFilter` | (this spec) |
+| | `agentweave-server-jetty` | Embedded Jetty 12 host for plain Java | (this spec) |
+| Protocols | `agentweave-mcp` | MCP client and tool server, over stdio and Streamable HTTP (MCP Java SDK 2.1.0) | `agentweave-mcp` |
+| | `agentweave-a2a` | A2A client and full-lifecycle agent server, JSON-RPC binding (a2a-java 1.5.0.Final) | `agentweave-a2a` |
+| | `agentweave-utcp` | UTCP client and manual provider, implemented from spec 1.1 | `agentweave-utcp` |
+| Discovery | `agentweave-discovery` | Capability catalog, hybrid search, fallback, sessions, generic meta-tools, raw provider payloads | `agentweave-discovery` |
+| | `agentweave-discovery-embeddings` | Offline and LangChain4j-backed `Embedder`s | `agentweave-discovery-embeddings` |
+| | `agentweave-discovery-anthropic` | Typed Anthropic tool-search adapter | `agentweave-discovery-anthropic` |
+| | `agentweave-discovery-openai` | Typed OpenAI Responses tool-search adapter | `agentweave-discovery-openai` |
+| Integrations | `agentweave-langchain4j` | Tools in, agents out, `@Tool` out, catalog tool search | `agentweave-langchain4j` |
+| | `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration; every protocol optional | `agentweave-spring-boot-starter` |
+| Packaging | `agentweave-bom` | Version alignment (`java-platform`) | — |
+| Not published | `examples/*`, `evals/tool-discovery` | Runnable examples; the discovery evaluation harness | `evals-tool-discovery` |
 
-Dependency rule (enforced by module boundaries):
+Dependency rules, enforced by module boundaries:
 
-- `core` depends on nothing protocol-specific.
-- each connector depends on `core` + exactly its own protocol SDK.
-- the Spring starter depends on `core` + connectors; **nothing depends on the starter**, so plain-Java
-  and non-Spring-framework users consume `core` + a connector directly.
+- `core` depends on nothing.
+- `server` depends on `core` and on the servlet API (compileOnly). Only `server-jetty` brings a
+  container.
+- Each protocol module depends on `core`, on `server` (for its endpoints), and on exactly its own
+  protocol SDK (or none, for UTCP).
+- `discovery` depends on `core` only. Its embedding and provider modules add one library each.
+- Integrations depend on what they wire. **Nothing depends on an integration**, so plain-Java and
+  non-Spring users take `core` plus the modules they need.
 
-## Core SPIs and value types (`agentweave-core`)
+## Core seams (`agentweave-core`)
 
-Protocol-neutral surface, no protocol types leaking out:
+- **Connectors.** `ProtocolConnector` (lifecycle, `ProtocolId`, `ComplianceReport`) is the seam
+  every protocol implements. `ToolConnector` adds `ToolSource` for tools, and `AgentConnector`
+  adds message, task and stream operations for agents. Tool-calling and agent messaging stay
+  separate surfaces.
+- **Tools.**
+  - `ToolSource` (`listTools`, `invoke`, caller-aware `invoke`) is the one interface servers,
+    adapters and the registry consume.
+  - `ToolSpec` carries the name, description, JSON input schema, and protocol-neutral `metadata`:
+    behavior hints, title and tags. MCP tool annotations and UTCP tags map to and from it.
+  - `ToolOutcome` holds ordered `Content` (`Text`, `Data`, `Json`, `Link`, or `Unmapped`, so
+    unmappable parts are visible rather than dropped), an `error` flag, and structured content. A
+    tool that runs and fails is an outcome, not an exception.
+  - `ToolRegistry` combines sources under `<source>.<tool>` names.
+  - `LocalTools` turns `@AgentTool` methods, or programmatic handlers, into tools, generating JSON
+    Schema from the Java types.
+- **Agents.** `AgentHandler` with `AgentTaskContext` (reply; working; artifact; require input or
+  auth; complete, fail or reject; cancellation) is the server-side contract. `AgentMessage`,
+  `AgentReply`, `AgentEvent`, `AgentDescriptor` and `TaskState` are the neutral data model. A2A is
+  its first protocol.
+- **Cross-cutting.**
+  - `CredentialProvider` supplies outbound credentials.
+  - `InboundAuthenticator` returns an `AuthDecision` for each inbound request. `CallerIdentity`
+    flows to tools and agent handlers; its `scopes` attribute drives discovery permissions.
+  - `ObservationHandler.observe(...)` is shared by every module; handler failures are swallowed.
+  - There is one unchecked `AgentWeaveException`, with a neutral `ErrorCategory` and the native
+    `protocolCode`.
+  - `ComplianceReport` lists the protocol, SDK name and version, wire revisions, negotiated
+    revision, and supported and unsupported features. Tests assert it.
 
-- **`ProtocolConnector`** — lifecycle (`start`/`close`), identity (`ProtocolId`), and the negotiated
-  `ComplianceReport`. The extension seam every protocol module implements.
-- **Tool model** — `ToolSpec` (name, description, JSON input schema as a neutral map), `ToolInvocation`
-  (tool name + argument map), `ToolOutcome` (ordered neutral `Content` parts + `error` flag + optional
-  structured payload). `Content` is sealed: `Text`, `Data`, and `Unmapped` — unmappable parts are made
-  visible, never dropped.
-- **`ToolConnector`** (`ProtocolConnector` + `listTools` + `invoke`) — the interface application code
-  programs against for tool-calling protocols. A tool that runs and fails is an outcome with `error`
-  set, not an exception. (Separate catalog/invoker interfaces were considered and dropped: nothing
-  needed one without the other.)
-- **`CredentialProvider`** SPI — the authentication/configuration extension point; connectors resolve
-  credentials through it rather than hard-coding auth.
-- **`ObservationHandler`** — observability hooks fired around discovery/invocation (start/stop/error),
-  so metrics/tracing can bind without the core depending on any telemetry library.
-- **Error model** — a single unchecked `AgentWeaveException` with a neutral `ErrorCategory` and the
-  protocol's native code kept as `protocolCode`; connectors map protocol-specific errors into it.
-- **Observability** — `ObservationHandler.observe(...)` is the shared helper every connector uses, so
-  all protocols report operations identically; handler exceptions are swallowed.
-- **Compatibility model** — `ComplianceReport` = `{ protocol, sdkVersion, wireRevisions[],
-  supported[], unsupported[] }`, the machine-readable, test-asserted statement of what a connector
-  actually does (principles 5, 6, 8).
+## Cross-module decisions
 
-## Key decisions
-
-- **MCP has two independent version axes.** The *wire/spec revision* is a date string (`YYYY-MM-DD`)
-  negotiated in the `initialize` handshake and marking the last backwards-incompatible change; the
-  *Java SDK major version* is SemVer (`io.modelcontextprotocol.sdk`). They are not interchangeable.
-  AgentWeave's `ComplianceReport` carries `sdkVersion` and `wireRevisions[]` as distinct fields, never
-  one "version". *"MCP V1/V2" is interpreted as SDK major versions (1.x vs 2.x) — the axis that holds
-  the real breaking API change and migration guides.* (Confirmed with the user.)
-- **Wrap, don't reimplement.** MCP and A2A connectors wrap the official Java SDKs. UTCP has no official
-  Java SDK, so its connector is implemented from the specification (recorded as a deviation risk).
-- **Bridge Reactor to a blocking-friendly core.** The MCP SDK's public API is Reactive Streams
-  (Project Reactor) with a sync facade. AgentWeave's core interfaces are blocking-friendly; the MCP
-  connector uses the SDK's `McpSyncClient` facade and keeps Reactor off the core API.
-- **No forced unification.** Tool-calling (MCP, UTCP) and agent task/messaging (A2A) stay as distinct
-  core surfaces; A2A will add its own interfaces rather than being squeezed into `ToolInvoker`.
+- **MCP has two version axes.** The wire revision is a date negotiated in `initialize`; the Java
+  SDK version is SemVer. "MCP V1/V2" means SDK majors 1.x and 2.x (confirmed with the user).
+  Reports keep the two in separate fields.
+- **Wrap, don't reimplement.** MCP and A2A wrap the official Java SDKs. UTCP has none, so it is
+  implemented from the spec, with the official Python implementation as the authority where the
+  docs disagree.
+- **One hosting contract.** Every server role is a set of async-capable servlets behind
+  `InboundAuthFilter`. Jetty and Spring Boot mount the same endpoints, so auth and caller
+  propagation behave the same everywhere. SDK resources are released on servlet `destroy()`.
+- **JSON.** Jackson 3 (`tools.jackson`) is used where AgentWeave needs JSON, matching MCP SDK 2.x
+  and Spring Boot 4. SDKs keep their own JSON internally (Gson in a2a-java, Jackson 2 in the
+  Anthropic SDK); different packages mean no conflict.
+- **No model calls.** AgentWeave never calls an LLM. Discovery's provider adapters build request
+  parts and process responses. LangChain4j and Spring AI remain the model layer (goal non-goal).
+- **Spring Boot 4.x only.** 3.5 is out of OSS support and uses Jackson 2. Server endpoints are
+  opt-in per protocol.
+- **Claims follow measurement.** Retrieval quality and model-in-the-loop effects of discovery are
+  reported only as measured by `evals/tool-discovery`, bound to a commit (see
+  `agentweave-discovery`).
 
 ## Compatibility matrix
 
-| Protocol | Spec / wire revisions | Official Java SDK | AgentWeave target |
+| Protocol | Spec / wire revisions | Official Java SDK | AgentWeave |
 |---|---|---|---|
-| **MCP** | `2024-11-05`, `2025-03-26` (Streamable HTTP, OAuth), `2025-06-18` (no JSON-RPC batching, structured output, OAuth Resource Server), `2025-11-25`, `2026-07-28` (stateless) | `io.modelcontextprotocol.sdk:mcp` — `1.x` (legacy `McpSchema`), **`2.x` GA** (tracks `2025-11-25`, Streamable-HTTP-first, SSE deprecated), `2.2.x-M` (modern stateless, `2026-07-28`) | **Built:** client, SDK **2.1.0**, stdio, wire `2024-11-05`…`2025-11-25` (offers `2025-11-25`). Streamable HTTP, SSE, server role: not built |
-| **A2A** | `1.0.0` (prior `0.3.0`, `0.2.6`, `0.1.0`); 3-layer: canonical proto data model → abstract operations → bindings | `org.a2aproject.sdk` (a2a-java), Java 17+, client+server | Target: spec **`1.0.0`**, JSON-RPC binding first. Not built |
-| **UTCP** | **`1.1`** (`1.0` deprecated, `0.1` legacy); manual at `GET /utcp` with `manual_version` + `utcp_version`; call templates per tool | **none official** (Python, TypeScript, Go only) | Target: spec **`1.1`**, HTTP manual client first (custom implementation). Not built |
+| **MCP** | `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25`, `2026-07-28` (stateless) | `io.modelcontextprotocol.sdk:mcp` 1.x, **2.x** (2.1.0 latest GA), 2.2.x milestones | Client and tool server on **SDK 2.1.0**. stdio speaks `2024-11-05`…`2025-11-25`; Streamable HTTP speaks `2025-03-26`…`2025-11-25`; both offer `2025-11-25`. Not built: SSE, MCP authorization flow, resources, prompts, sampling, roots, elicitation, `2026-07-28` |
+| **A2A** | `1.0` (prior `0.3.0`, `0.2.6`, `0.1.0`) | `org.a2aproject.sdk` **1.5.0.Final** (spec 1.0) | Client and full-lifecycle server over JSON-RPC. Not built: gRPC and HTTP+JSON bindings, card signatures, multi-tenancy |
+| **UTCP** | **`1.1`** (`1.0` manuals accepted) | none (Python, TypeScript and Go only) | Client (http, text and file manuals; http tools; api_key, basic and oauth2 auth) and manual provider. Not built: YAML, OpenAPI conversion, non-HTTP tool templates |
+
+Model providers, for discovery's native adapters: Anthropic tool search (`defer_loading` plus
+`tool_reference`; anthropic-java 3.5.0) and OpenAI Responses `tool_search` (openai-java 4.100.0,
+`gpt-5.4` and later). Gemini, Bedrock Converse and Mistral have no native tool search, so they use
+the generic meta-tools.
 
 ## Risks
 
-- **UTCP has no official Java SDK** — the connector must be built and maintained from the spec; UTCP is
-  MPL-2.0 (track licensing). Highest-uncertainty connector.
-- **MCP moves fast** (2.x just GA, 2.2 in milestones) — pin versions; isolate fully behind `core`.
-- **Domain mismatch** between A2A (tasks/messages) and MCP/UTCP (tools) — resist over-unifying the core.
-- **Reactor vs blocking** — bridge deliberately via the SDK sync facade.
-- **Licenses** — MCP MIT, A2A Apache-2.0, UTCP MPL-2.0; verify transitively before shipping.
+- UTCP is implemented from a spec whose docs and reference implementation disagree.
+  Deviations are tracked in `agentweave-utcp`.
+- SDKs move fast. Versions are pinned, and SDK workarounds live in module specs; for example, the
+  MCP session-sweeper thread leak is documented in `agentweave-mcp`.
+- LangChain4j's tool-search API is `@Experimental`.
+- Licenses: AgentWeave is MIT. The dependencies are MCP SDK (MIT), a2a-java (Apache-2.0) and the
+  Anthropic and OpenAI SDKs (MIT/Apache-2.0). The UTCP specification is MPL-2.0; it is implemented
+  from the docs, and no code is copied. ToolRet evaluation data carries no license tag, so it is
+  downloaded locally only.
 
 ## Out of scope
 
-- Sequencing/roadmap (which connector lands when) — tracked in the working plan, not in this spec.
-- Agent orchestration, planning, memory, and LLM-calling — see `agentweave-goal` non-goals.
+- Sequencing and roadmap, which are tracked in the working plan.
+- Agent orchestration, planning, memory and LLM calls (see the `agentweave-goal` non-goals).
 
 ## Sources
 
-Protocol details below were taken from official specifications and reference implementations (not from
-memory), on 2025-11-05:
+Taken from official specifications and reference implementations on 2026-11-05:
 
-- MCP versioning (date-based wire revisions): <https://spec.modelcontextprotocol.io/specification/versioning>
-- MCP `2025-06-18` changelog: <https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-06-18/changelog.mdx>
-- MCP Java SDK (versions, transports, architecture): <https://github.com/modelcontextprotocol/java-sdk> and its releases (`v2.0.0` GA, `v2.1.0`, `v2.2.0-M1`; `MIGRATION-1.0.md`, `MIGRATION-2.0.md`)
-- Spring AI MCP (Spring Boot integration): <https://docs.spring.io/spring-ai/reference/2.0-SNAPSHOT/api/mcp/mcp-overview.html>
-- A2A specification `1.0.0` (overview, bindings, agent discovery): <https://a2a-protocol.org/latest/specification/>
-- A2A Java SDK: <https://github.com/a2aproject/a2a-java>
-- UTCP specification (`1.1` introduction, RFC): <https://www.utcp.io/> and <https://github.com/universal-tool-calling-protocol/utcp-specification>
+- MCP:
+  - [Versioning](https://spec.modelcontextprotocol.io/specification/versioning)
+  - [Java SDK](https://github.com/modelcontextprotocol/java-sdk), its releases (`v2.0.0`,
+    `v2.1.0`, `v2.2.0-M2`) and its `MIGRATION-1.0.md` / `MIGRATION-2.0.md`
+- A2A:
+  - [Specification 1.0](https://a2a-protocol.org/latest/specification/)
+  - [a2a-java](https://github.com/a2aproject/a2a-java), at `v1.5.0.Final`
+- UTCP:
+  - [utcp.io](https://www.utcp.io/)
+  - [Specification repository](https://github.com/universal-tool-calling-protocol/utcp-specification)
+  - [python-utcp](https://github.com/universal-tool-calling-protocol/python-utcp) at `bb8e2f6`
+- Tool search:
+  - [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
+  - [OpenAI](https://developers.openai.com/api/docs/guides/tools-tool-search)
+- Spring Boot:
+  - [Support generations](https://api.spring.io/projects/spring-boot/generations)
+  - [Developing auto-configuration](https://docs.spring.io/spring-boot/reference/features/developing-auto-configuration.html)

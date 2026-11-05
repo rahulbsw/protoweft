@@ -7,16 +7,23 @@ title: AgentWeave — interoperable agent & tool protocols for Java
 
 # AgentWeave
 
-*A small Java framework that makes it easy to add interoperable agent and tool protocols — MCP, A2A, UTCP — to any Java application.*
+*The protocol backbone for Java agents: MCP, A2A and UTCP behind one protocol-neutral API, in both
+directions, plugged into LangChain4j, Spring Boot or plain Java.*
 
 ## Goal
 
-Let Java applications speak the emerging agent/tool interoperability protocols through one
-protocol-neutral programming model, instead of coupling to any single protocol's SDK and wire
-format. A plain Java app, a bespoke agent framework, or a Spring Boot service should all be able to
-discover and call tools (and, later, talk agent-to-agent) over whichever protocol the other side
-speaks, while the application code stays written against stable, protocol-neutral AgentWeave
-interfaces.
+Be the go-to Java layer for agent and tool interoperability, the way LangChain became the go-to layer
+for composing LLM applications. The scope is protocols, not model orchestration.
+
+Java applications speak the emerging interoperability protocols through one protocol-neutral
+programming model instead of coupling to any one protocol's SDK and wire format:
+
+- **Consume** tools and agents over whichever protocol the other side speaks.
+- **Publish** their own tools and agents.
+- **Discover** the right capability among thousands without flooding the model's context.
+
+A plain Java app, a bespoke agent framework, a LangChain4j agent or a Spring Boot service all use the
+same stable interfaces.
 
 ## Problem
 
@@ -35,6 +42,11 @@ protocol-specific types, auth, and error handling through their application. Ver
 it worse: MCP alone carries two independent version axes — the date-based wire revision and the Java
 SDK major version — that are routinely conflated. There is no neutral Java seam that lets an
 application target "a tool" or "an agent" and swap the protocol underneath.
+
+Scale adds a second problem. An application connected to many servers and manuals has more tools than
+it should send to a model on every turn: every schema costs context tokens, and selection gets harder
+as the list grows. Java frameworks offer tool search only for their own tools and their own model
+clients. None does it across protocols with permission and availability filtering.
 
 ## Target users
 
@@ -67,32 +79,51 @@ These are durable design commitments; every change is held against them.
    (notably MCP), AgentWeave models them as separate, explicit fields and never collapses them.
 9. **Protocol-specific types stay out of the shared core API** unless genuinely needed by more than
    one integration.
+10. **Both directions.** Every supported protocol has a client and a server role, behind one hosting
+    contract and one inbound-authentication hook.
+11. **No model calls.** AgentWeave never calls an LLM. Where a model provider has a native feature
+    (such as tool search), AgentWeave builds the request parts and the application or its framework
+    sends them.
+12. **Claims follow measurement.** Effects on model behavior, such as tool-selection accuracy with
+    discovery, are stated only as measured by the evaluation harness, bound to a commit, never
+    assumed.
 
 ## Capabilities
 
 What AgentWeave provides:
 
-- A **protocol-neutral core**: value types for tools, invocations, and outcomes; a `ToolConnector`
-  interface and a `ProtocolConnector` SPI; a neutral error model; and extension points for
-  authentication/credentials, configuration, and observability.
-- **Pluggable protocol connectors** — MCP, A2A, and UTCP — each a separate module implementing the
-  core SPIs behind stable Java interfaces.
-- An **optional Spring Boot starter** that auto-configures the core and selected connectors.
-- **Explicit, testable compatibility reporting** per connector (protocol + SDK version + wire
-  revisions + supported/unsupported features).
-- **A runnable example** per integration demonstrating the extension model end to end.
-
-### Smallest useful first build
-
-The protocol-neutral **core** plus **one end-to-end MCP client connector** (stdio transport, wrapping
-MCP Java SDK 2.x targeting wire revision 2025-11-25), exposing `ToolConnector`, publishing
-a compliance report, with focused tests and a runnable example. It must be straightforward to add the
-A2A and UTCP connectors and the Spring starter against the same core, without reworking it.
+- **A protocol-neutral core:**
+  - tool sources, connectors and a namespaced tool registry
+  - `@AgentTool` methods with JSON Schema generated from Java types
+  - a neutral agent model covering the full task lifecycle
+  - credentials, inbound authentication, observability and one error model
+- **Protocol modules, each with client and server:**
+  - **MCP**, over stdio and Streamable HTTP.
+  - **A2A**: an agent client, plus a full-lifecycle agent server (tasks, streaming, input-required,
+    cancel, resubscribe, push notifications, extended card).
+  - **UTCP**: a manual client, plus a manual provider for the app's own tools.
+- **Hosting:** the same endpoints in embedded Jetty or Spring Boot, each behind the same
+  authentication hook.
+- **Tool discovery:**
+  - A provider-neutral capability catalog: hybrid keyword and semantic search; exact filters for
+    protocol, version, permissions and availability; a low-confidence fallback; per-conversation
+    sessions.
+  - Generic search meta-tools for any model.
+  - Native tool-search request parts for Anthropic and OpenAI.
+- **Integrations:**
+  - **LangChain4j:** AgentWeave tools in AI services, AI services served as A2A agents, `@Tool`
+    methods served over MCP and UTCP, and catalog-backed tool search.
+  - **Spring Boot 4 starter:** connectors from configuration, opt-in endpoints, Spring Security,
+    Micrometer and Actuator.
+- **Explicit, tested compatibility reporting** per connector.
+- **An evaluation harness** that measures discovery against an all-tools baseline.
+- **Runnable examples** and a documentation site.
 
 ## Non-goals
 
-- **Not an agent runtime or orchestration engine.** AgentWeave is the protocol seam, not a planner,
-  memory store, or LLM client.
+- **Not an agent runtime, orchestration engine or LLM client.** AgentWeave is the protocol layer, not
+  a planner, memory store, prompt-chaining library or RAG framework. LangChain4j and Spring AI are the
+  model layer that AgentWeave plugs into.
 - **Not a reimplementation of the protocol SDKs.** Where an official Java SDK exists (MCP, A2A),
   AgentWeave wraps it rather than re-deriving the wire format. (UTCP has no official Java SDK, so its
   connector is implemented directly from the specification.)
@@ -104,9 +135,12 @@ A2A and UTCP connectors and the Spring starter against the same core, without re
 
 | Aspect | Choice | Rationale |
 |---|---|---|
-| Language baseline | Java 17 (LTS) | Required floor of both wrapped SDKs (MCP java-sdk, a2a-java) and of Spring Boot 3.x; widest enterprise reach. |
-| Build | Gradle (Kotlin DSL), multi-module | Chosen for multi-module ergonomics, version catalogs, and convention plugins. |
-| JSON | Jackson behind a core abstraction | Mirrors the MCP SDK's own pluggable-Jackson approach; keeps a JSON library out of the core API. |
+| Language baseline | Java 17 (LTS) | The floor of every wrapped SDK (MCP, a2a-java, LangChain4j, the Anthropic and OpenAI SDKs) and of Spring Boot 4; widest enterprise reach. |
+| Build | Gradle (Kotlin DSL), multi-module, with a BOM | Multi-module ergonomics; one BOM aligns versions for users. |
+| JSON | No JSON library in the core; Jackson 3 where AgentWeave needs JSON | Matches MCP SDK 2.x and Spring Boot 4; the core stays dependency-free. |
+| Spring | Spring Boot 4.x only | 3.5 is out of OSS support, and 4.x defaults to Jackson 3. |
+| Docs | Zensical (`mkdocs.yml`) on GitHub Pages, plus aggregated Javadoc | The maintained successor of Material for MkDocs. |
+| License | MIT | Chosen by the project owner. |
 
 See the architecture spec (`agentweave-architecture`) for the module layout, the per-protocol
 compatibility matrix, and the cited sources.

@@ -34,6 +34,11 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
   agents (as an `ask` tool) as `<source>.<tool>`.
 - **Honest compatibility.** Every connector publishes a `ComplianceReport` with the SDK version, the
   wire revisions it speaks, the negotiated revision, and the supported and unsupported features.
+- **Tool discovery at scale.** A provider-neutral capability catalog keeps short cards apart from
+  full schemas. It searches with hybrid keyword and semantic ranking and applies exact filters
+  (protocol, version, permissions, availability). A low-confidence fallback broadens the search.
+  Models use it through generic meta-tools or through Anthropic's and OpenAI's native tool search.
+  Effects are [measured](docs/discovery/evaluation.md), not assumed.
 - **Framework-neutral.** The core has no dependencies. LangChain4j and Spring Boot support are
   optional modules on top.
 
@@ -59,7 +64,10 @@ AgentWeave is not an LLM framework: it has no model clients, chains, memory or R
 | `agentweave-a2a` | A2A client and agent server (JSON-RPC). |
 | `agentweave-utcp` | UTCP client and manual provider. |
 | `agentweave-server`, `agentweave-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
-| `agentweave-langchain4j` | LangChain4j adapter: tools in, agents and `@Tool`s out. |
+| `agentweave-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
+| `agentweave-discovery-embeddings` | Offline (bge-small, MiniLM) and LangChain4j-backed embedders. |
+| `agentweave-discovery-anthropic` / `-openai` | Typed native tool-search adapters on the official SDKs. |
+| `agentweave-langchain4j` | LangChain4j adapter: tools in, agents and `@Tool`s out, and catalog tool search. |
 | `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration with opt-in servers, Micrometer and Actuator. |
 | `agentweave-bom` | Version alignment. |
 
