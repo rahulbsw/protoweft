@@ -95,9 +95,14 @@ public final class McpToolServer {
      * authenticated caller reaches the tools. Configure it before the host calls
      * {@link #endpoints()}.
      */
-    public static final class Http implements ServerEndpointProvider {
+    public static final class Http implements ServerEndpointProvider, AutoCloseable {
+
+        /** Read once: building a provider starts its session sweeper, so it is closed right away. */
+        private static final List<String> HTTP_REVISIONS = httpRevisions();
 
         private final Settings settings;
+        private HttpServletStreamableServerTransportProvider transport;
+        private SweeperCapture.Captured<HttpServletStreamableServerTransportProvider> built;
         private String path = "/mcp";
         private final List<String> allowedOrigins = new ArrayList<>();
         private List<ServletEndpoint> endpoints;
@@ -151,8 +156,33 @@ public final class McpToolServer {
 
         /** What this server implements; the revision is negotiated per session, so none is set. */
         public ComplianceReport compliance() {
-            return ToolServerCore.compliance(McpFeatures.TRANSPORT_STREAMABLE_HTTP,
-                    HttpServletStreamableServerTransportProvider.builder().build().protocolVersions());
+            return ToolServerCore.compliance(McpFeatures.TRANSPORT_STREAMABLE_HTTP, HTTP_REVISIONS);
+        }
+
+        /**
+         * Closes all MCP sessions and stops the SDK's session sweeper thread. Hosts also
+         * trigger this when they destroy the endpoint's servlet. Safe to call more than once.
+         */
+        @Override
+        public synchronized void close() {
+            if (transport != null) {
+                try {
+                    transport.closeGracefully().block();
+                } finally {
+                    built.shutdownSweepers();
+                    transport = null;
+                }
+            }
+        }
+
+        private static List<String> httpRevisions() {
+            var probe = SweeperCapture.build(() -> HttpServletStreamableServerTransportProvider.builder().build());
+            try {
+                return List.copyOf(probe.value().protocolVersions());
+            } finally {
+                probe.value().closeGracefully().block();
+                probe.shutdownSweepers();
+            }
         }
 
         /**
@@ -164,17 +194,19 @@ public final class McpToolServer {
         @Override
         public synchronized List<ServletEndpoint> endpoints() {
             if (endpoints == null) {
-                HttpServletStreamableServerTransportProvider transport = HttpServletStreamableServerTransportProvider
+                built = SweeperCapture.build(() -> HttpServletStreamableServerTransportProvider
                         .builder()
                         .mcpEndpoint(path)
                         .contextExtractor(request -> McpTransportContext.create(
                                 Map.of(ToolServerCore.CALLER_KEY, InboundAuthFilter.caller(request))))
                         .httpHeaderValidator(DefaultServerTransportSecurityValidator.builder()
                                 .allowedOrigins(List.copyOf(allowedOrigins)).build())
-                        .build();
+                        .build());
+                transport = built.value();
                 settings.core().build(McpServer.async(transport));
                 String name = "/mcp".equals(path) ? "mcp" : "mcp:" + path;
-                endpoints = List.of(new ServletEndpoint(name, ProtocolId.MCP, List.of(path), transport, true));
+                endpoints = List.of(new ServletEndpoint(name, ProtocolId.MCP, List.of(path),
+                        new ClosingServlet(transport, this::close), true));
             }
             return endpoints;
         }

@@ -116,6 +116,27 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
 - **stdio serving.** `Stdio.run()` blocks until stdin reaches EOF, then closes the server.
   While it runs, `System.out` is redirected to `System.err`, so stray prints can't corrupt the
   JSON-RPC stream. Applications must still configure logging to stderr.
+- **Tool metadata.** `ToolSpec` metadata hints (read-only, destructive, idempotent,
+  open-world, title) map to and from MCP tool annotations in both directions. Only the hints a
+  server actually sets are carried over.
+
+## SDK workarounds
+
+- **Session sweeper thread leak (SDK 2.1.0; still present on `main` and in `v2.2.0-M2`).**
+  `HttpServletStreamableServerTransportProvider` runs its idle-session sweeper on
+  `Schedulers.newSingle(...)`, Reactor's single-thread scheduler. Its thread is non-daemon, and
+  `closeGracefully()` only disposes the subscription, never the scheduler, so a host that stops
+  the server never exits.
+  - **Workaround:** while building the provider, `SweeperCapture` registers Reactor's official
+    `Schedulers.addExecutorServiceDecorator` hook, keyed and removed immediately after. It records
+    the sweeper's executor, and `McpToolServer.Http.close()` shuts that executor down after
+    `closeGracefully()`.
+  - **Triggers:** `ClosingServlet` calls `close()` when the host destroys the servlet, so Jetty
+    stop and Spring shutdown both release it.
+  - **Why not disable the sweeper:** abandoned sessions would accumulate on long-running
+    servers.
+  - **Regression test:** `McpToolServerShutdownTest`. Remove the workaround once the SDK disposes
+    its scheduler.
 
 ## Coverage
 
