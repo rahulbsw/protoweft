@@ -242,7 +242,8 @@ public final class UtcpClientConnector implements ToolConnector {
     }
 
     private static ToolSpec spec(String name, Manual.Tool tool) {
-        return new ToolSpec(name, tool.description(), Json.object(withoutNulls(tool.inputs())));
+        Map<String, Object> metadata = tool.tags().isEmpty() ? Map.of() : Map.of(ToolSpec.META_TAGS, tool.tags());
+        return new ToolSpec(name, tool.description(), Json.object(withoutNulls(tool.inputs())), metadata);
     }
 
     /** The reference serializes unset JSON Schema keywords as null; null there means absent. */

@@ -161,7 +161,18 @@ public final class LocalTools implements ToolSource {
                 }
             }
             method.setAccessible(true);
-            ToolSpec spec = new ToolSpec(toolName, annotation.description(), JavaTypes.objectSchema(properties, required));
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            if (annotation.tags().length > 0) {
+                metadata.put(ToolSpec.META_TAGS, List.of(annotation.tags()));
+            }
+            if (annotation.readOnly()) {
+                metadata.put(ToolSpec.META_READ_ONLY, true);
+            }
+            if (annotation.destructive()) {
+                metadata.put(ToolSpec.META_DESTRUCTIVE, true);
+            }
+            ToolSpec spec = new ToolSpec(toolName, annotation.description(),
+                    JavaTypes.objectSchema(properties, required), metadata);
             return new LocalTool(spec, (args, caller) -> {
                 Object[] values = new Object[params.length];
                 for (int i = 0; i < params.length; i++) {

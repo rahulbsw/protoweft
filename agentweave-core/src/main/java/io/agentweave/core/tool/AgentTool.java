@@ -35,4 +35,13 @@ public @interface AgentTool {
 
     /** What the tool does, written for a model deciding whether to call it. */
     String description();
+
+    /** Keywords that help discovery find the tool. */
+    String[] tags() default {};
+
+    /** The tool doesn't modify its environment. Published as MCP {@code readOnlyHint}. */
+    boolean readOnly() default false;
+
+    /** The tool may perform destructive updates. Published as MCP {@code destructiveHint}. */
+    boolean destructive() default false;
 }

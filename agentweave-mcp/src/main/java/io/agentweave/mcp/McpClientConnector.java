@@ -130,9 +130,34 @@ public final class McpClientConnector implements ToolConnector {
         McpSchema.ListToolsResult result = observe("tools/list", "", c::listTools);
         List<ToolSpec> tools = new ArrayList<>(result.tools().size());
         for (McpSchema.Tool t : result.tools()) {
-            tools.add(new ToolSpec(t.name(), t.description(), t.inputSchema()));
+            tools.add(new ToolSpec(t.name(), t.description(), t.inputSchema(), metadata(t)));
         }
         return List.copyOf(tools);
+    }
+
+    /** MCP tool annotations are hints; only the ones the server set are carried over. */
+    private static Map<String, Object> metadata(McpSchema.Tool t) {
+        Map<String, Object> meta = new HashMap<>();
+        if (t.title() != null) {
+            meta.put(ToolSpec.META_TITLE, t.title());
+        }
+        McpSchema.ToolAnnotations a = t.annotations();
+        if (a != null) {
+            if (a.title() != null && t.title() == null) {
+                meta.put(ToolSpec.META_TITLE, a.title());
+            }
+            putIfSet(meta, ToolSpec.META_READ_ONLY, a.readOnlyHint());
+            putIfSet(meta, ToolSpec.META_DESTRUCTIVE, a.destructiveHint());
+            putIfSet(meta, ToolSpec.META_IDEMPOTENT, a.idempotentHint());
+            putIfSet(meta, ToolSpec.META_OPEN_WORLD, a.openWorldHint());
+        }
+        return meta;
+    }
+
+    private static void putIfSet(Map<String, Object> meta, String key, Boolean value) {
+        if (value != null) {
+            meta.put(key, value);
+        }
     }
 
     @Override

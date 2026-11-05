@@ -56,13 +56,36 @@ final class ToolServerCore {
         this.requestTimeout = requestTimeout;
     }
 
+    /** Publishes ToolSpec metadata hints as MCP tool annotations. */
+    private static McpSchema.Tool toMcpTool(ToolSpec tool, Map<String, Object> schema) {
+        McpSchema.Tool.Builder b = McpSchema.Tool.builder(tool.name(), schema).description(tool.description());
+        Map<String, Object> meta = tool.metadata();
+        if (meta.get(ToolSpec.META_TITLE) instanceof String title) {
+            b.title(title);
+        }
+        if (meta.keySet().stream().anyMatch(k -> k.equals(ToolSpec.META_READ_ONLY) || k.equals(ToolSpec.META_DESTRUCTIVE)
+                || k.equals(ToolSpec.META_IDEMPOTENT) || k.equals(ToolSpec.META_OPEN_WORLD))) {
+            b.annotations(McpSchema.ToolAnnotations.builder()
+                    .readOnlyHint(bool(meta, ToolSpec.META_READ_ONLY))
+                    .destructiveHint(bool(meta, ToolSpec.META_DESTRUCTIVE))
+                    .idempotentHint(bool(meta, ToolSpec.META_IDEMPOTENT))
+                    .openWorldHint(bool(meta, ToolSpec.META_OPEN_WORLD))
+                    .build());
+        }
+        return b.build();
+    }
+
+    private static Boolean bool(Map<String, Object> meta, String key) {
+        return meta.get(key) instanceof Boolean value ? value : null;
+    }
+
     /** Builds the SDK server on {@code spec}; the tool list is snapshotted now. */
     McpAsyncServer build(McpServer.AsyncSpecification<?> spec) {
         List<AsyncToolSpecification> specs = new ArrayList<>();
         for (ToolSpec tool : tools.listTools()) {
             Map<String, Object> schema = tool.inputSchema().isEmpty() ? EMPTY_OBJECT_SCHEMA : tool.inputSchema();
             specs.add(AsyncToolSpecification.builder()
-                    .tool(McpSchema.Tool.builder(tool.name(), schema).description(tool.description()).build())
+                    .tool(toMcpTool(tool, schema))
                     .callHandler((exchange, request) -> call(exchange.transportContext(), request))
                     .build());
         }

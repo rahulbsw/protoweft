@@ -58,7 +58,7 @@ public final class ToolRegistry implements ToolSource, AutoCloseable {
         List<ToolSpec> all = new ArrayList<>();
         for (Map.Entry<String, ToolSource> e : snapshot().entrySet()) {
             for (ToolSpec spec : e.getValue().listTools()) {
-                all.add(new ToolSpec(e.getKey() + SEPARATOR + spec.name(), spec.description(), spec.inputSchema()));
+                all.add(spec.withName(e.getKey() + SEPARATOR + spec.name()));
             }
         }
         return List.copyOf(all);
