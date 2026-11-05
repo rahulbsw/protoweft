@@ -1,105 +1,121 @@
 # AgentWeave
 
-A small Java framework for adding interoperable agent and tool protocols (MCP, A2A, UTCP) to
-Java applications, behind one protocol-neutral API.
+**The protocol backbone for Java agents.** AgentWeave puts the agent and tool interoperability
+protocols — [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org) and
+[UTCP](https://www.utcp.io) — behind one protocol-neutral Java 17 API, in both the client and the
+server role, with optional LangChain4j and Spring Boot 4 integrations.
 
-> **Status: first vertical slice.** Only the protocol-neutral core and an **MCP stdio client** are
-> implemented. A2A, UTCP, other MCP transports, and the Spring Boot starter are not built yet.
-> Every connector publishes a `ComplianceReport` stating exactly what it implements.
+```java
+public class Weather {
+    @AgentTool(description = "Current temperature in a city, in Celsius")
+    public double temperature(@ToolParam(description = "City name") String city) { return 21.5; }
+}
+
+LocalTools tools = LocalTools.builder().scan(new Weather()).build();
+
+// Serve the tool over MCP and UTCP from one embedded server...
+AgentWeaveServer server = AgentWeaveServer.builder().port(8080)
+        .endpoints(McpToolServer.http(tools), UtcpManualProvider.builder(tools).build())
+        .start();
+
+// ...and call any MCP server through the same protocol-neutral API.
+ToolConnector mcp = McpClientConnector.http("http://localhost:8080").build();
+mcp.start();
+System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "Oslo"))).text());   // 21.5
+```
+
+## Features
+
+- **One API, three protocols.** Application code depends on `ToolSource`, `ToolConnector` and
+  `AgentConnector`; only the builder call names a protocol.
+- **Client and server for every protocol.** Consume MCP servers, UTCP manuals and A2A agents;
+  publish tools over MCP and UTCP and agents over A2A, all behind one `InboundAuthenticator`.
+- **One tool registry.** `ToolRegistry` namespaces local methods, MCP servers, UTCP manuals and A2A
+  agents (as an `ask` tool) as `<source>.<tool>`.
+- **Honest compatibility.** Every connector publishes a `ComplianceReport` with the SDK version, the
+  wire revisions it speaks, the negotiated revision, and the supported and unsupported features.
+- **Framework-neutral.** The core has no dependencies. LangChain4j and Spring Boot support are
+  optional modules on top.
+
+## Protocol support
+
+| Protocol | Client | Server | Transport / binding | Specification | Built on |
+|---|---|---|---|---|---|
+| MCP | `McpClientConnector` | `McpToolServer` | stdio, Streamable HTTP | `2024-11-05` to `2025-11-25` | MCP Java SDK `2.1.0` |
+| A2A | `A2aAgentConnector` | `A2aAgentServer` | JSON-RPC, SSE streaming | `1.0` | a2a-java `1.5.0.Final` |
+| UTCP | `UtcpClientConnector` | `UtcpManualProvider` | HTTP, text and file manuals; `http` and `text` tools | `1.1` (accepts `1.0`) | implemented from the spec |
+
+Coverage and limitations are documented per protocol in the [user guide](docs/index.md).
+
+AgentWeave is not an LLM framework: it has no model clients, chains, memory or RAG. Use it with
+[LangChain4j](https://docs.langchain4j.dev) or [Spring AI](https://spring.io/projects/spring-ai).
 
 ## Modules
 
-| Module | What it is | Depends on |
-|---|---|---|
-| `agentweave-core` | Protocol-neutral types and SPIs. No dependencies. | — |
-| `agentweave-mcp` | MCP client connector (stdio), wrapping the official MCP Java SDK 2.x | core, `io.modelcontextprotocol.sdk:mcp` |
-| `examples/mcp-client-example` | Runnable example | core, mcp |
+| Artifact | What it is |
+|---|---|
+| `agentweave-core` | Protocol-neutral API. No dependencies. |
+| `agentweave-mcp` | MCP client and tool server (stdio, Streamable HTTP). |
+| `agentweave-a2a` | A2A client and agent server (JSON-RPC). |
+| `agentweave-utcp` | UTCP client and manual provider. |
+| `agentweave-server`, `agentweave-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
+| `agentweave-langchain4j` | LangChain4j adapter: tools in, agents and `@Tool`s out. |
+| `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration with opt-in servers, Micrometer and Actuator. |
+| `agentweave-bom` | Version alignment. |
 
-Requirements: Java 17+. Build with the Gradle wrapper: `./gradlew build`.
+## Getting started
 
-## Using it (plain Java, no framework)
+Requirements: Java 17 or newer. AgentWeave `0.1.0-SNAPSHOT` isn't on Maven Central yet; build it
+and install it into your local Maven repository:
 
-Application code depends on `ToolConnector` from the core. Only the line that builds the
-connector names a protocol:
+```bash
+./gradlew build                 # compile and test everything
+./gradlew publishToMavenLocal   # io.agentweave:*:0.1.0-SNAPSHOT into ~/.m2
+```
 
-```java
-try (ToolConnector tools = McpClientConnector
-        .stdio("npx", "-y", "@modelcontextprotocol/server-everything")
-        .requestTimeout(Duration.ofSeconds(30))
-        .credentials((protocol, target) -> List.of(new Credential.NamedSecret("API_KEY", secret)))
-        .observations(myObservationHandler)
-        .build()) {
-    tools.start();                                   // spawns the server, negotiates the revision
-    tools.listTools().forEach(t -> System.out.println(t.name()));
-    ToolOutcome out = tools.invoke(ToolInvocation.of("echo", Map.of("message", "hi")));
-    if (out.error()) { /* the tool ran and reported a failure */ }
-    System.out.println(out.text());
+Then, in your project:
+
+```kotlin
+repositories { mavenLocal(); mavenCentral() }
+
+dependencies {
+    implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
+    implementation("io.agentweave:agentweave-mcp")
+    implementation("io.agentweave:agentweave-server-jetty")
 }
 ```
 
-- **Errors.** A tool that runs and fails returns `ToolOutcome.error() == true`. An
-  `AgentWeaveException` means the call itself couldn't be made. It carries a neutral `ErrorCategory`
-  and, where available, the protocol's native error code.
-- **Credentials.** Supplied through `CredentialProvider`. Over MCP stdio, `NamedSecret`s become
-  environment variables of the server process, because MCP stdio servers take credentials from
-  their environment. Bearer tokens are rejected, since the MCP HTTP authorization flow isn't
-  implemented.
-- **Observability.** Implement `ObservationHandler` to get start, success, and error events
-  (with latency) for `initialize`, `tools/list`, and `tools/call`. Handler exceptions are swallowed
-  and never break a call.
-
-## Running the example
+Run an example:
 
 ```bash
-./gradlew :examples:mcp-client-example:run
-# against the official reference server (needs Node):
-./gradlew :examples:mcp-client-example:run --args="npx -y @modelcontextprotocol/server-everything"
+./gradlew :examples:mcp-client-example:run          # MCP client against a bundled stdio server
+./gradlew :examples:plain-java-gateway:run          # one tool and agent over MCP, UTCP and A2A
+./gradlew :examples:spring-boot-example:bootRun     # the same in Spring Boot
 ```
 
-With no arguments it launches a bundled Java demo server and calls its `greet` tool. Output
-includes the compliance report:
+## Documentation
 
-```
-SDK:               io.modelcontextprotocol.sdk:mcp 2.1.0
-Wire revisions:    [2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25]
-Negotiated:        2025-11-25
-```
+- [Getting started](docs/getting-started.md)
+- Concepts: [architecture](docs/concepts/architecture.md), [tools](docs/concepts/tools.md),
+  [agents](docs/concepts/agents.md), [security](docs/concepts/security.md),
+  [errors and observability](docs/concepts/errors-and-observability.md),
+  [versions and compliance](docs/concepts/compliance.md)
+- Protocols: [MCP](docs/protocols/mcp.md), [A2A](docs/protocols/a2a.md), [UTCP](docs/protocols/utcp.md)
+- Integrations: [Spring Boot](docs/integrations/spring-boot.md),
+  [LangChain4j](docs/integrations/langchain4j.md), [embedded Jetty](docs/integrations/jetty.md)
+- [Examples](docs/examples.md), [troubleshooting](docs/operations/troubleshooting.md)
 
-## Versions: SDK version ≠ wire revision
+The documentation site is built with [Zensical](https://zensical.org) (`zensical build`), and the
+API reference with `./gradlew aggregateJavadoc`.
 
-MCP has two independent version axes, and AgentWeave keeps them in separate fields:
+Design decisions and their sources are recorded as specs: [`goal-and-requirements.md`](goal-and-requirements.md),
+[`architecture.md`](architecture.md), and a `SPEC.md` in each module.
 
-- **Wire/specification revision**: a date (`2025-11-25`), negotiated per connection during
-  `initialize`.
-- **Java SDK version**: SemVer (`2.1.0`). SDK 2.x speaks wire revisions `2024-11-05` through
-  `2025-11-25` over stdio.
+## Contributing and security
 
-"MCP V1/V2" in this project means **SDK major versions 1.x and 2.x**. This slice targets SDK 2.x.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
-## MCP coverage (this slice)
+## License
 
-Implemented: stdio transport, version negotiation, `tools/list` (with pagination), `tools/call`,
-text/image/audio content, and structured tool output.
-
-Not implemented (declared in `ComplianceReport.unsupported()`): Streamable HTTP and SSE
-transports, authorization, resources, prompts, completion, logging, progress, cancellation,
-sampling, roots, elicitation, `tools/list_changed` notifications, and resource/resource-link
-content. Resource and resource-link parts in results appear as `Content.Unmapped` instead of
-being silently dropped.
-
-## Adding a protocol connector
-
-1. Create a module that depends on `agentweave-core` (and on the protocol's SDK, if one exists).
-2. Implement `ToolConnector` for tool-calling protocols, or `ProtocolConnector` plus your own
-   interface for different domains (for example A2A tasks).
-3. Publish an honest `ComplianceReport`, map protocol errors onto `ErrorCategory`, and run
-   operations through `ObservationHandler.observe(...)`.
-4. Assert the report in tests.
-
-## Design
-
-Specs, with rationale and official sources:
-
-- [`goal-and-requirements.md`](goal-and-requirements.md): goal, principles, non-goals
-- [`architecture.md`](architecture.md): modules, SPIs, compatibility matrix, risks, sources
-- [`agentweave-mcp/SPEC.md`](agentweave-mcp/SPEC.md): MCP connector decisions and deviations
+[MIT](LICENSE)
