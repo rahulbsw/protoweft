@@ -3,9 +3,11 @@ import com.vanniktech.maven.publish.JavaPlatform
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import com.vanniktech.maven.publish.SourcesJar
+import org.cyclonedx.gradle.CyclonedxDirectTask
 
 plugins {
     id("com.vanniktech.maven.publish.base") version "0.37.0" apply false
+    id("org.cyclonedx.bom") version "3.5.1"
 }
 
 allprojects {
@@ -132,6 +134,15 @@ configure(subprojects.filter { it.buildFile.exists() && it.name != "agentweave-b
 
 configure(libraryProjects) {
     publishToCentral(JavaLibrary(JavadocJar.Javadoc(), SourcesJar.Sources()))
+}
+
+// SBOM (`./gradlew cyclonedxBom` -> build/reports/cyclonedx/bom.json): runtime dependencies of the
+// published libraries only; examples, evals, conformance apps and the build itself are left out.
+allprojects {
+    tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
+        enabled = project in libraryProjects
+        includeConfigs = listOf("runtimeClasspath")
+    }
 }
 
 project(":agentweave-bom") {
