@@ -29,7 +29,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * <p>Thread-safe. Flows for the same resource are serialized; different resources proceed in parallel.
  */
-public final class OAuthClient {
+public final class OAuthClient implements io.agentweave.core.auth.HttpAuthorizer {
 
     /** The grant used to obtain tokens. */
     public enum Grant {
@@ -87,6 +87,18 @@ public final class OAuthClient {
      */
     public static URI canonicalResource(URI resource) {
         return Uris.canonical(resource);
+    }
+
+    /** {@code Bearer <token>} from the cache (refreshing if possible); no interactive flow. */
+    @Override
+    public Optional<String> authorization(URI resource) {
+        return cachedToken(resource).map(token -> "Bearer " + token);
+    }
+
+    /** Runs discovery, registration and the configured grant for a 401/403 challenge. */
+    @Override
+    public boolean onChallenge(URI resource, int status, String wwwAuthenticate) {
+        return handleUnauthorized(resource, wwwAuthenticate, status).shouldRetry();
     }
 
     /**

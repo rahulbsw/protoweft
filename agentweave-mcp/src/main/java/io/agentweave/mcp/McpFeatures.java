@@ -83,6 +83,26 @@ public final class McpFeatures {
         return Set.copyOf(s);
     }
 
+    /**
+     * The client's coverage: {@link #AUTHORIZATION} moves to supported when an
+     * {@code HttpAuthorizer} (for example agentweave-oauth's {@code OAuthClient}) is configured.
+     */
+    static Set<String> clientSupported(String transport, boolean authorizer) {
+        Set<String> s = new HashSet<>(supported(Role.CLIENT, transport));
+        if (authorizer) {
+            s.add(AUTHORIZATION);
+        }
+        return Set.copyOf(s);
+    }
+
+    static Set<String> clientUnsupported(String transport, boolean authorizer) {
+        Set<String> s = new HashSet<>(unsupported(Role.CLIENT, transport));
+        if (authorizer) {
+            s.remove(AUTHORIZATION);
+        }
+        return Set.copyOf(s);
+    }
+
     private static void requireTransport(String transport) {
         if (!TRANSPORTS.contains(transport)) {
             throw new IllegalArgumentException("not an implemented transport: " + transport);

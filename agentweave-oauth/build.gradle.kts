@@ -8,6 +8,7 @@ dependencies {
     compileOnly("jakarta.servlet:jakarta.servlet-api:${project.property("servletApiVersion")}")
 
     testImplementation(project(":agentweave-server-jetty"))
+    testImplementation(project(":agentweave-mcp"))
     testImplementation("jakarta.servlet:jakarta.servlet-api:${project.property("servletApiVersion")}")
     testImplementation(platform("org.junit:junit-bom:${project.property("junitVersion")}"))
     testImplementation("org.junit.jupiter:junit-jupiter")

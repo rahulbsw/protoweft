@@ -10,6 +10,9 @@ import io.modelcontextprotocol.client.transport.StdioClientTransport;
 import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.modelcontextprotocol.spec.McpClientTransport;
 
+import io.agentweave.core.auth.HttpAuthorizer;
+import io.modelcontextprotocol.client.transport.customizer.McpHttpClientTransportAuthorizationErrorHandler;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -24,6 +27,11 @@ sealed interface ClientTransport permits ClientTransport.Stdio, ClientTransport.
 
     /** The {@link McpFeatures} id of this transport. */
     String featureId();
+
+    /** Whether requests are authorized on demand (MCP authorization); only HTTP can. */
+    default boolean authorizes() {
+        return false;
+    }
 
     /** The {@code target} handed to the credential provider. */
     String credentialTarget();
@@ -88,10 +96,21 @@ sealed interface ClientTransport permits ClientTransport.Stdio, ClientTransport.
     }
 
     /** Streamable HTTP; credentials become request headers. */
-    record Http(String baseUrl, String endpoint, Map<String, String> headers) implements ClientTransport {
+    record Http(String baseUrl, String endpoint, Map<String, String> headers, HttpAuthorizer authorizer)
+            implements ClientTransport {
 
         public Http {
             headers = Map.copyOf(headers);
+        }
+
+        @Override
+        public boolean authorizes() {
+            return authorizer != null;
+        }
+
+        /** The MCP endpoint URL: the OAuth resource the authorizer obtains tokens for. */
+        URI resource() {
+            return URI.create(baseUrl).resolve(endpoint);
         }
 
         @Override
@@ -143,6 +162,15 @@ sealed interface ClientTransport permits ClientTransport.Stdio, ClientTransport.
                     .connectTimeout(connectTimeout);
             if (!send.isEmpty()) {
                 b.addHttpRequestCustomizer((request, method, uri, body, context) -> send.forEach(request::setHeader));
+            }
+            if (authorizer != null) {
+                // Runs after the static headers, so an obtained token replaces a configured one.
+                URI resource = resource();
+                b.addHttpRequestCustomizer((request, method, uri, body, context) ->
+                        authorizer.authorization(resource).ifPresent(value -> request.setHeader("Authorization", value)));
+                b.authorizationErrorHandler(McpHttpClientTransportAuthorizationErrorHandler.fromSync(
+                        (snapshot, response, context) -> authorizer.onChallenge(resource, response.statusCode(),
+                                response.headers().firstValue("WWW-Authenticate").orElse(null))));
             }
             return b;
         }

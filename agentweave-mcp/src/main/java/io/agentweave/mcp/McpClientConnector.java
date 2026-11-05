@@ -81,8 +81,8 @@ public final class McpClientConnector implements ToolConnector {
         Properties sdk = sdkProperties();
         this.baseReport = new ComplianceReport(ProtocolId.MCP, sdk.getProperty("mcp.sdk.name"),
                 sdk.getProperty("mcp.sdk.version"), transport.protocolVersions(), null,
-                McpFeatures.supported(McpFeatures.Role.CLIENT, transport.featureId()),
-                McpFeatures.unsupported(McpFeatures.Role.CLIENT, transport.featureId()));
+                McpFeatures.clientSupported(transport.featureId(), transport.authorizes()),
+                McpFeatures.clientUnsupported(transport.featureId(), transport.authorizes()));
         this.report = baseReport;
     }
 
@@ -433,7 +433,7 @@ public final class McpClientConnector implements ToolConnector {
         private String endpoint = "/mcp";
         private final Map<String, String> headers = new LinkedHashMap<>();
         private final Settings settings = new Settings();
-
+        private io.agentweave.core.auth.HttpAuthorizer authorizer;
         private HttpBuilder(String baseUrl) {
             Objects.requireNonNull(baseUrl, "baseUrl");
             URI uri;
@@ -487,8 +487,13 @@ public final class McpClientConnector implements ToolConnector {
             return this;
         }
 
+        /** Obtains tokens on demand, for example MCP authorization via agentweave-oauth's OAuthClient. */
+        public HttpBuilder authorizer(io.agentweave.core.auth.HttpAuthorizer authorizer) {
+            this.authorizer = Objects.requireNonNull(authorizer, "authorizer");
+            return this;
+        }
         public McpClientConnector build() {
-            return new McpClientConnector(new ClientTransport.Http(baseUrl, endpoint, headers), settings);
+            return new McpClientConnector(new ClientTransport.Http(baseUrl, endpoint, headers, authorizer), settings);
         }
     }
 }
