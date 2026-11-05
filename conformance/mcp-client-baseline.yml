@@ -1,0 +1,30 @@
+# Expected failures of AgentWeave's MCP client (conformance/mcp-client, McpClientConnector) in the
+# official MCP conformance suite, @modelcontextprotocol/conformance@0.2.0-alpha.12:
+#   conformance client --scenario <s> --spec-version 2025-11-25 --expected-failures <this file>
+#
+# Every entry names the AgentWeave feature it waits for: an id that McpFeatures (agentweave-mcp)
+# reports as unsupported, or a precise library bug. Entries are per check (<scenario>:<check-id>).
+# The suite exits 1 on any failure not listed here, and on any entry here that now passes.
+# The auth/* scenarios are not run yet (McpFeatures.AUTHORIZATION); they get entries, or pass,
+# when OAuth lands. See docs/operations/conformance.md.
+
+client:
+  # McpFeatures.ELICITATION ("elicitation") is unsupported: McpClientConnector declares no
+  # elicitation capability and registers no handler, so the SDK answers the mock server's
+  # elicitation/create with -32601 "Method not found" and no defaults can be applied.
+  - elicitation-sep1034-client-defaults:client-elicitation-sep1034-general
+  - elicitation-sep1034-client-defaults:client-elicitation-sep1034-string-default
+  - elicitation-sep1034-client-defaults:client-elicitation-sep1034-integer-default
+  - elicitation-sep1034-client-defaults:client-elicitation-sep1034-number-default
+  - elicitation-sep1034-client-defaults:client-elicitation-sep1034-enum-default
+  - elicitation-sep1034-client-defaults:client-elicitation-sep1034-boolean-default
+
+  # Upstream bug, MCP Java SDK 2.1.0 (used unchanged by McpClientConnector over Streamable HTTP):
+  # HttpClientStreamableHttpTransport.sendMessage consumes a POST-initiated SSE stream with no
+  # resumable stream (consumeSseStream(body, null)), and never reads the SSE "retry" field. When
+  # the server closes that stream before the response (SEP-1699), the client neither waits
+  # "retry" ms nor reconnects with Last-Event-ID, so the tools/call never completes. The SDK's own
+  # conformance baseline lists sse-retry for the same reason. No AgentWeave feature id covers SSE
+  # resumability; the fix belongs in the SDK.
+  - sse-retry:client-sse-retry-timing
+  - sse-retry:client-sse-last-event-id
