@@ -76,8 +76,20 @@ hooks build on this module and never re-implement search.
   - keyword/vector agreement
   - the top cosine
 
-  The default thresholds (`Confidence.Policy.DEFAULT`) are **provisional** until the evaluation
-  harness tunes them.
+  Thresholds are chosen as follows:
+  - **An explicit policy is never overridden.**
+  - **Hybrid presets:** when none is set, the catalog uses the preset calibrated for the embedder
+    (`BGE_SMALL_EN_V15`, `ALL_MINILM_L6_V2`, matched by `Embedder.name()`).
+  - **Everything else:** keyword-only search and unknown embedders use `DEFAULT`.
+
+  Why presets:
+  - **Calibration result.** The `calibrate` command (dev/test split over ToolRet and
+    MCPToolBench++) showed that the earlier provisional thresholds flagged only 1.4% of bge-hybrid
+    misses as LOW. The preset flags 45% of misses, with 18% false alarms on the held-out split.
+  - **Why the keyword default stays:** tuning it would cut miss detection from 58% to 18%, which
+    is the wrong trade for a fallback whose job is to avoid silent omission.
+  - **Limitation:** the fallback still doesn't flag more than half of hybrid misses. It reduces
+    silent omission; it doesn't eliminate it.
 - **Fallback stages.**
   - **`PROGRESSIVE`** (default): on LOW confidence, re-search with 3× the limit and no vector
     floor (stage `BROADENED`). If names-only is enabled, it then adds up to 50 cards of other
@@ -120,8 +132,11 @@ hooks build on this module and never re-implement search.
 - Card summaries are English-oriented: the tokenizer, stopwords and plural trimming target
   English.
 - Re-checking availability calls the source's probe on every search. Keep probes cheap.
-- **Retrieval quality is unmeasured** until the evaluation harness (`evals/tool-discovery`) runs.
-  No claim of accuracy or of unchanged accuracy is made here.
+- **Retrieval quality is measured; model behavior is not yet.** Offline retrieval results, bound
+  to commits, are in `docs/discovery/evaluation.md` and owned by `evals-tool-discovery`. Example:
+  hybrid R@5 is 0.863 on MCPToolBench++'s 87 tools, falling to 0.521 with about 44k distractors.
+  Selection accuracy, wrong-tool rate, call correctness and tokens against the all-tools baseline
+  need the model-in-the-loop arms, which haven't run. No claim of unchanged accuracy is made.
 
 ## Verification
 

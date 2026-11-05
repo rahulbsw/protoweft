@@ -272,53 +272,12 @@ Each run writes `build/eval-results/<run-id>/`:
   `catalog.providerName(id)` and `catalog.toolIdForName(name)`. Gold tools are named first, so they
   never get a dedupe suffix.
 
-## First offline results
+## Offline results
 
-Measured on 2026-11-05 with `run-retrieval` (all queries, depth 100, seed 42) at commit
-`02af18d026bc51fcc508f333d365b0a21b3dd6c3` **with uncommitted changes** (this integration, before
-it was committed), MCPToolBench++ `2bd35e58ed5ebe79bbb12df0f9919a34ed2cb037` and ToolRet
-`mangopy/ToolRet-Queries@b8c76ad3349ff17497b6bdb28bb5b8f61a0f6445`,
-`mangopy/ToolRet-Tools@e06c38c75612b6536bd959e08cdd345894aba6a7`. MCPToolBench++ at N = 87 uses
-its own tools only; every other row is the gold tools plus the whole ToolRet corpus as distractors
-(content duplicates dropped). Means with 95% bootstrap intervals; N = 1,000 and 10,000, R@1/R@3
-and Completeness are in the run's report. Re-run to reproduce; these numbers hold only for this
-data and configuration.
-
-| dataset | retriever | N | R@5 | R@10 | nDCG@10 | MRR |
-|---|---|---|---|---|---|---|
-| mcptoolbench | catalog-bm25 | 87 | 0.779 [0.758, 0.799] | 0.832 [0.814, 0.850] | 0.727 [0.708, 0.747] | 0.695 [0.675, 0.715] |
-| mcptoolbench | catalog-dense | 87 | 0.839 [0.820, 0.858] | 0.911 [0.897, 0.925] | 0.756 [0.740, 0.773] | 0.712 [0.693, 0.731] |
-| mcptoolbench | catalog-hybrid | 87 | 0.863 [0.846, 0.880] | 0.898 [0.882, 0.913] | 0.795 [0.778, 0.812] | 0.767 [0.749, 0.785] |
-| mcptoolbench | catalog-hybrid-minilm | 87 | 0.838 [0.819, 0.857] | 0.867 [0.850, 0.885] | 0.754 [0.736, 0.772] | 0.719 [0.699, 0.738] |
-| mcptoolbench | catalog-bm25 | 44466 | 0.500 [0.474, 0.525] | 0.536 [0.512, 0.561] | 0.466 [0.443, 0.489] | 0.448 [0.424, 0.471] |
-| mcptoolbench | catalog-dense | 44466 | 0.481 [0.455, 0.507] | 0.542 [0.516, 0.567] | 0.451 [0.428, 0.475] | 0.430 [0.407, 0.454] |
-| mcptoolbench | catalog-hybrid | 44466 | 0.521 [0.496, 0.545] | 0.573 [0.547, 0.597] | 0.494 [0.471, 0.517] | 0.475 [0.451, 0.499] |
-| mcptoolbench | catalog-hybrid-minilm | 44466 | 0.470 [0.445, 0.494] | 0.529 [0.505, 0.554] | 0.434 [0.411, 0.458] | 0.411 [0.388, 0.435] |
-| toolret:toolbench | catalog-bm25 | 44392 | 0.348 [0.327, 0.368] | 0.454 [0.431, 0.476] | 0.340 [0.322, 0.358] | 0.390 [0.369, 0.412] |
-| toolret:toolbench | catalog-dense | 44392 | 0.317 [0.297, 0.338] | 0.412 [0.390, 0.436] | 0.308 [0.290, 0.326] | 0.354 [0.333, 0.376] |
-| toolret:toolbench | catalog-hybrid | 44392 | 0.379 [0.358, 0.401] | 0.474 [0.451, 0.497] | 0.357 [0.339, 0.375] | 0.403 [0.383, 0.426] |
-| toolret:toolbench | catalog-hybrid-minilm | 44392 | 0.348 [0.327, 0.369] | 0.454 [0.432, 0.477] | 0.335 [0.317, 0.353] | 0.379 [0.357, 0.401] |
-| toolret:toollens | catalog-bm25 | 44393 | 0.085 [0.065, 0.107] | 0.109 [0.087, 0.134] | 0.081 [0.063, 0.099] | 0.119 [0.095, 0.147] |
-| toolret:toollens | catalog-dense | 44393 | 0.087 [0.066, 0.110] | 0.107 [0.084, 0.131] | 0.086 [0.066, 0.107] | 0.131 [0.102, 0.162] |
-| toolret:toollens | catalog-hybrid | 44393 | 0.098 [0.075, 0.121] | 0.130 [0.105, 0.156] | 0.098 [0.078, 0.119] | 0.146 [0.117, 0.177] |
-| toolret:toollens | catalog-hybrid-minilm | 44393 | 0.062 [0.044, 0.080] | 0.098 [0.076, 0.122] | 0.066 [0.051, 0.081] | 0.102 [0.080, 0.128] |
-| toolret:metatool | catalog-bm25 | 44392 | 0.233 [0.175, 0.292] | 0.282 [0.223, 0.345] | 0.213 [0.163, 0.266] | 0.200 [0.151, 0.252] |
-| toolret:metatool | catalog-dense | 44392 | 0.320 [0.258, 0.385] | 0.362 [0.297, 0.430] | 0.293 [0.237, 0.353] | 0.280 [0.224, 0.339] |
-| toolret:metatool | catalog-hybrid | 44392 | 0.287 [0.223, 0.350] | 0.343 [0.275, 0.405] | 0.253 [0.199, 0.306] | 0.235 [0.184, 0.289] |
-| toolret:metatool | catalog-hybrid-minilm | 44392 | 0.292 [0.232, 0.357] | 0.362 [0.297, 0.427] | 0.257 [0.207, 0.310] | 0.236 [0.188, 0.289] |
-| toolret:apibank | catalog-bm25 | 44392 | 0.273 [0.201, 0.348] | 0.342 [0.263, 0.424] | 0.290 [0.222, 0.359] | 0.360 [0.278, 0.445] |
-| toolret:apibank | catalog-dense | 44392 | 0.280 [0.205, 0.358] | 0.359 [0.282, 0.438] | 0.272 [0.210, 0.338] | 0.324 [0.247, 0.403] |
-| toolret:apibank | catalog-hybrid | 44392 | 0.303 [0.225, 0.383] | 0.385 [0.304, 0.468] | 0.322 [0.254, 0.392] | 0.401 [0.321, 0.490] |
-| toolret:apibank | catalog-hybrid-minilm | 44392 | 0.293 [0.218, 0.367] | 0.361 [0.277, 0.445] | 0.292 [0.226, 0.361] | 0.358 [0.280, 0.438] |
-| toolret:apigen | catalog-bm25 | 44392 | 0.621 [0.595, 0.650] | 0.704 [0.680, 0.731] | 0.557 [0.534, 0.582] | 0.552 [0.526, 0.579] |
-| toolret:apigen | catalog-dense | 44392 | 0.554 [0.527, 0.582] | 0.635 [0.608, 0.662] | 0.488 [0.465, 0.513] | 0.480 [0.455, 0.506] |
-| toolret:apigen | catalog-hybrid | 44392 | 0.629 [0.603, 0.657] | 0.726 [0.701, 0.752] | 0.555 [0.533, 0.579] | 0.540 [0.516, 0.565] |
-| toolret:apigen | catalog-hybrid-minilm | 44392 | 0.629 [0.602, 0.656] | 0.717 [0.693, 0.743] | 0.549 [0.527, 0.572] | 0.535 [0.511, 0.560] |
-
-Calibration on the same data (N = 1,000 and all; dev/test 50/50) found that with the default
-`Confidence.Policy`, the bge-based `catalog-dense` and `catalog-hybrid` almost never report LOW
-(P(LOW | miss@5) = 0.2% and 1.4% on the test split), because bge cosines rarely fall below the
-default `lowCosine` of 0.50. The suggestions it wrote are not applied.
+The published offline results are in [`docs/discovery/evaluation.md`](../../docs/discovery/evaluation.md).
+They were measured at clean commits `fdbf3d9` (N = 1,000, 10,000 and all) and `611d295`
+(MCPToolBench++ against its own 87 tools), together with the calibration run that set the hybrid
+confidence presets. Model-in-the-loop results (`run-llm`) haven't been produced yet.
 
 ## Caveats
 
