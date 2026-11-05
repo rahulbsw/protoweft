@@ -49,9 +49,41 @@ public final class TokenEstimator {
         return total;
     }
 
-    /** System prompt + every turn's text, arguments and tool results + tool definitions. */
+    /**
+     * Tokens of provider-specific raw tool definitions, conservatively: a non-deferred tool counts
+     * as its full JSON; a {@code defer_loading} tool counts its name and description only (OpenAI
+     * shows those up front; Anthropic shows nothing, so this over-estimates there); a namespace
+     * counts its own name and description plus its members by the same rule.
+     */
+    public long rawTools(List<Map<String, Object>> tools) {
+        long total = 0;
+        for (Map<String, Object> t : tools) {
+            total += rawTool(t);
+        }
+        return total;
+    }
+
+    private long rawTool(Map<String, Object> t) {
+        if ("namespace".equals(t.get("type"))) {
+            long total = text(String.valueOf(t.getOrDefault("name", ""))) + text(String.valueOf(t.getOrDefault("description", "")));
+            for (Object inner : Json.asList(t.get("tools"))) {
+                total += rawTool(Json.asMap(inner));
+            }
+            return total;
+        }
+        if (Boolean.TRUE.equals(t.get("defer_loading"))) {
+            return text(String.valueOf(t.getOrDefault("name", ""))) + text(String.valueOf(t.getOrDefault("description", "")));
+        }
+        return text(Json.write(t));
+    }
+
+    /**
+     * System prompt + every turn's text, arguments and tool results + tool definitions (neutral
+     * and raw). A raw tool result counts its {@code content} (what it expands to in context), or its
+     * JSON when the content is empty.
+     */
     public long request(ModelRequest request) {
-        long total = text(request.system()) + tools(request.tools());
+        long total = text(request.system()) + tools(request.tools()) + rawTools(request.rawTools());
         for (Turn turn : request.conversation()) {
             if (turn instanceof Turn.User u) {
                 total += text(u.text());
@@ -62,7 +94,7 @@ public final class TokenEstimator {
                 }
             } else if (turn instanceof Turn.ToolResults r) {
                 for (ToolResult res : r.results()) {
-                    total += text(res.content());
+                    total += !res.content().isEmpty() || res.raw() == null ? text(res.content()) : text(Json.write(res.raw()));
                 }
             }
         }

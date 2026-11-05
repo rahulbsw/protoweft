@@ -3,6 +3,7 @@ package io.agentweave.evals.discovery.llm;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.JsonValue;
+import com.openai.core.ObjectMappers;
 import com.openai.errors.OpenAIServiceException;
 import com.openai.models.Reasoning;
 import com.openai.models.ReasoningEffort;
@@ -14,11 +15,13 @@ import com.openai.models.responses.ResponseFunctionToolCall;
 import com.openai.models.responses.ResponseInputItem;
 import com.openai.models.responses.ResponseOutputItem;
 import com.openai.models.responses.ResponseOutputMessage;
+import com.openai.models.responses.ResponseToolSearchCall;
 import com.openai.models.responses.ResponseUsage;
 import io.agentweave.core.tool.ToolSpec;
 import io.agentweave.evals.discovery.Json;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +34,12 @@ import java.util.Objects;
  * replayed as input items on later turns.
  */
 public final class OpenAiModelClient implements ModelClient {
+
+    /**
+     * {@link ToolCall#name()} given to a client-executed {@code tool_search_call} (which has no
+     * name of its own); answer it with a raw {@code tool_search_output} {@link ToolResult}.
+     */
+    public static final String TOOL_SEARCH_CALL = "tool_search";
 
     /**
      * Request options; {@code null} fields are omitted so the model's defaults apply.
@@ -86,7 +95,12 @@ public final class OpenAiModelClient implements ModelClient {
         if (options.reasoningEffort() != null) {
             b.reasoning(Reasoning.builder().effort(ReasoningEffort.of(options.reasoningEffort())).build());
         }
-        request.tools().forEach(t -> b.addTool(toFunctionTool(t)));
+        if (!request.rawTools().isEmpty()) {
+            // Raw provider JSON (e.g. a client tool_search tool): the whole tools array is sent verbatim.
+            b.putAdditionalBodyProperty("tools", JsonValue.from(rawToolArray(request)));
+        } else {
+            request.tools().forEach(t -> b.addTool(toFunctionTool(t)));
+        }
         b.inputOfResponse(inputItems(request.conversation()));
         long t0 = System.nanoTime();
         Response response;
@@ -116,6 +130,31 @@ public final class OpenAiModelClient implements ModelClient {
         return tool.build();
     }
 
+    /** Neutral tools as non-strict function JSON, then the raw definitions verbatim. */
+    static List<Map<String, Object>> rawToolArray(ModelRequest request) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ToolSpec spec : request.tools()) {
+            Map<String, Object> fn = new LinkedHashMap<>();
+            fn.put("type", "function");
+            fn.put("name", spec.name());
+            if (!spec.description().isEmpty()) {
+                fn.put("description", spec.description());
+            }
+            Map<String, Object> params = new LinkedHashMap<>(spec.inputSchema());
+            params.putIfAbsent("type", "object");
+            fn.put("parameters", params);
+            fn.put("strict", false);
+            out.add(fn);
+        }
+        out.addAll(request.rawTools());
+        return out;
+    }
+
+    /** Converts raw JSON (a map, or an SDK model object) to an input item with the SDK's own mapper. */
+    static ResponseInputItem rawInputItem(Object raw) {
+        return ObjectMappers.jsonMapper().convertValue(raw, ResponseInputItem.class);
+    }
+
     static List<ResponseInputItem> inputItems(List<Turn> conversation) {
         List<ResponseInputItem> items = new ArrayList<>();
         for (Turn turn : conversation) {
@@ -143,6 +182,11 @@ public final class OpenAiModelClient implements ModelClient {
                 }
             } else if (turn instanceof Turn.ToolResults r) {
                 for (ToolResult res : r.results()) {
+                    if (res.raw() != null) {
+                        // A raw input item (e.g. tool_search_output), sent verbatim.
+                        items.add(rawInputItem(res.raw()));
+                        continue;
+                    }
                     items.add(ResponseInputItem.ofFunctionCallOutput(ResponseInputItem.FunctionCallOutput.builder()
                             .callId(res.callId()).output(res.content()).build()));
                 }
@@ -158,6 +202,9 @@ public final class OpenAiModelClient implements ModelClient {
             items.add(ResponseInputItem.ofReasoning(item.asReasoning()));
         } else if (item.isMessage()) {
             items.add(ResponseInputItem.ofResponseOutputMessage(item.asMessage()));
+        } else if (item.isToolSearchCall() || item.isToolSearchOutput()) {
+            // Output and input shapes of tool search items are the same JSON.
+            items.add(rawInputItem(item));
         }
     }
 
@@ -168,6 +215,13 @@ public final class OpenAiModelClient implements ModelClient {
             if (item.isFunctionCall()) {
                 ResponseFunctionToolCall fc = item.asFunctionCall();
                 calls.add(parseCall(fc.callId(), fc.name(), fc.arguments()));
+            } else if (item.isToolSearchCall() && isClientExecuted(item)) {
+                ResponseToolSearchCall ts = item.asToolSearchCall();
+                Object args = ts._arguments().convert(Object.class);
+                calls.add(args instanceof Map<?, ?>
+                        ? new ToolCall(ts.callId().orElse(""), TOOL_SEARCH_CALL, Json.asMap(args), Json.write(args), null)
+                        : new ToolCall(ts.callId().orElse(""), TOOL_SEARCH_CALL, Map.of(), String.valueOf(args),
+                        "tool_search arguments are not a JSON object"));
             } else if (item.isMessage()) {
                 for (ResponseOutputMessage.Content c : item.asMessage().content()) {
                     if (c.isOutputText()) {
@@ -177,6 +231,11 @@ public final class OpenAiModelClient implements ModelClient {
             }
         }
         return new Turn.Assistant(text.toString(), calls, List.copyOf(response.output()));
+    }
+
+    private static boolean isClientExecuted(ResponseOutputItem item) {
+        // Hosted searches say "server" and are answered by OpenAI; anything else is ours to answer.
+        return !"server".equals(Json.asMap(ObjectMappers.jsonMapper().convertValue(item, Map.class)).get("execution"));
     }
 
     /** Parses function-call arguments; malformed JSON is kept raw with an error. */

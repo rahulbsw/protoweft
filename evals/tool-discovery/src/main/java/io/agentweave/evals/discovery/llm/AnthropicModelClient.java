@@ -112,12 +112,17 @@ public final class AnthropicModelClient implements ModelClient {
                 default -> throw new IllegalArgumentException("unknown thinking mode: " + options.thinking());
             }
         }
-        for (int i = 0; i < request.tools().size(); i++) {
-            Tool tool = toTool(request.tools().get(i));
-            if (options.cacheTools() && i == request.tools().size() - 1) {
-                tool = tool.toBuilder().cacheControl(CacheControlEphemeral.builder().build()).build();
+        if (!request.rawTools().isEmpty()) {
+            // Raw provider JSON (e.g. defer_loading tools): the whole tools array is sent verbatim.
+            b.putAdditionalBodyProperty("tools", JsonValue.from(rawToolArray(request, options.cacheTools())));
+        } else {
+            for (int i = 0; i < request.tools().size(); i++) {
+                Tool tool = toTool(request.tools().get(i));
+                if (options.cacheTools() && i == request.tools().size() - 1) {
+                    tool = tool.toBuilder().cacheControl(CacheControlEphemeral.builder().build()).build();
+                }
+                b.addTool(tool);
             }
-            b.addTool(tool);
         }
         messages(request.conversation()).forEach(b::addMessage);
         long t0 = System.nanoTime();
@@ -156,6 +161,34 @@ public final class AnthropicModelClient implements ModelClient {
         return tool.build();
     }
 
+    /**
+     * The {@code tools} array for a request with raw tools: neutral tools as Messages API JSON,
+     * then the raw definitions verbatim. With {@code cacheTools}, the last non-deferred tool gets
+     * {@code cache_control} (deferred tools may not carry it).
+     */
+    static List<Map<String, Object>> rawToolArray(ModelRequest request, boolean cacheTools) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ToolSpec spec : request.tools()) {
+            Map<String, Object> t = new LinkedHashMap<>();
+            t.put("name", spec.name());
+            if (!spec.description().isEmpty()) {
+                t.put("description", spec.description());
+            }
+            t.put("input_schema", spec.inputSchema().isEmpty() ? Map.of("type", "object") : spec.inputSchema());
+            out.add(t);
+        }
+        request.rawTools().forEach(t -> out.add(new LinkedHashMap<>(t)));
+        if (cacheTools) {
+            for (int i = out.size() - 1; i >= 0; i--) {
+                if (!Boolean.TRUE.equals(out.get(i).get("defer_loading"))) {
+                    out.get(i).put("cache_control", Map.of("type", "ephemeral"));
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
     /** Neutral conversation to Messages API params, replaying recorded {@link Message}s verbatim. */
     static List<MessageParam> messages(List<Turn> conversation) {
         List<MessageParam> out = new ArrayList<>();
@@ -181,6 +214,11 @@ public final class AnthropicModelClient implements ModelClient {
             } else if (turn instanceof Turn.ToolResults r) {
                 List<ContentBlockParam> blocks = new ArrayList<>();
                 for (ToolResult res : r.results()) {
+                    if (res.raw() != null) {
+                        // A raw tool_result block (e.g. tool_reference content), sent verbatim.
+                        blocks.add(JsonValue.from(res.raw()).convert(ContentBlockParam.class));
+                        continue;
+                    }
                     blocks.add(ContentBlockParam.ofToolResult(ToolResultBlockParam.builder()
                             .toolUseId(res.callId()).content(res.content()).isError(res.error()).build()));
                 }
