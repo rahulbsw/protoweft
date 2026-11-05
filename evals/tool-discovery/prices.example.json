@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy to prices.json and fill in USD per million tokens from the providers' pricing pages (https://docs.claude.com/en/docs/about-claude/pricing, https://platform.openai.com/docs/pricing). The harness ships no prices; null values are rejected. cachedInput and cacheWrite are optional and default to input.",
+  "anthropic:claude-sonnet-5-5": {"input": null, "output": null, "cachedInput": null, "cacheWrite": null},
+  "openai:gpt-6.1-sol": {"input": null, "output": null, "cachedInput": null}
+}
