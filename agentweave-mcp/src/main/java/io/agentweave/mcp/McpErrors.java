@@ -49,8 +49,8 @@ final class McpErrors {
             return ErrorCategory.VERSION_MISMATCH;
         }
         // The MCP spec reports both unknown tools and invalid arguments as -32602, so the
-        // two cannot be told apart reliably; both map to INVALID_ARGUMENTS.
-        if (code == McpSchema.ErrorCodes.INVALID_PARAMS) {
+        // two cannot be told apart reliably; both map to INVALID_ARGUMENTS, as does an unknown resource URI.
+        if (code == McpSchema.ErrorCodes.INVALID_PARAMS || code == McpSchema.ErrorCodes.RESOURCE_NOT_FOUND) {
             return ErrorCategory.INVALID_ARGUMENTS;
         }
         if (code == McpSchema.ErrorCodes.METHOD_NOT_FOUND) {

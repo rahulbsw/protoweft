@@ -50,9 +50,13 @@ class McpClientConnectorTest {
     @Test
     void declaresOnlyWhatItImplements() {
         ComplianceReport report = server().build().compliance();
-        assertThat(report.supported()).contains(McpFeatures.TRANSPORT_STDIO, McpFeatures.TOOLS_LIST, McpFeatures.TOOLS_CALL);
-        assertThat(report.unsupported()).contains(McpFeatures.TRANSPORT_STREAMABLE_HTTP, McpFeatures.AUTHORIZATION,
-                McpFeatures.RESOURCES, McpFeatures.PROMPTS, McpFeatures.SAMPLING);
+        assertThat(report.supported()).contains(McpFeatures.TRANSPORT_STDIO, McpFeatures.TOOLS_LIST, McpFeatures.TOOLS_CALL,
+                McpFeatures.RESOURCES, McpFeatures.RESOURCES_SUBSCRIBE, McpFeatures.PROMPTS, McpFeatures.COMPLETION,
+                McpFeatures.LOGGING, McpFeatures.PROGRESS, McpFeatures.CONTENT_RESOURCE, McpFeatures.TOOLS_LIST_CHANGED,
+                McpFeatures.RESOURCES_LIST_CHANGED, McpFeatures.PROMPTS_LIST_CHANGED);
+        assertThat(report.unsupported()).containsExactlyInAnyOrder(McpFeatures.TRANSPORT_STREAMABLE_HTTP,
+                McpFeatures.TRANSPORT_SSE, McpFeatures.AUTHORIZATION, McpFeatures.CANCELLATION, McpFeatures.SAMPLING,
+                McpFeatures.ROOTS, McpFeatures.ELICITATION);
     }
 
     @Test

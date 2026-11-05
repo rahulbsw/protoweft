@@ -26,7 +26,10 @@ public final class McpFeatures {
     public static final String CONTENT_RESOURCE = "content/resource";
     public static final String CONTENT_RESOURCE_LINK = "content/resource-link";
     public static final String RESOURCES = "resources";
+    public static final String RESOURCES_SUBSCRIBE = "resources/subscribe";
+    public static final String RESOURCES_LIST_CHANGED = "resources/list-changed";
     public static final String PROMPTS = "prompts";
+    public static final String PROMPTS_LIST_CHANGED = "prompts/list-changed";
     public static final String COMPLETION = "completion";
     public static final String LOGGING = "logging";
     public static final String PROGRESS = "progress";
@@ -35,32 +38,48 @@ public final class McpFeatures {
     public static final String ROOTS = "roots";
     public static final String ELICITATION = "elicitation";
 
+    /** Which side of the protocol a report describes. */
+    enum Role { CLIENT, SERVER }
+
     /** Implemented by both the client connector and the tool server, on either transport. */
     private static final Set<String> COMMON = Set.of(
             LIFECYCLE_VERSION_NEGOTIATION, TOOLS_LIST, TOOLS_CALL, TOOLS_STRUCTURED_OUTPUT,
-            CONTENT_TEXT, CONTENT_IMAGE, CONTENT_AUDIO, CONTENT_RESOURCE_LINK);
+            CONTENT_TEXT, CONTENT_IMAGE, CONTENT_AUDIO, CONTENT_RESOURCE, CONTENT_RESOURCE_LINK,
+            RESOURCES, RESOURCES_SUBSCRIBE, PROMPTS, COMPLETION, LOGGING, PROGRESS);
+
+    /**
+     * Implemented by the client only: it listens for list changes, while the server's lists
+     * are snapshots taken when it is built.
+     */
+    private static final Set<String> CLIENT_ONLY = Set.of(TOOLS_LIST_CHANGED, RESOURCES_LIST_CHANGED,
+            PROMPTS_LIST_CHANGED);
 
     /** Defined by MCP, implemented by neither role. */
     private static final Set<String> NOT_IMPLEMENTED = Set.of(
-            TRANSPORT_SSE, AUTHORIZATION, TOOLS_LIST_CHANGED, CONTENT_RESOURCE, RESOURCES, PROMPTS,
-            COMPLETION, LOGGING, PROGRESS, CANCELLATION, SAMPLING, ROOTS, ELICITATION);
+            TRANSPORT_SSE, AUTHORIZATION, CANCELLATION, SAMPLING, ROOTS, ELICITATION);
 
     private static final Set<String> TRANSPORTS = Set.of(TRANSPORT_STDIO, TRANSPORT_STREAMABLE_HTTP);
 
-    /** What a client or server using {@code transport} implements. */
-    static Set<String> supported(String transport) {
+    /** What {@code role} implements over {@code transport}. */
+    static Set<String> supported(Role role, String transport) {
         requireTransport(transport);
         Set<String> s = new HashSet<>(COMMON);
         s.add(transport);
+        if (role == Role.CLIENT) {
+            s.addAll(CLIENT_ONLY);
+        }
         return Set.copyOf(s);
     }
 
-    /** What a client or server using {@code transport} does not implement, including the other transport. */
-    static Set<String> unsupported(String transport) {
+    /** What {@code role} does not implement over {@code transport}, including the other transport. */
+    static Set<String> unsupported(Role role, String transport) {
         requireTransport(transport);
         Set<String> s = new HashSet<>(NOT_IMPLEMENTED);
         s.addAll(TRANSPORTS);
         s.remove(transport);
+        if (role == Role.SERVER) {
+            s.addAll(CLIENT_ONLY);
+        }
         return Set.copyOf(s);
     }
 

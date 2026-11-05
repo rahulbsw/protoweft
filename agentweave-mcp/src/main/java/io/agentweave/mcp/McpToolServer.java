@@ -10,7 +10,6 @@ import io.agentweave.server.ServerEndpointProvider;
 import io.agentweave.server.ServletEndpoint;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.json.McpJsonDefaults;
-import io.modelcontextprotocol.server.McpAsyncServer;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.transport.DefaultServerTransportSecurityValidator;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
@@ -39,10 +38,14 @@ import java.util.concurrent.CountDownLatch;
  *
  * // stdio: serves until stdin closes
  * McpToolServer.stdio(tools).serverInfo("weather", "1.0").run();
+ *
+ * // with resources and prompts
+ * McpToolServer.http(tools).resources(McpResources.scan(new Docs())).prompts(McpPrompts.scan(new Prompts()));
  * }</pre>
  *
- * <p>The tool list is read once, when serving starts. See {@code compliance()} on each variant
- * for exactly what is implemented.
+ * <p>Tools reporting through {@link io.agentweave.core.tool.ToolProgress} send MCP progress and
+ * log notifications to the calling session. The tool list is read once, when serving starts.
+ * See {@code compliance()} on each variant for exactly what is implemented.
  */
 public final class McpToolServer {
 
@@ -66,6 +69,8 @@ public final class McpToolServer {
         private String version = "0.1.0";
         private ObservationHandler observations = ObservationHandler.NOOP;
         private Duration requestTimeout = Duration.ofSeconds(60);
+        private McpResources resources;
+        private McpPrompts prompts;
 
         Settings(ToolSource tools) {
             this.tools = Objects.requireNonNull(tools, "tools");
@@ -84,7 +89,7 @@ public final class McpToolServer {
         }
 
         ToolServerCore core() {
-            return new ToolServerCore(tools, name, version, observations, requestTimeout);
+            return new ToolServerCore(tools, name, version, observations, requestTimeout, resources, prompts);
         }
     }
 
@@ -103,6 +108,7 @@ public final class McpToolServer {
         private final Settings settings;
         private HttpServletStreamableServerTransportProvider transport;
         private SweeperCapture.Captured<HttpServletStreamableServerTransportProvider> built;
+        private ToolServerCore.Built server;
         private String path = "/mcp";
         private final List<String> allowedOrigins = new ArrayList<>();
         private List<ServletEndpoint> endpoints;
@@ -125,10 +131,27 @@ public final class McpToolServer {
             return this;
         }
 
-        /** The longest a {@code tools/call} may run before failing with a JSON-RPC error. Default 60 seconds. */
+        /**
+         * The longest a {@code tools/call}, {@code resources/read}, {@code prompts/get} or
+         * {@code completion/complete} may run before failing with a JSON-RPC error. Default 60 seconds.
+         */
         public synchronized Http requestTimeout(Duration timeout) {
             requireConfigurable();
             settings.requestTimeout(timeout);
+            return this;
+        }
+
+        /** Publishes resources, declaring the {@code resources} capability (with {@code subscribe}). */
+        public synchronized Http resources(McpResources resources) {
+            requireConfigurable();
+            settings.resources = Objects.requireNonNull(resources, "resources");
+            return this;
+        }
+
+        /** Publishes prompts, declaring the {@code prompts} capability. */
+        public synchronized Http prompts(McpPrompts prompts) {
+            requireConfigurable();
+            settings.prompts = Objects.requireNonNull(prompts, "prompts");
             return this;
         }
 
@@ -165,6 +188,9 @@ public final class McpToolServer {
          */
         @Override
         public synchronized void close() {
+            if (server != null) {
+                server.unbind().run();
+            }
             if (transport != null) {
                 try {
                     transport.closeGracefully().block();
@@ -203,7 +229,7 @@ public final class McpToolServer {
                                 .allowedOrigins(List.copyOf(allowedOrigins)).build())
                         .build());
                 transport = built.value();
-                settings.core().build(McpServer.async(transport));
+                server = settings.core().build(McpServer.async(transport));
                 String name = "/mcp".equals(path) ? "mcp" : "mcp:" + path;
                 endpoints = List.of(new ServletEndpoint(name, ProtocolId.MCP, List.of(path),
                         new ClosingServlet(transport, this::close), true));
@@ -242,9 +268,24 @@ public final class McpToolServer {
             return this;
         }
 
-        /** The longest a {@code tools/call} may run before failing with a JSON-RPC error. Default 60 seconds. */
+        /**
+         * The longest a {@code tools/call}, {@code resources/read}, {@code prompts/get} or
+         * {@code completion/complete} may run before failing with a JSON-RPC error. Default 60 seconds.
+         */
         public Stdio requestTimeout(Duration timeout) {
             settings.requestTimeout(timeout);
+            return this;
+        }
+
+        /** Publishes resources, declaring the {@code resources} capability (with {@code subscribe}). */
+        public Stdio resources(McpResources resources) {
+            settings.resources = Objects.requireNonNull(resources, "resources");
+            return this;
+        }
+
+        /** Publishes prompts, declaring the {@code prompts} capability. */
+        public Stdio prompts(McpPrompts prompts) {
+            settings.prompts = Objects.requireNonNull(prompts, "prompts");
             return this;
         }
 
@@ -267,7 +308,7 @@ public final class McpToolServer {
             InputStream in = new EofSignallingInputStream(System.in, closed);
             PrintStream out = System.out;
             System.setOut(System.err);
-            McpAsyncServer server = null;
+            ToolServerCore.Built server = null;
             try {
                 server = settings.core().build(McpServer.async(
                         new StdioServerTransportProvider(McpJsonDefaults.getMapper(), in, out)));

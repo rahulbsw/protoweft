@@ -97,8 +97,10 @@ class McpToolServerStdioTest {
 
         assertThat(report.wireRevisions()).containsExactly("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25");
         assertThat(report.negotiated()).isEmpty();
-        assertThat(report.supported()).contains(McpFeatures.TRANSPORT_STDIO, McpFeatures.TOOLS_CALL);
-        assertThat(report.unsupported()).contains(McpFeatures.TRANSPORT_STREAMABLE_HTTP, McpFeatures.RESOURCES);
+        assertThat(report.supported()).contains(McpFeatures.TRANSPORT_STDIO, McpFeatures.TOOLS_CALL, McpFeatures.RESOURCES,
+                McpFeatures.PROMPTS, McpFeatures.LOGGING, McpFeatures.PROGRESS, McpFeatures.COMPLETION);
+        assertThat(report.unsupported()).contains(McpFeatures.TRANSPORT_STREAMABLE_HTTP, McpFeatures.SAMPLING,
+                McpFeatures.ELICITATION, McpFeatures.ROOTS, McpFeatures.RESOURCES_LIST_CHANGED);
     }
 
     private static String java() {

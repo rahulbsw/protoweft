@@ -15,15 +15,26 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
 `2.2.0-M*` releases are milestones):
 
 - **Client:** `McpClientConnector` exposes a remote MCP server's tools through the core
-  `ToolConnector` API.
+  `ToolConnector` API, and its resources, prompts, completion, logging, progress and
+  list-change notifications through MCP-specific methods.
 - **Server:** `McpToolServer` serves any core `ToolSource` (`LocalTools`, `ToolRegistry`, a
-  connector) to MCP clients.
+  connector) to MCP clients, plus optional `McpResources` and `McpPrompts`, with logging,
+  progress and completion.
 
 ## Boundary
 
 - Public API: `McpClientConnector` (with `Builder` for stdio and `HttpBuilder` for HTTP),
-  `McpToolServer` (with `Http` and `Stdio`), and `McpFeatures` (feature ids). Every other type is
-  package-private, and MCP SDK types never appear in a public signature.
+  `McpToolServer` (with `Http` and `Stdio`), `McpFeatures` (feature ids), and the resource and
+  prompt types:
+  - authoring: `McpResources`, `McpPrompts`, the handler interfaces `McpResourceHandler`,
+    `McpPromptHandler`, `McpCompleter` and their request records, and the annotations
+    `@McpResource`, `@McpResourceTemplate`, `@McpPrompt`, `@McpComplete`;
+  - neutral records shared by both roles: `McpResourceInfo`, `McpTemplateInfo`,
+    `McpResourceContents`, `McpPromptInfo`, `McpPromptArgument`, `McpPromptMessage`,
+    `McpPromptResult`, `McpCompletion`, `McpLogMessage`.
+
+  Every other type is package-private, and MCP SDK types never appear in a public signature.
+  Resources and prompts are MCP-only concepts, so they live here and not in `agentweave-core`.
 - The client uses the SDK's blocking `McpSyncClient`. The server uses the SDK's async server
   internally so each tool call can carry a timeout. Reactor stays off the AgentWeave API.
 - `McpToolServer.Http` is a `ServerEndpointProvider` (`agentweave-server`). It contributes one
@@ -50,14 +61,21 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
 - **No over-advertising on the wire.**
   - The client registers no roots, sampling, or elicitation handlers, so its capabilities are
     empty.
-  - The server declares only `tools` (`listChanged: false`).
-  - A server without the `tools` capability makes the client's `listTools`/`invoke` fail with
-    `UNSUPPORTED`.
+  - The server declares `tools` (`listChanged: false`) and `logging` (SDK 2.1.0 adds `logging`
+    to every server anyway). It adds `resources` (`subscribe: true, listChanged: false`) only
+    when given `McpResources`, `prompts` (`listChanged: false`) only when given `McpPrompts`,
+    and `completions` only when at least one completer is registered.
+  - The client checks the server's declared capability before each call and fails with
+    `UNSUPPORTED` when it is missing: `tools` for `listTools`/`invoke`, `resources` for
+    listing and reading, `resources.subscribe` for `subscribe`/`unsubscribe`, `prompts`,
+    `completions`, and `logging` for `setLogLevel`.
 - **Client error mapping** (to `ErrorCategory`; the JSON-RPC code, or the HTTP status for
   auth failures, is kept as `protocolCode`):
   - `-32602` → `INVALID_ARGUMENTS`. It is used for unknown tools, malformed requests, and (by
     servers before `2025-11-25`) invalid arguments. The client can't tell these apart, so it
     doesn't guess `TOOL_NOT_FOUND`.
+  - `-32002` (resource not found) → `INVALID_ARGUMENTS`: the URI is the caller's argument, and
+    core has no not-found category besides `TOOL_NOT_FOUND`.
   - `-32601` → `UNSUPPORTED`.
   - HTTP 401/403 (the SDK's `McpHttpClientTransportAuthorizationException`) → `AUTHENTICATION`.
   - The SDK's "Unsupported protocol version" during `initialize` → `VERSION_MISMATCH`.
@@ -77,8 +95,10 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
 - **Tool failures are outcomes in both directions.** `ToolOutcome.error()` ⇄
   `CallToolResult.isError`.
 - **Content mapping, client** (MCP → core): text → `Text`; image/audio → `Data` (base64 as
-  received); `resource_link` → `Link`; embedded `resource` → `Unmapped`. It is declared
-  unsupported, not dropped.
+  received); `resource_link` → `Link`; embedded `resource` → two parts, a `Link` (URI, mime
+  type) followed by its body as `Text` or `Data`. Core `Content` has no embedded-resource part,
+  and the pair keeps URI, type and body without inventing one. The same mapping applies to
+  tool results and prompt messages.
 - **Content mapping, server** (core → MCP):
   - `Text` → text.
   - `Data` → image or audio content for `image/*` or `audio/*` mime types.
@@ -91,7 +111,8 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
     JSON object. No `outputSchema` is declared.
 - **Caller propagation.** Over HTTP, the host's `InboundAuthFilter` authenticates every request.
   The SDK's `contextExtractor` copies `InboundAuthFilter.caller(request)` into the per-request
-  transport context, and the call handler passes it to `ToolSource.invoke(invocation, caller)`.
+  transport context, and the call handler passes it to `ToolSource.invoke(invocation, caller, progress)`;
+  resource, prompt and completion handlers read it the same way.
   Over stdio, the caller is `CallerIdentity.ANONYMOUS`, because the process launcher is the
   trust boundary.
 - **Credentials.**
@@ -110,9 +131,64 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
   `DefaultServerTransportSecurityValidator`. A request carrying an `Origin` that isn't in
   `allowedOrigins(...)` gets 403, as MCP requires. Requests with no `Origin` (non-browser
   clients) pass.
+- **Prompt messages** (`McpPromptMessage(role, List<Content>)`). MCP gives a prompt message one
+  content part. On the server, a single part maps like tool content; a `Link` followed by `Text`
+  or `Data` becomes an embedded resource (`McpPromptMessage.resource(...)` builds it); anything
+  else fails the call with `-32603`.
+- **Resource and prompt authoring.**
+  - Builders (`McpResources.builder()`, `McpPrompts.builder()`) and annotation scanning
+    (`McpResources.scan(obj)`, `McpPrompts.scan(obj)`, or `.scan(...)` on a builder) produce the
+    same entries, as `@AgentTool` does for tools. Annotated parameters bind by name
+    (`@ToolParam` sets name, description and `required`; `Optional` is never required) and
+    convert from strings to `String`/`int`/`long`/`double`/`boolean`, since MCP prompt arguments
+    and URI variables are strings. `CallerIdentity` and the request record are injected.
+  - Resource handlers return `String` (text, default `text/plain`), `byte[]` (blob, default
+    `application/octet-stream`), `McpResourceContents` (or a list), or any other value as JSON
+    text (default `application/json`). Prompt handlers return a `String` (one user message),
+    messages, or an `McpPromptResult`.
+  - URI templates are RFC 6570 simple `{var}` expressions, matched by the SDK's template
+    manager; extracted values are percent-decoded before the handler sees them.
+  - Handlers run on Reactor's bounded-elastic pool with the server's `requestTimeout`, observed
+    as `resources/read`, `prompts/get` and `completion/complete`. Errors map like tool protocol
+    errors: `INVALID_ARGUMENTS` (including a missing required prompt argument, checked before
+    the handler) → `-32602`, other `AgentWeaveException`s → `-32603` with their message,
+    anything else → `-32603 "internal error"`. Unknown URIs get the SDK's `-32002`, unknown
+    prompts its `-32602`.
+  - Handlers and completers receive the caller exactly as tools do (see "Caller propagation").
+- **Subscriptions.** The SDK tracks `resources/subscribe` per session.
+  `McpResources.notifyUpdated(uri)` sends `notifications/resources/updated` to subscribed
+  sessions of every server the `McpResources` is bound to; a server unbinds when it closes.
+  Delivery failures are dropped so a vanished subscriber can't fail the publisher. On the
+  client, the SDK re-reads the resource on each update and `subscribe(uri, listener)` receives
+  the contents, routed by their URI.
+- **Completion.** One completer per prompt argument or template variable. The server returns
+  at most 100 values (MCP's cap) with `total` set to the full count and `hasMore` when
+  truncated; an argument without a completer gets an empty result. `McpCompleter.of(list)`
+  filters by case-insensitive prefix.
+- **Logging and progress, server.** Each `tools/call` gets a session-bound `ToolProgress`
+  passed to `ToolSource.invoke(invocation, caller, progress)`.
+  - `log(level, msg)` → `notifications/message` with the tool name as `logger`. `Level` maps
+    one-to-one onto MCP's RFC 5424 levels; the SDK filters by the session's `logging/setLevel`
+    (default `info`).
+  - `progress(done, total, msg)` → `notifications/progress`, only when the request carried
+    `_meta.progressToken`, echoing that token.
+  - Each notification is sent (bounded wait) before `progress`/`log` returns, so it precedes
+    the result on the wire; failures are swallowed because `ToolProgress` never throws.
+- **Logging and progress, client.** `invoke(invocation, caller, progress)` sends a fresh
+  `progressToken` only when `progress` isn't `NOOP`, and routes matching
+  `notifications/progress` to it. `onLog` receives every log message; `setLogLevel` sends
+  `logging/setLevel`. MCP doesn't tie log messages to a request, so they go to connector-level
+  listeners, not to a call's `ToolProgress`. The SDK's sync client runs each notification
+  consumer on its own worker thread, which reorders them; the connector therefore taps
+  progress and log notifications on the transport (`NotificationTap`), in arrival order and
+  before the response that follows them.
+- **List changes.** The client's `onToolsChanged`/`onResourcesChanged`/`onPromptsChanged`
+  receive the re-listed items the SDK fetches on each `list_changed` notification.
 - **Tool list is a snapshot.** The server reads `listTools()` once, when it is built: on the
   first `endpoints()` call for HTTP, or in `run()` for stdio. Configuration is frozen from then
-  on. `tools/list_changed` isn't offered.
+  on. `McpResources` and `McpPrompts` are immutable once built, for the same reason. The
+  server offers no `list_changed` notifications: the SDK can add entries at runtime but keeps
+  completers in a fixed map, so runtime additions couldn't complete.
 - **stdio serving.** `Stdio.run()` blocks until stdin reaches EOF, then closes the server.
   While it runs, `System.out` is redirected to `System.err`, so stray prints can't corrupt the
   JSON-RPC stream. Applications must still configure logging to stderr.
@@ -140,21 +216,24 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
 
 ## Coverage
 
-Supported and unsupported feature ids are listed in `McpFeatures`, and tests assert them for
-the client on both transports and for the server on both transports. Implemented:
+Supported and unsupported feature ids are listed in `McpFeatures` per role, and tests assert
+them for the client on both transports and for the server on both transports. Implemented in
+both roles:
 - version negotiation
 - the transport in use
 - `tools/list` and `tools/call`
 - structured output
-- text, image, audio, and resource-link content
+- text, image, audio, resource-link, and embedded-resource content
+- `resources` (list, read, templates), `resources/subscribe`
+- `prompts`, `completion`, `logging`, `progress`
+
+Client only: `tools/list-changed`, `resources/list-changed`, `prompts/list-changed` (the
+server's lists are snapshots).
 
 Not implemented in either role:
 - the SSE transport
 - MCP authorization
-- `tools/list_changed`
-- embedded resources
-- resources, prompts, and completion
-- logging, progress, and cancellation
+- cancellation
 - sampling, roots, and elicitation
 
 ## Verification
@@ -170,7 +249,27 @@ Not implemented in either role:
   - origin rejection
   - the caller identity seen by the tool
 - **SDK client against our HTTP server:** the SDK's own `McpSyncClient` with
-  `HttpClientStreamableHttpTransport`, independent of our client.
+  `HttpClientStreamableHttpTransport`, independent of our client (`SdkClientInteropTest` for
+  tools).
+- **Resources, prompts, completion, logging, progress** (`AuthoringContract`, run by
+  `McpAuthoringHttpTest` and `McpAuthoringStdioTest`): our client against our server on both
+  transports. It covers text and binary resources, templates with percent-decoded variables,
+  unknown URIs, subscribe → update → unsubscribe, prompts with arguments, embedded resources
+  and images, missing arguments, completion (including the 100-value cap), `setLevel`
+  filtering of log messages sent during a tool call, progress with and without a token, the
+  caller in resource and prompt handlers (`alice` over HTTP, `anonymous` over stdio), and
+  annotation-authored entries. A server without resources or prompts answers `UNSUPPORTED`.
+- **Conformance fixtures** (`ConformanceFixtureTest`): the SDK's client against our server
+  publishing the MCP conformance suite's fixture names (`test://static-text`,
+  `test://static-binary`, `test://template/{id}/data`, `test://watched-resource`,
+  `test_simple_prompt`, `test_prompt_with_arguments`, `test_prompt_with_embedded_resource`,
+  `test_prompt_with_image`, and progress/logging tools). It checks declared capabilities, the
+  progress token, and log levels on the wire.
+- **Client against SDK servers** (`McpClientNotificationsTest`): every undeclared capability
+  fails with `UNSUPPORTED`, subscribing needs `resources.subscribe`, and list-change listeners
+  receive the new lists.
+- **Authoring API** (`McpAuthoringApiTest`): builder and scan validation, result conversion,
+  embedded-resource round trip, percent-decoding.
 - **stdio server:** a subprocess running `McpToolServer.stdio`, with the servlet API removed
   from its classpath. It is driven by our stdio client, and tests check that it exits when stdin
   closes and that stray stdout prints don't corrupt the protocol.

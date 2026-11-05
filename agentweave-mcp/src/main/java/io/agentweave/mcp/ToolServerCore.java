@@ -10,11 +10,12 @@ import io.agentweave.core.server.CallerIdentity;
 import io.agentweave.core.tool.Content;
 import io.agentweave.core.tool.ToolInvocation;
 import io.agentweave.core.tool.ToolOutcome;
+import io.agentweave.core.tool.ToolProgress;
 import io.agentweave.core.tool.ToolSource;
 import io.agentweave.core.tool.ToolSpec;
 import io.modelcontextprotocol.common.McpTransportContext;
-import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.modelcontextprotocol.server.McpAsyncServer;
+import io.modelcontextprotocol.server.McpAsyncServerExchange;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures.AsyncToolSpecification;
 import io.modelcontextprotocol.spec.McpError;
@@ -22,7 +23,6 @@ import io.modelcontextprotocol.spec.McpSchema;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,14 +46,24 @@ final class ToolServerCore {
     private final String serverVersion;
     private final ObservationHandler observations;
     private final Duration requestTimeout;
+    private final McpResources resources;
+    private final McpPrompts prompts;
 
     ToolServerCore(ToolSource tools, String serverName, String serverVersion,
                    ObservationHandler observations, Duration requestTimeout) {
+        this(tools, serverName, serverVersion, observations, requestTimeout, null, null);
+    }
+
+    /** {@code resources} and {@code prompts} may be {@code null}: their capabilities are then not declared. */
+    ToolServerCore(ToolSource tools, String serverName, String serverVersion, ObservationHandler observations,
+                   Duration requestTimeout, McpResources resources, McpPrompts prompts) {
         this.tools = Objects.requireNonNull(tools, "tools");
         this.serverName = serverName;
         this.serverVersion = serverVersion;
         this.observations = observations;
         this.requestTimeout = requestTimeout;
+        this.resources = resources;
+        this.prompts = prompts;
     }
 
     /** Publishes ToolSpec metadata hints as MCP tool annotations. */
@@ -79,46 +89,80 @@ final class ToolServerCore {
         return meta.get(key) instanceof Boolean value ? value : null;
     }
 
-    /** Builds the SDK server on {@code spec}; the tool list is snapshotted now. */
-    McpAsyncServer build(McpServer.AsyncSpecification<?> spec) {
+    /**
+     * Builds the SDK server on {@code spec}; the tool list is snapshotted now. Call the returned
+     * server's {@code close} through {@link Built#close()} so resource notifications stop.
+     */
+    Built build(McpServer.AsyncSpecification<?> spec) {
         List<AsyncToolSpecification> specs = new ArrayList<>();
         for (ToolSpec tool : tools.listTools()) {
             Map<String, Object> schema = tool.inputSchema().isEmpty() ? EMPTY_OBJECT_SCHEMA : tool.inputSchema();
             specs.add(AsyncToolSpecification.builder()
                     .tool(toMcpTool(tool, schema))
-                    .callHandler((exchange, request) -> call(exchange.transportContext(), request))
+                    .callHandler(this::call)
                     .build());
         }
+        McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder().tools(false).logging();
+        ServerAuthoring authoring = new ServerAuthoring(observations, requestTimeout);
+        if (resources != null) {
+            capabilities.resources(true, false);
+            spec.resources(authoring.resources(resources)).resourceTemplates(authoring.templates(resources));
+        }
+        if (prompts != null) {
+            capabilities.prompts(false);
+            spec.prompts(authoring.prompts(prompts));
+        }
+        if ((resources != null && !resources.completers().isEmpty())
+                || (prompts != null && !prompts.completers().isEmpty())) {
+            capabilities.completions();
+            spec.completions(authoring.completions(resources, prompts));
+        }
+        McpAsyncServer server;
         try {
-            return spec.serverInfo(serverName, serverVersion)
-                    .capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
+            server = spec.serverInfo(serverName, serverVersion)
+                    .capabilities(capabilities.build())
                     .tools(specs)
                     .build();
         } catch (IllegalArgumentException e) {
             throw new AgentWeaveException(ErrorCategory.CONFIGURATION, ProtocolId.MCP,
                     "cannot serve these tools over MCP: " + e.getMessage(), e);
         }
+        return new Built(server, resources == null ? () -> { } : resources.bind(server));
+    }
+
+    /** A built SDK server and the action that unbinds it from its {@link McpResources}. */
+    record Built(McpAsyncServer server, Runnable unbind) {
+        void close() {
+            unbind.run();
+            server.close();
+        }
     }
 
     static ComplianceReport compliance(String transportFeature, List<String> wireRevisions) {
         Properties sdk = McpClientConnector.sdkProperties();
         return new ComplianceReport(ProtocolId.MCP, sdk.getProperty("mcp.sdk.name"), sdk.getProperty("mcp.sdk.version"),
-                wireRevisions, null, McpFeatures.supported(transportFeature), McpFeatures.unsupported(transportFeature));
+                wireRevisions, null, McpFeatures.supported(McpFeatures.Role.SERVER, transportFeature),
+                McpFeatures.unsupported(McpFeatures.Role.SERVER, transportFeature));
     }
 
-    private Mono<McpSchema.CallToolResult> call(McpTransportContext context, McpSchema.CallToolRequest request) {
-        CallerIdentity caller = context != null && context.get(CALLER_KEY) instanceof CallerIdentity c
-                ? c : CallerIdentity.ANONYMOUS;
+    /** The caller the HTTP transport put in the context; anonymous over stdio. */
+    static CallerIdentity caller(McpTransportContext context) {
+        return context != null && context.get(CALLER_KEY) instanceof CallerIdentity c ? c : CallerIdentity.ANONYMOUS;
+    }
+
+    private Mono<McpSchema.CallToolResult> call(McpAsyncServerExchange exchange, McpSchema.CallToolRequest request) {
+        CallerIdentity caller = caller(exchange.transportContext());
+        ToolProgress progress = new SessionProgress(exchange, request.progressToken(), request.name());
         ToolInvocation invocation = ToolInvocation.of(request.name(), request.arguments());
         Observation observation = new Observation(ProtocolId.MCP, "tools/call", request.name());
-        Mono<McpSchema.CallToolResult> work = Mono.fromCallable(() -> toResult(tools.invoke(invocation, caller)))
+        Mono<McpSchema.CallToolResult> work = Mono.fromCallable(() -> toResult(tools.invoke(invocation, caller, progress)))
                 .subscribeOn(Schedulers.boundedElastic())
                 .timeout(requestTimeout, Mono.error(() -> new AgentWeaveException(ErrorCategory.TIMEOUT, ProtocolId.MCP,
                         "tool call '" + request.name() + "' timed out after " + requestTimeout)));
-        return observed(observation, work).onErrorResume(ToolServerCore::toProtocolFailure);
+        return observed(observations, observation, work).onErrorResume(ToolServerCore::toProtocolFailure);
     }
 
-    private <T> Mono<T> observed(Observation observation, Mono<T> work) {
+    static <T> Mono<T> observed(ObservationHandler observations, Observation observation, Mono<T> work) {
         return Mono.defer(() -> {
             long start = System.nanoTime();
             safely(() -> observations.onStart(observation));
@@ -147,48 +191,13 @@ final class ToolServerCore {
     static McpSchema.CallToolResult toResult(ToolOutcome outcome) {
         List<McpSchema.Content> parts = new ArrayList<>(outcome.content().size());
         for (Content part : outcome.content()) {
-            parts.add(toMcp(part));
+            parts.add(McpContent.toMcp(part));
         }
         McpSchema.CallToolResult.Builder result = McpSchema.CallToolResult.builder().content(parts).isError(outcome.error());
         if (outcome.structured() instanceof Map<?, ?> object) {
             result.structuredContent(object); // MCP structuredContent must be a JSON object
         }
         return result.build();
-    }
-
-    private static McpSchema.Content toMcp(Content part) {
-        if (part instanceof Content.Text text) {
-            return McpSchema.TextContent.builder(text.text()).build();
-        }
-        if (part instanceof Content.Data data) {
-            if (data.mimeType().startsWith("image/")) {
-                return McpSchema.ImageContent.builder(data.base64Data(), data.mimeType()).build();
-            }
-            if (data.mimeType().startsWith("audio/")) {
-                return McpSchema.AudioContent.builder(data.base64Data(), data.mimeType()).build();
-            }
-            throw unsupported("binary content of type " + data.mimeType() + " (MCP tool results carry only image/* "
-                    + "and audio/* data inline)");
-        }
-        if (part instanceof Content.Json json) {
-            try {
-                return McpSchema.TextContent.builder(McpJsonDefaults.getMapper().writeValueAsString(json.value())).build();
-            } catch (IOException e) {
-                throw new AgentWeaveException(ErrorCategory.INTERNAL, ProtocolId.MCP, "cannot serialize JSON content", e);
-            }
-        }
-        if (part instanceof Content.Link link) {
-            return McpSchema.ResourceLink.builder()
-                    .uri(link.uri())
-                    .name(link.name() != null && !link.name().isEmpty() ? link.name() : link.uri())
-                    .mimeType(link.mimeType())
-                    .build();
-        }
-        throw unsupported("content of type '" + ((Content.Unmapped) part).protocolType() + "'");
-    }
-
-    private static AgentWeaveException unsupported(String what) {
-        return new AgentWeaveException(ErrorCategory.UNSUPPORTED, ProtocolId.MCP, "cannot return " + what + " over MCP");
     }
 
     private static Duration since(long startNanos) {

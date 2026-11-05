@@ -285,9 +285,13 @@ class McpHttpEndToEndTest {
         assertThat(report.wireRevisions()).containsExactly("2025-03-26", "2025-06-18", "2025-11-25");
         assertThat(report.negotiated()).isEmpty();
         assertThat(report.supported()).contains(McpFeatures.TRANSPORT_STREAMABLE_HTTP, McpFeatures.TOOLS_LIST,
-                McpFeatures.TOOLS_CALL, McpFeatures.TOOLS_STRUCTURED_OUTPUT, McpFeatures.CONTENT_RESOURCE_LINK);
-        assertThat(report.unsupported()).contains(McpFeatures.TRANSPORT_STDIO, McpFeatures.AUTHORIZATION,
-                McpFeatures.TOOLS_LIST_CHANGED, McpFeatures.RESOURCES, McpFeatures.PROMPTS);
+                McpFeatures.TOOLS_CALL, McpFeatures.TOOLS_STRUCTURED_OUTPUT, McpFeatures.CONTENT_RESOURCE_LINK,
+                McpFeatures.RESOURCES, McpFeatures.RESOURCES_SUBSCRIBE, McpFeatures.PROMPTS, McpFeatures.COMPLETION,
+                McpFeatures.LOGGING, McpFeatures.PROGRESS);
+        assertThat(report.unsupported()).containsExactlyInAnyOrder(McpFeatures.TRANSPORT_STDIO, McpFeatures.TRANSPORT_SSE,
+                McpFeatures.AUTHORIZATION, McpFeatures.TOOLS_LIST_CHANGED, McpFeatures.RESOURCES_LIST_CHANGED,
+                McpFeatures.PROMPTS_LIST_CHANGED, McpFeatures.CANCELLATION, McpFeatures.SAMPLING, McpFeatures.ROOTS,
+                McpFeatures.ELICITATION);
     }
 
     @Test
