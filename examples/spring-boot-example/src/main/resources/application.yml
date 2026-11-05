@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: weather-agent
+
+server:
+  port: 8080
+
+# The bearer token TokenAuthenticator expects. Override with EXAMPLE_API_TOKEN.
+example:
+  api-token: demo-token
+
+agentweave:
+  server:
+    mcp:
+      enabled: true                      # Streamable HTTP at /mcp
+      server-name: weather
+    utcp:
+      enabled: true                      # GET /utcp, POST /utcp/tools/<tool>
+      # Tell UTCP clients to send the token on tool calls, from their WEATHER_TOKEN variable.
+      api-key-header: Authorization
+      api-key-variable: WEATHER_TOKEN
+      # base-url: https://weather.example.com   # set when behind a proxy (or set server.forward-headers-strategy)
+    a2a:
+      enabled: true                      # card at /.well-known/agent-card.json, JSON-RPC at /a2a
+      # public-url: https://weather.example.com # required for anything but local clients
+      description: Answers questions about the weather
+      skills:
+        - id: weather
+          name: Weather
+          description: Current temperature in a city
+          tags: [weather]
+          examples: ["What is the weather in Paris?"]
+
+  # Client connectors: each becomes a source in the ToolRegistry bean, tools named <name>.<tool>.
+  # mcp:
+  #   clients:
+  #     files: { command: npx, args: [-y, "@modelcontextprotocol/server-filesystem", /tmp] }
+  # utcp:
+  #   manuals:
+  #     weather: { url: https://api.example.com/utcp, variables: { API_KEY: "${WEATHER_API_KEY}" } }
+  # a2a:
+  #   agents:
+  #     travel: { url: https://travel.example.com }
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
