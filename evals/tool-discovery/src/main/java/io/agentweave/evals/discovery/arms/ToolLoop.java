@@ -73,6 +73,17 @@ public final class ToolLoop {
 
     public static Outcome run(ModelClient client, String system, String userText, List<ToolSpec> initialTools,
                               int maxOutputTokens, int maxTurns, CallHandler handler, TokenEstimator estimator) {
+        return run(client, system, userText, initialTools, List.of(), maxOutputTokens, maxTurns, handler, estimator);
+    }
+
+    /**
+     * As {@link #run(ModelClient, String, String, List, int, int, CallHandler, TokenEstimator)},
+     * plus provider-specific raw tool definitions sent unchanged on every turn (native arms).
+     * The payload estimate counts them with {@link TokenEstimator#rawTools}.
+     */
+    public static Outcome run(ModelClient client, String system, String userText, List<ToolSpec> initialTools,
+                              List<Map<String, Object>> rawTools, int maxOutputTokens, int maxTurns,
+                              CallHandler handler, TokenEstimator estimator) {
         if (maxTurns < 1) {
             throw new IllegalArgumentException("maxTurns must be >= 1");
         }
@@ -90,9 +101,10 @@ public final class ToolLoop {
         String error = null;
         boolean hitMax = false;
         for (int turn = 1; turn <= maxTurns; turn++) {
-            ModelRequest request = new ModelRequest(system, conversation, List.copyOf(tools.values()), maxOutputTokens);
+            ModelRequest request = new ModelRequest(system, conversation, List.copyOf(tools.values()), maxOutputTokens,
+                    rawTools);
             if (estimator != null) {
-                payload += estimator.tools(request.tools());
+                payload += estimator.tools(request.tools()) + estimator.rawTools(request.rawTools());
             }
             ModelResponse response;
             try {
@@ -136,7 +148,7 @@ public final class ToolLoop {
             }
             conversation.add(new Turn.ToolResults(results));
         }
-        return new Outcome(real, selected, discovery, responses, usage, latency, payload, initialTools.size(),
+        return new Outcome(real, selected, discovery, responses, usage, latency, payload, initialTools.size() + rawTools.size(),
                 finalText, hitMax, error);
     }
 

@@ -23,8 +23,11 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 - It depends on `agentweave-core`, `com.anthropic:anthropic-java:3.5.0`,
   `com.openai:openai-java:4.100.0`, `com.knuddels:jtokkit:1.1.0` and Jackson 3. The SDKs never reach
   a published module, so the "ships no LLM clients" non-goal holds.
-- It does not depend on `agentweave-discovery` yet. Discovery retrievers and arms plug in through
-  `RetrieverFactory`/`ArmFactory` (ServiceLoader), or through a later dependency edge.
+- It depends on `agentweave-discovery` and `agentweave-discovery-embeddings` (with the
+  all-MiniLM-L6-v2 model artifact at runtime) to evaluate them. Discovery retrievers and arms are
+  registered through `RetrieverFactory`/`ArmFactory` (ServiceLoader); the CLI has no
+  discovery-specific code except the `calibrate` command. The discovery modules make no model
+  calls; only this module's own clients do.
 - Data is downloaded by `scripts/fetch_*.py` into `build/data/` and never committed. ToolRet's HF
   cards have no license, so it is used locally only. MCPToolBench++ is MIT.
 
@@ -39,9 +42,17 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
     to JSON Schema, and `TaskSampler`.
 - `retrieval`: `Retriever { name(); index(catalog); retrieve(task, catalog, k) }`, plus
   `RandomRetriever`, `OracleRetriever` and the `RetrieverFactory` SPI.
+  - Discovery-backed: `CatalogBridge` (eval catalog → `CapabilityCatalog`), `CatalogRetriever`
+    (`catalog-bm25`, `catalog-dense`, `catalog-hybrid`, `catalog-hybrid-minilm`, registered by
+    `DiscoveryRetrieverFactory`), `VectorOnlyIndex` and `CachingEmbedder`.
+- `calibration`: `Calibration` (signals, levels, metrics, policy grid search); the
+  `run.CalibrateRun` command writes `calibration.json`.
 - `llm`:
   - `ModelClient { provider(); model(); send(ModelRequest) }`, with `Turn`
     (User / Assistant(providerState) / ToolResults), `ToolCall`, `ToolResult`, `Usage`.
+  - Provider-specific parts: `ModelRequest.rawTools` (raw tool JSON) and `ToolResult.raw` (a raw
+    `tool_result` block or input item); `OpenAiModelClient.TOOL_SEARCH_CALL` names parsed
+    client-executed `tool_search_call`s.
   - Implementations: `AnthropicModelClient` (Messages API), `OpenAiModelClient` (Responses API),
     `AnthropicTokenCounter`, `TokenEstimator` (jtokkit), `ScriptedModelClient` and
     `EstimatingModelClient`.
@@ -49,6 +60,8 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
   - `Arm { name(); run(task, catalog, client) }` → `ArmResult`.
   - `ToolLoop`: a select/respond loop with a max-turns limit and discovery counting.
   - Built-in arms `AllToolsArm` and `TopKInjectedArm`, plus the `ArmFactory` SPI.
+  - Discovery arms `GenericSearchArm`, `NativeAnthropicArm`, `NativeOpenAiArm`, registered by
+    `DiscoveryArmFactory` as `generic-search`, `native-anthropic`, `native-openai`.
 - `metrics`: `RetrievalMetrics`, `ArgumentMatcher`, `CallScorer` and `Stats`.
 - `cost`: `PriceTable`, `CostGuard`, `SpendLedger` and `GuardedModelClient`.
 
@@ -86,6 +99,34 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 - **Model defaults** are documented, not fixed: `claude-sonnet-5-5` and `gpt-6.1-sol`.
   - Temperature is not sent by default, because current Claude models reject it.
   - Tools go to OpenAI as non-strict functions, so schemas pass through unchanged.
+
+- **Discovery retrievers** run the product's own `catalog.search`:
+  - Sources are MCP servers (from the tool's `server` metadata) or, without one, the dataset.
+    Tools are named by their provider-safe eval-catalog name, so `<source>.<name>` maps back to
+    eval ids one to one.
+  - `catalog-dense` is a `CapabilityIndex` wrapper: a `HybridIndex` with the embedder indexes, and
+    hits are re-ranked by cosine, below-floor hits dropped. Keyword signals stay on the hits, so
+    `Confidence` uses the same inputs as hybrid.
+  - Retrieval and calibration use fallback `NONE` (pure ranking); arms default to `PROGRESSIVE`.
+  - Embeddings are cached on disk per model, keyed by SHA-256 of model, kind and text. Appends are
+    single writes under an exclusive file lock; a truncated tail is cut off on load.
+- **Calibration** never applies anything. It re-derives levels from recorded signals
+  (`Calibration.level` mirrors `Confidence.Policy.assess`, checked by a test), splits tasks into
+  dev/test by a stable hash, and maximizes P(hit@1 | HIGH) + P(LOW | miss@5) on dev subject to a
+  minimum HIGH share and a maximum LOW rate among top-5 hits. Default and suggested policies are
+  reported on both splits.
+- **Discovery arms**:
+  - `generic-search` offers only the three `DiscoveryTools` meta-tools, answered through a
+    `DiscoverySession`; `call_capability` (or a direct call of a capability name) is the
+    selection. Parameters: `inlineSchemas`, `fallback`, `load`.
+  - `native-anthropic` sends the catalog as `defer_loading` tools plus the custom search tool and
+    answers searches with `tool_reference` blocks; `native-openai` sends the client `tool_search`
+    tool and answers with `tool_search_output` (optionally also declaring deferred functions or
+    namespaces). Both use `AnthropicPayloads`/`OpenAiPayloads` verbatim as raw JSON through the
+    SDKs' additional body properties and Jackson mapping.
+  - A native arm given a model of the other provider makes no call and records an error.
+  - The cost guard checks every turn. Raw tools count conservatively: deferred tools by name and
+    description, others in full; raw answers count the definitions they load.
 
 ## Invariants
 

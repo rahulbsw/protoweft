@@ -36,7 +36,12 @@ public final class AnthropicTokenCounter {
         if (request.system() != null && !request.system().isBlank()) {
             b.system(request.system());
         }
-        request.tools().forEach(t -> b.addTool(AnthropicModelClient.toTool(t)));
+        if (request.rawTools().isEmpty()) {
+            request.tools().forEach(t -> b.addTool(AnthropicModelClient.toTool(t)));
+        } else {
+            b.putAdditionalBodyProperty("tools",
+                    com.anthropic.core.JsonValue.from(AnthropicModelClient.rawToolArray(request, false)));
+        }
         AnthropicModelClient.messages(request.conversation()).forEach(b::addMessage);
         try {
             return client.messages().countTokens(b.build()).inputTokens();
