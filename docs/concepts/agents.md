@@ -90,8 +90,11 @@ The rules:
 | `caller()` | The authenticated `CallerIdentity`. |
 
 Publish the handler with an `AgentDescriptor` (name, description, version, skills) through the
-[A2A server](../protocols/a2a.md#serving-an-agent). The [LangChain4j module](../integrations/langchain4j.md#agents-out)
-turns an AI Service into a handler.
+[A2A server](../protocols/a2a.md#serving-an-agent). The framework adapters build handlers for you:
+[LangChain4j](../integrations/langchain4j.md#agents-out) from an AI Service,
+[Spring AI](../integrations/spring-ai.md#agents-out-a-chatclient-as-an-a2a-agent) from a `ChatClient`
+(blocking or streaming), and [ARGI](../integrations/argi.md#agents-over-a2a-with-approvals) from an
+ARGI agent, with tool approvals as `input-required`.
 
 ## Talking to an agent
 

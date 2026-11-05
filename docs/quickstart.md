@@ -59,5 +59,6 @@ gradle run --args="mcp=http://localhost:8080 utcp=https://api.example.com/utcp a
 
 - [Getting started](getting-started.md) has the dependency coordinates and the BOM.
 - [Tools and the registry](concepts/tools.md) covers `@AgentTool`, schemas and namespacing.
-- Integrations: [Spring Boot](integrations/spring-boot.md), [LangChain4j](integrations/langchain4j.md).
+- Integrations: [Spring Boot](integrations/spring-boot.md), [LangChain4j](integrations/langchain4j.md),
+  [Spring AI](integrations/spring-ai.md), [ARGI](integrations/argi.md), [OAuth](integrations/oauth.md).
 - [Tool discovery](discovery/index.md) is for when you have too many tools for one prompt.
