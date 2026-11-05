@@ -193,4 +193,23 @@ class CapabilityCatalogTest {
         assertThat(catalog.invoke("tracker.search_issues", Map.of("q", "bug"), ADMIN).text())
                 .isEqualTo("mcp:search_issues");
     }
+
+    @Test
+    void calibratedConfidencePresetIsChosenByEmbedderUnlessSetExplicitly() {
+        Embedder bge = new HybridIndexTest.FakeEmbedder(Map.of()) {
+            @Override
+            public String name() {
+                return "bge-small-en-v1.5-q";
+            }
+        };
+        assertThat(CapabilityCatalog.builder().source("w", Fixtures.weather()).build().fallbackPolicy().confidence())
+                .isSameAs(Confidence.Policy.DEFAULT);
+        assertThat(CapabilityCatalog.builder().source("w", Fixtures.weather()).embedder(bge).build()
+                .fallbackPolicy().confidence()).isSameAs(Confidence.Policy.BGE_SMALL_EN_V15);
+
+        Confidence.Policy mine = new Confidence.Policy(0.5, 0.2, 0.9, 0.4, 0.1);
+        assertThat(CapabilityCatalog.builder().source("w", Fixtures.weather()).embedder(bge)
+                .fallback(FallbackPolicy.DEFAULT.withConfidence(mine)).build().fallbackPolicy().confidence())
+                .isSameAs(mine);
+    }
 }

@@ -38,6 +38,9 @@ class HybridCatalogTest {
                 .embedder(OfflineEmbedders.bgeSmallEnV15()).build();
         DiscoveryResult semantic = hybrid.search(DiscoveryQuery.builder(query).limit(1).build());
         assertThat(semantic.mode()).isEqualTo(DiscoveryResult.Mode.HYBRID);
-        assertThat(semantic.names()).containsExactly("svc.current_conditions");
+        assertThat(semantic.names().get(0)).isEqualTo("svc.current_conditions");
+        // No query term matches, so the calibrated bge preset judges this LOW and broadens the result.
+        assertThat(semantic.confidence().level()).isEqualTo(io.agentweave.discovery.Confidence.Level.LOW);
+        assertThat(semantic.stage()).isNotEqualTo(io.agentweave.discovery.FallbackPolicy.Stage.NONE);
     }
 }

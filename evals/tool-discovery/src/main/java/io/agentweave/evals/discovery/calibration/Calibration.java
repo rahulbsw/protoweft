@@ -73,7 +73,7 @@ public final class Calibration {
     }
 
     /** The search outcome for one retriever. */
-    public record Suggestion(Policy policy, boolean feasible, int gridSize, double objective, Metrics defaultDev,
+    public record Suggestion(Policy defaultPolicy, Policy policy, boolean feasible, int gridSize, double objective, Metrics defaultDev,
                              Metrics suggestedDev, Metrics defaultTest, Metrics suggestedTest) {
     }
 
@@ -143,8 +143,13 @@ public final class Calibration {
 
     /** Grid-searches policies on {@code dev} and reports default vs suggested on dev and {@code test}. */
     public static Suggestion suggest(List<Signals> dev, List<Signals> test, double minHighShare, double maxFalseAlarm) {
+        return suggest(dev, test, minHighShare, maxFalseAlarm, Policy.DEFAULT);
+    }
+
+    /** As {@link #suggest(List, List, double, double)}, comparing against the retriever's product default {@code def}. */
+    public static Suggestion suggest(List<Signals> dev, List<Signals> test, double minHighShare, double maxFalseAlarm,
+                                     Policy def) {
         boolean semantic = dev.stream().anyMatch(Signals::semantic);
-        Policy def = Policy.DEFAULT;
         List<Policy> grid = grid(semantic);
         Policy best = null;
         double bestObjective = Double.NEGATIVE_INFINITY;
@@ -169,7 +174,7 @@ public final class Calibration {
         }
         boolean feasible = best != null;
         Policy chosen = feasible ? best : def;
-        return new Suggestion(chosen, feasible, grid.size(), feasible ? bestObjective : Double.NaN, metrics(def, dev),
+        return new Suggestion(def, chosen, feasible, grid.size(), feasible ? bestObjective : Double.NaN, metrics(def, dev),
                 metrics(chosen, dev), metrics(def, test), metrics(chosen, test));
     }
 

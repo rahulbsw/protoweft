@@ -59,7 +59,10 @@ public final class CapabilityCatalog {
     private CapabilityCatalog(Builder b) {
         this.sources = Map.copyOf(b.sources);
         this.index = b.index != null ? b.index : new HybridIndex(b.embedder);
-        this.fallback = b.fallback;
+        // Unless thresholds were set explicitly, use the preset calibrated for the embedder.
+        this.fallback = b.fallback.confidence() == Confidence.Policy.DEFAULT && b.index == null
+                ? b.fallback.withConfidence(Confidence.Policy.forEmbedder(b.embedder))
+                : b.fallback;
         this.observations = b.observations;
     }
 

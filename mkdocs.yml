@@ -78,6 +78,9 @@ nav:
       - MCP: protocols/mcp.md
       - A2A: protocols/a2a.md
       - UTCP: protocols/utcp.md
+  - Tool discovery:
+      - Overview: discovery/index.md
+      - Evaluation: discovery/evaluation.md
   - Integrations:
       - Spring Boot: integrations/spring-boot.md
       - LangChain4j: integrations/langchain4j.md

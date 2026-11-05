@@ -104,7 +104,7 @@ class HybridIndexTest {
     }
 
     /** Embeds by looking up the first word of the text; the query "forecast" maps to (1, 0.2). */
-    static final class FakeEmbedder implements Embedder {
+    static class FakeEmbedder implements Embedder {
         private final Map<String, float[]> vectors;
         int documentCalls;
 

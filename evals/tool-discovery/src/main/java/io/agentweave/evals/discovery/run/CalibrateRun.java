@@ -141,7 +141,8 @@ public final class CalibrateRun {
                 if (d.isEmpty()) {
                     continue;
                 }
-                Suggestion s = Calibration.suggest(d, te, config.minHighShare(), config.maxFalseAlarm());
+                Suggestion s = Calibration.suggest(d, te, config.minHighShare(), config.maxFalseAlarm(),
+                        productDefault(rname));
                 suggestions.put(rname, suggestionMap(s, d.size(), te.size()));
                 md.append(suggestionSection(rname, s));
             }
@@ -162,6 +163,17 @@ public final class CalibrateRun {
         }
     }
 
+    /** The thresholds the catalog uses by default for this retriever's embedder (keyword-only: DEFAULT). */
+    static io.agentweave.discovery.Confidence.Policy productDefault(String retriever) {
+        if (retriever.contains("minilm")) {
+            return io.agentweave.discovery.Confidence.Policy.ALL_MINILM_L6_V2;
+        }
+        if (retriever.contains("hybrid") || retriever.contains("dense")) {
+            return io.agentweave.discovery.Confidence.Policy.BGE_SMALL_EN_V15;
+        }
+        return io.agentweave.discovery.Confidence.Policy.DEFAULT;
+    }
+
     /** Relevant for retrieval: graded gold (alternatives do not count, as in the retrieval metrics). */
     private static boolean relevant(EvalTask t, String toolId) {
         return t.goldRelevance().getOrDefault(toolId, 0) > 0;
@@ -171,7 +183,7 @@ public final class CalibrateRun {
         List<List<String>> rows = new ArrayList<>();
         for (Map.Entry<String, List<Signals>> e : perCell.entrySet()) {
             String[] k = e.getKey().split("\\|");
-            Metrics m = Calibration.metrics(io.agentweave.discovery.Confidence.Policy.DEFAULT, e.getValue());
+            Metrics m = Calibration.metrics(productDefault(k[1]), e.getValue());
             List<String> row = new ArrayList<>(List.of(k[0], k[1], k[2], String.valueOf(m.n())));
             for (Level l : Level.values()) {
                 row.add(m.counts().get(l) + " (" + pct(m.counts().get(l) / (double) Math.max(1, m.n())) + "): "
@@ -205,7 +217,7 @@ public final class CalibrateRun {
 
     private static Map<String, Object> suggestionMap(Suggestion s, int devN, int testN) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("default", Calibration.policyMap(io.agentweave.discovery.Confidence.Policy.DEFAULT));
+        m.put("default", Calibration.policyMap(s.defaultPolicy()));
         m.put("suggested", Calibration.policyMap(s.policy()));
         m.put("feasible", s.feasible());
         m.put("gridSize", s.gridSize());
