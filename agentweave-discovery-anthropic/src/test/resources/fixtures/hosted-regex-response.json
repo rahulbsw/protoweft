@@ -1,0 +1,51 @@
+{
+  "id": "msg_01HostedRegexExample",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "I'll search for a tool that can look up the weather."
+    },
+    {
+      "type": "server_tool_use",
+      "id": "srvtoolu_01ABCDEFGHIJ",
+      "name": "tool_search_tool_regex",
+      "input": {
+        "pattern": "weather|forecast"
+      }
+    },
+    {
+      "type": "tool_search_tool_result",
+      "tool_use_id": "srvtoolu_01ABCDEFGHIJ",
+      "content": {
+        "type": "tool_search_tool_search_result",
+        "tool_references": [
+          {
+            "type": "tool_reference",
+            "tool_name": "weather__forecast"
+          }
+        ]
+      }
+    },
+    {
+      "type": "text",
+      "text": "I found a forecast tool. Let me check Paris."
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_01KLMNOPQRST",
+      "name": "weather__forecast",
+      "input": {
+        "city": "Paris"
+      }
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 1243,
+    "output_tokens": 112
+  }
+}

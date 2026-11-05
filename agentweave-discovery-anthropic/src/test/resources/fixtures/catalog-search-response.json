@@ -1,0 +1,33 @@
+{
+  "id": "msg_01CatalogSearchExample",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "Let me find a tool for customer records."
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_01SEARCH000001",
+      "name": "search_capabilities",
+      "input": {
+        "query": "find a customer record by email",
+        "limit": 3
+      }
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_01UNKNOWN00002",
+      "name": "crm__exportEverything",
+      "input": {}
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 318,
+    "output_tokens": 64
+  }
+}
