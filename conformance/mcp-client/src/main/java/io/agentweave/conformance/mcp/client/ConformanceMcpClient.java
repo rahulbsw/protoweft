@@ -5,7 +5,8 @@ import java.util.TreeMap;
 
 /**
  * The client under test for the MCP conformance suite's client scenarios, built on AgentWeave's
- * {@link io.agentweave.mcp.McpClientConnector} only.
+ * {@link io.agentweave.mcp.McpClientConnector}, with agentweave-oauth's {@code OAuthClient} as its
+ * authorizer for the {@code auth/*} scenarios.
  *
  * <p>Contract (from the suite's {@code src/runner/client.ts}): the server URL is the last
  * command-line argument; {@code MCP_CONFORMANCE_SCENARIO} names the scenario,
@@ -14,7 +15,7 @@ import java.util.TreeMap;
  * the client finished its side of the scenario; the suite judges the result from the wire.
  *
  * <p>Scenarios are registered in {@link #SCENARIOS}. The {@code auth/*} scenarios are routed to
- * {@link AuthScenarios}, the extension point for MCP authorization.
+ * {@link AuthScenarios} (MCP authorization).
  */
 public final class ConformanceMcpClient {
 

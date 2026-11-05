@@ -4,7 +4,7 @@ AgentWeave runs two official conformance suites against small apps built only on
 
 | Suite | Version | Tests | App under test |
 |---|---|---|---|
-| [MCP conformance suite](https://github.com/modelcontextprotocol/conformance) | `@modelcontextprotocol/conformance@0.2.0-alpha.12` (the version the MCP Java SDK pins), spec `2025-11-25` | server scenarios (`--suite active`) and the non-auth client scenarios | `conformance/mcp-server` (`McpToolServer.http` on `AgentWeaveServer`), `conformance/mcp-client` (`McpClientConnector`) |
+| [MCP conformance suite](https://github.com/modelcontextprotocol/conformance) | `@modelcontextprotocol/conformance@0.2.0-alpha.12` (the version the MCP Java SDK pins), spec `2025-11-25` | server scenarios (`--suite active`) and the 18 client scenarios required for 2025-11-25 (4 non-auth, 14 `auth/*`) | `conformance/mcp-server` (`McpToolServer.http` on `AgentWeaveServer`), `conformance/mcp-client` (`McpClientConnector`, with agentweave-oauth's `OAuthClient` for `auth/*`) |
 | [A2A TCK](https://github.com/a2aproject/a2a-tck) | tag `1.0.0.alpha3` (A2A spec 1.0, as pinned by a2a-java 1.5.0.Final), `--level must` | the TCK's MUST requirements for the transports the card declares | `conformance/a2a-sut` (`A2aAgentServer` on `AgentWeaveServer`) |
 
 The apps in `conformance/` are never published. Every failure that remains is listed in a
@@ -13,9 +13,9 @@ entry that now passes.
 
 ## What is not tested yet
 
-- The MCP client `auth/*` scenarios (14 required for 2025-11-25). `agentweave-mcp` has no MCP
-  authorization flow yet (`McpFeatures.AUTHORIZATION`). `conformance/mcp-client` has an
-  extension point for them (`AuthScenarios`).
+- The MCP client `auth/*` scenarios outside the 2025-11-25 requirement set: the back-compat
+  (`2025-03-26`), extension (client credentials, DPoP, enterprise-managed, workload identity) and
+  draft (`2026-07-28`) scenarios.
 - The A2A gRPC and HTTP+JSON bindings. AgentWeave serves only JSON-RPC, and the card declares
   only that, so the TCK skips those transports.
 - The TCK's SHOULD and MAY levels.
@@ -63,8 +63,9 @@ artifacts.
 
 These come from local runs on 2026-11-05. The MCP server suite and the A2A TCK were re-run on
 `main` after commit `d62edad`, which fixed the two library gaps those suites found (embedded
-resources in MCP tool results, and inline file names in A2A); the MCP client figures are from the
-first run at commit `4c1f483`. The apps were built with the JDK 17 toolchain and run
+resources in MCP tool results, and inline file names in A2A). The MCP client figures are from a
+run of all 18 required client scenarios on the same day, on a tree based on commit `5945750`
+(`main`) plus the `auth/*` client wiring in `conformance/mcp-client`. The apps were built with the JDK 17 toolchain and run
 on JDK 21.0.10, with Node 26.3.1, Python 3.12.0 and uv 0.5.1. All three scripts exited 0.
 
 ### MCP server: 31 scenarios, 65 checks
@@ -84,9 +85,13 @@ not support), each in a different scenario. 27 scenarios passed completely.
 
 In every scenario with a failure, the `wire-schema-valid` check still passed.
 
-### MCP client: 4 scenarios, 12 scored checks
+### MCP client: 18 scenarios, 67 scored checks
 
-4 checks passed and 8 are in the baseline.
+18 checks passed and 49 are in the baseline; `mcp-client.sh` exited 0. Check counts are distinct
+check ids per scenario. In the `auth/*` scenarios fewer checks are emitted than a complete flow
+produces, because the flow stops after discovering the protected resource metadata (see the
+agentweave-oauth bug below). With that bug patched in a scratch copy (not in this tree), all 14
+`auth/*` scenarios passed every check: 183 of 183.
 
 | Scenario | Passed | Baselined |
 |---|---|---|
@@ -94,6 +99,13 @@ In every scenario with a failure, the `wire-schema-valid` check still passed.
 | `tools_call` | 2/2 | 0 |
 | `elicitation-sep1034-client-defaults` | 0/6 | 6 (unsupported) |
 | `sse-retry` | 1/3 (`client-sse-graceful-reconnect`) | 2 (upstream SDK bug) |
+| `auth/metadata-default`, `auth/metadata-var1`, `auth/metadata-var2`, `auth/metadata-var3` | 1/7 each (`prm-pathbased-requested`) | 6 each (agentweave-oauth bug) |
+| `auth/basic-cimd` | 1/2 | 1 (agentweave-oauth bug) |
+| `auth/scope-from-www-authenticate`, `auth/scope-from-scopes-supported`, `auth/scope-omitted-when-undefined` | 1/2 each | 1 each (agentweave-oauth bug) |
+| `auth/scope-step-up` | 1/3 | 2 (agentweave-oauth bug) |
+| `auth/scope-retry-limit` | 1/2 | 1 (agentweave-oauth bug) |
+| `auth/token-endpoint-auth-basic`, `-post`, `-none` | 1/4 each | 3 each (agentweave-oauth bug) |
+| `auth/pre-registration` | 1/2 | 1 (agentweave-oauth bug) |
 
 ### A2A TCK, MUST level: 235 test cases
 
@@ -125,6 +137,25 @@ deselected.
 |---|---|
 | `elicitation-sep1034-client-defaults:*`: the 6 checks `general`, `string-`, `integer-`, `number-`, `enum-` and `boolean-default` | `McpFeatures.ELICITATION` is unsupported. The connector declares no elicitation capability, so `elicitation/create` is answered with `-32601`. |
 | `sse-retry:client-sse-retry-timing`, `sse-retry:client-sse-last-event-id` | Upstream bug in MCP Java SDK 2.1.0 (see below). The MCP Java SDK's own baseline lists `sse-retry` too. |
+| `auth/metadata-{default,var1,var2,var3}`: `authorization-server-metadata`, `client-registration`, `authorization-request`, `token-request`, `resource-parameter-in-authorization`, `resource-parameter-in-token` | agentweave-oauth bug: `http://localhost` authorization servers are refused (see below). |
+| `auth/basic-cimd:cimd-client-id-used`; `auth/scope-from-www-authenticate`, `auth/scope-from-scopes-supported`, `auth/scope-omitted-when-undefined`, `auth/scope-retry-limit`: the check named like the scenario; `auth/scope-step-up`: `scope-step-up-initial`, `scope-step-up-escalation`; `auth/pre-registration:pre-registration-auth` | Same agentweave-oauth bug. |
+| `auth/token-endpoint-auth-{basic,post,none}`: `token-endpoint-auth-method`, `resource-parameter-in-authorization`, `resource-parameter-in-token` | Same agentweave-oauth bug. |
+
+The agentweave-oauth bug in detail:
+
+- Every mock server of the suite listens on `http://localhost:<port>`, its authorization server
+  included.
+- `Uris.requireSecure` (`agentweave-oauth/src/main/java/io/agentweave/oauth/Uris.java:121-132`)
+  allows plain `http` only when `Uris.isLoopback` (`Uris.java:112-118`) is true, and
+  `isLoopback` accepts the literal addresses `127.0.0.0/8` and `::1` only, never the name
+  `localhost`.
+- `Discovery.authorizationServer` (`Discovery.java:92`) applies it to the issuer listed in the
+  protected resource metadata, so `OAuthClient.handleUnauthorized` gives up with
+  `authorization server issuer must use https: http://localhost:<port>`. No authorization server
+  metadata, registration, authorization or token request is sent, and the connector surfaces the
+  401.
+- With `isLoopback` also accepting `localhost` (tried in a scratch copy only), every `auth/*`
+  check passes, so this is the only gap the 14 scenarios find.
 
 The SDK bug in detail:
 
@@ -140,6 +171,18 @@ The TCK has no baseline option. `a2a-tck.sh` compares the failed and errored cas
 report with this list, using the same rules as the MCP suite.
 
 ## Notes on the apps
+
+- `conformance/mcp-client` runs the `auth/*` scenarios with one client configuration, nothing
+  tailored per scenario: `McpClientConnector.http(..).authorizer(oauthClient)` with the
+  authorization code grant, the suite's fixed Client ID Metadata Document URL
+  (`https://conformance-test.local/client-metadata.json`, used only when the server advertises
+  `client_id_metadata_document_supported`), else Dynamic Client Registration;
+  `auth/pre-registration` uses the `client_id`/`client_secret` from `MCP_CONFORMANCE_CONTEXT`.
+  Each scenario lists the tools and calls `test-tool`. The suite's authorization endpoint approves
+  at once with a redirect, so the `BrowserLauncher` is a headless user agent: it GETs the
+  authorization URL, then the redirect `Location` (the OAuthClient's loopback receiver). Each
+  challenge and the OAuthClient's decision, with its reason when it gives up, go to the
+  scenario's `stderr.txt`.
 
 - `conformance/mcp-server` publishes the suite's fixture names and texts exactly. It binds
   `localhost` and allows only `http://localhost:*`, `http://127.0.0.1:*` and `http://[::1]:*` as

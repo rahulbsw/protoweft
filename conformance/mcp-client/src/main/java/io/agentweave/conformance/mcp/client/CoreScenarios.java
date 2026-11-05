@@ -1,5 +1,6 @@
 package io.agentweave.conformance.mcp.client;
 
+import io.agentweave.core.auth.HttpAuthorizer;
 import io.agentweave.core.tool.ToolInvocation;
 import io.agentweave.core.tool.ToolOutcome;
 import io.agentweave.core.tool.ToolSpec;
@@ -58,7 +59,7 @@ final class CoreScenarios {
         }
     }
 
-    private static void callIfListed(McpClientConnector client, String tool, Map<String, Object> arguments) {
+    static void callIfListed(McpClientConnector client, String tool, Map<String, Object> arguments) {
         List<ToolSpec> tools = client.listTools();
         System.out.println("tools: " + tools.stream().map(ToolSpec::name).toList());
         if (tools.stream().noneMatch(t -> t.name().equals(tool))) {
@@ -70,12 +71,25 @@ final class CoreScenarios {
 
     /** A started connector for the suite's URL: base (scheme, host, port) plus the endpoint path. */
     static McpClientConnector connect(ConformanceMcpClient.Run run) {
-        McpClientConnector client = McpClientConnector.http(base(run.serverUrl()))
+        return connect(run, null);
+    }
+
+    /** As {@link #connect(ConformanceMcpClient.Run)}, with tokens from {@code authorizer} when it is not null. */
+    static McpClientConnector connect(ConformanceMcpClient.Run run, HttpAuthorizer authorizer) {
+        McpClientConnector.HttpBuilder builder = McpClientConnector.http(base(run.serverUrl()))
                 .endpoint(endpoint(run.serverUrl()))
                 .clientInfo("agentweave-conformance-client", "1.0.0")
-                .requestTimeout(Duration.ofSeconds(20))
-                .build();
-        client.start();
+                .requestTimeout(Duration.ofSeconds(20));
+        if (authorizer != null) {
+            builder.authorizer(authorizer);
+        }
+        McpClientConnector client = builder.build();
+        try {
+            client.start();
+        } catch (RuntimeException e) {
+            client.close();
+            throw e;
+        }
         return client;
     }
 

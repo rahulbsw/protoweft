@@ -54,9 +54,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The non-auth client scenarios required for 2025-11-25. The auth/* scenarios join this
-        # list when agentweave-mcp implements MCP authorization.
-        scenario: [initialize, tools_call, elicitation-sep1034-client-defaults, sse-retry]
+        # Every client scenario required for 2025-11-25: the 4 non-auth ones and the 14 auth/*
+        # ones (the suite's `auth` suite; McpClientConnector with agentweave-oauth's OAuthClient).
+        scenario:
+          - initialize
+          - tools_call
+          - elicitation-sep1034-client-defaults
+          - sse-retry
+          - auth/metadata-default
+          - auth/metadata-var1
+          - auth/metadata-var2
+          - auth/metadata-var3
+          - auth/basic-cimd
+          - auth/scope-from-www-authenticate
+          - auth/scope-from-scopes-supported
+          - auth/scope-omitted-when-undefined
+          - auth/scope-step-up
+          - auth/scope-retry-limit
+          - auth/token-endpoint-auth-basic
+          - auth/token-endpoint-auth-post
+          - auth/token-endpoint-auth-none
+          - auth/pre-registration
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -69,11 +87,18 @@ jobs:
           node-version: '22'
       - name: Run the MCP conformance suite (client, ${{ matrix.scenario }})
         run: scripts/conformance/mcp-client.sh '${{ matrix.scenario }}'
+      # Artifact names cannot contain '/', which auth/* scenario names do.
+      - name: Artifact name
+        id: artifact
+        if: always()
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: echo "name=conformance-mcp-client-${SCENARIO//\//-}" >> "$GITHUB_OUTPUT"
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: conformance-mcp-client-${{ matrix.scenario }}
+          name: ${{ steps.artifact.outputs.name }}
           path: build/conformance/mcp-client/
           if-no-files-found: warn
 
