@@ -7,10 +7,12 @@ import io.agentweave.core.ProtocolId;
 import io.agentweave.core.auth.CredentialProvider;
 import io.agentweave.core.observe.ObservationHandler;
 import io.agentweave.core.observe.ObservationHandler.Observation;
+import io.agentweave.core.server.CallerIdentity;
 import io.agentweave.core.tool.Content;
 import io.agentweave.core.tool.ToolConnector;
 import io.agentweave.core.tool.ToolInvocation;
 import io.agentweave.core.tool.ToolOutcome;
+import io.agentweave.core.tool.ToolProgress;
 import io.agentweave.core.tool.ToolSpec;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
@@ -29,6 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -44,7 +49,10 @@ import java.util.function.Supplier;
  * try (ToolConnector mcp = McpClientConnector.http("https://tools.example.com").build()) { ... }
  * }</pre>
  *
- * <p>Thread-safe once started. See {@link #compliance()} for exactly what is implemented.
+ * <p>Beyond tools it reads resources, renders prompts, requests completions and receives log,
+ * progress and list-change notifications; each fails with {@code UNSUPPORTED} when the server
+ * didn't declare the capability. Thread-safe once started. See {@link #compliance()} for
+ * exactly what is implemented.
  */
 public final class McpClientConnector implements ToolConnector {
 
@@ -59,7 +67,8 @@ public final class McpClientConnector implements ToolConnector {
 
     private volatile McpSyncClient client;
     private volatile ComplianceReport report;
-    private volatile boolean toolsOffered;
+    private volatile McpSchema.ServerCapabilities capabilities;
+    private final ClientListeners listeners = new ClientListeners();
 
     private McpClientConnector(ClientTransport transport, Settings settings) {
         this.transport = transport;
@@ -72,7 +81,8 @@ public final class McpClientConnector implements ToolConnector {
         Properties sdk = sdkProperties();
         this.baseReport = new ComplianceReport(ProtocolId.MCP, sdk.getProperty("mcp.sdk.name"),
                 sdk.getProperty("mcp.sdk.version"), transport.protocolVersions(), null,
-                McpFeatures.supported(transport.featureId()), McpFeatures.unsupported(transport.featureId()));
+                McpFeatures.supported(McpFeatures.Role.CLIENT, transport.featureId()),
+                McpFeatures.unsupported(McpFeatures.Role.CLIENT, transport.featureId()));
         this.report = baseReport;
     }
 
@@ -101,16 +111,18 @@ public final class McpClientConnector implements ToolConnector {
         if (client != null) {
             throw new AgentWeaveException(ErrorCategory.CONFIGURATION, ProtocolId.MCP, "connector already started");
         }
-        McpClientTransport sdkTransport = transport.open(
-                credentials.credentialsFor(ProtocolId.MCP, transport.credentialTarget()), requestTimeout);
-        McpSyncClient sync = McpClient.sync(sdkTransport)
+        McpClientTransport sdkTransport = listeners.tap(transport.open(
+                credentials.credentialsFor(ProtocolId.MCP, transport.credentialTarget()), requestTimeout));
+        McpClient.SyncSpec spec = McpClient.sync(sdkTransport)
                 .requestTimeout(requestTimeout)
                 .initializationTimeout(requestTimeout)
-                .clientInfo(McpSchema.Implementation.builder(clientName, clientVersion).build())
-                .build();
+                .clientInfo(McpSchema.Implementation.builder(clientName, clientVersion).build());
+        listeners.install(spec);
+        McpSyncClient sync = spec.build();
         try {
             McpSchema.InitializeResult init = observe("initialize", target, sync::initialize);
-            toolsOffered = init.capabilities() != null && init.capabilities().tools() != null;
+            capabilities = init.capabilities() != null ? init.capabilities()
+                    : McpSchema.ServerCapabilities.builder().build();
             report = baseReport.withNegotiatedRevision(init.protocolVersion());
             client = sync;
         } catch (RuntimeException e) {
@@ -126,55 +138,174 @@ public final class McpClientConnector implements ToolConnector {
 
     @Override
     public List<ToolSpec> listTools() {
-        McpSyncClient c = requireTools(McpFeatures.TOOLS_LIST);
-        McpSchema.ListToolsResult result = observe("tools/list", "", c::listTools);
-        List<ToolSpec> tools = new ArrayList<>(result.tools().size());
-        for (McpSchema.Tool t : result.tools()) {
-            tools.add(new ToolSpec(t.name(), t.description(), t.inputSchema(), metadata(t)));
-        }
-        return List.copyOf(tools);
-    }
-
-    /** MCP tool annotations are hints; only the ones the server set are carried over. */
-    private static Map<String, Object> metadata(McpSchema.Tool t) {
-        Map<String, Object> meta = new HashMap<>();
-        if (t.title() != null) {
-            meta.put(ToolSpec.META_TITLE, t.title());
-        }
-        McpSchema.ToolAnnotations a = t.annotations();
-        if (a != null) {
-            if (a.title() != null && t.title() == null) {
-                meta.put(ToolSpec.META_TITLE, a.title());
-            }
-            putIfSet(meta, ToolSpec.META_READ_ONLY, a.readOnlyHint());
-            putIfSet(meta, ToolSpec.META_DESTRUCTIVE, a.destructiveHint());
-            putIfSet(meta, ToolSpec.META_IDEMPOTENT, a.idempotentHint());
-            putIfSet(meta, ToolSpec.META_OPEN_WORLD, a.openWorldHint());
-        }
-        return meta;
-    }
-
-    private static void putIfSet(Map<String, Object> meta, String key, Boolean value) {
-        if (value != null) {
-            meta.put(key, value);
-        }
+        McpSyncClient c = require(McpFeatures.TOOLS_LIST, "tools", caps -> caps.tools() != null);
+        return observe("tools/list", "", c::listTools).tools().stream().map(McpContent::toToolSpec).toList();
     }
 
     @Override
     public ToolOutcome invoke(ToolInvocation invocation) {
+        return invoke(invocation, null, ToolProgress.NOOP);
+    }
+
+    /**
+     * Calls a tool, forwarding the server's {@code notifications/progress} for this call to
+     * {@code progress}. A {@code progressToken} is sent only when {@code progress} isn't
+     * {@link ToolProgress#NOOP}. The caller is not sent: MCP has no field for it.
+     */
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress) {
         Objects.requireNonNull(invocation, "invocation");
-        McpSyncClient c = requireTools(McpFeatures.TOOLS_CALL);
-        McpSchema.CallToolRequest request = McpSchema.CallToolRequest.builder(invocation.toolName())
-                .arguments(invocation.arguments())
-                .build();
-        McpSchema.CallToolResult result = observe("tools/call", invocation.toolName(), () -> c.callTool(request));
+        McpSyncClient c = require(McpFeatures.TOOLS_CALL, "tools", caps -> caps.tools() != null);
+        McpSchema.CallToolRequest.Builder request = McpSchema.CallToolRequest.builder(invocation.toolName())
+                .arguments(invocation.arguments());
+        String token = progress == null || progress == ToolProgress.NOOP ? null : UUID.randomUUID().toString();
+        if (token != null) {
+            request.progressToken(token);
+            listeners.track(token, progress);
+        }
+        McpSchema.CallToolResult result;
+        try {
+            result = observe("tools/call", invocation.toolName(), () -> c.callTool(request.build()));
+        } finally {
+            if (token != null) {
+                listeners.untrack(token);
+            }
+        }
         List<Content> content = new ArrayList<>();
         if (result.content() != null) {
             for (McpSchema.Content part : result.content()) {
-                content.add(toNeutral(part));
+                content.addAll(McpContent.toNeutral(part));
             }
         }
         return new ToolOutcome(content, Boolean.TRUE.equals(result.isError()), result.structuredContent());
+    }
+
+    // Resources, prompts, completion and logging (see SPEC.md); each requires the server's capability.
+
+    /** Every resource the server lists ({@code resources/list}, all pages). */
+    public List<McpResourceInfo> listResources() {
+        McpSyncClient c = require(McpFeatures.RESOURCES, "resources", caps -> caps.resources() != null);
+        return observe("resources/list", "", c::listResources).resources().stream().map(ClientListeners::toInfo).toList();
+    }
+
+    /** Every resource template the server lists ({@code resources/templates/list}, all pages). */
+    public List<McpTemplateInfo> listResourceTemplates() {
+        McpSyncClient c = require(McpFeatures.RESOURCES, "resources", caps -> caps.resources() != null);
+        return observe("resources/templates/list", "", c::listResourceTemplates).resourceTemplates().stream()
+                .map(ClientListeners::toInfo).toList();
+    }
+
+    /** Reads a resource; an unknown URI fails with {@code INVALID_ARGUMENTS} ({@code -32002}). */
+    public List<McpResourceContents> readResource(String uri) {
+        Objects.requireNonNull(uri, "uri");
+        McpSyncClient c = require(McpFeatures.RESOURCES, "resources", caps -> caps.resources() != null);
+        return observe("resources/read", uri, () -> c.readResource(McpSchema.ReadResourceRequest.builder(uri).build()))
+                .contents().stream().map(McpContent::toNeutral).toList();
+    }
+
+    /**
+     * Subscribes to a resource. On each {@code notifications/resources/updated} for it, the
+     * resource is re-read and {@code onUpdate} receives its contents. One listener per URI.
+     */
+    public void subscribe(String uri, Consumer<List<McpResourceContents>> onUpdate) {
+        Objects.requireNonNull(uri, "uri");
+        Objects.requireNonNull(onUpdate, "onUpdate");
+        McpSyncClient c = require(McpFeatures.RESOURCES_SUBSCRIBE, "resources.subscribe",
+                caps -> caps.resources() != null && Boolean.TRUE.equals(caps.resources().subscribe()));
+        listeners.subscribe(uri, onUpdate);
+        try {
+            observe("resources/subscribe", uri, () -> {
+                c.subscribeResource(McpSchema.SubscribeRequest.builder(uri).build());
+                return null;
+            });
+        } catch (RuntimeException e) {
+            listeners.unsubscribe(uri);
+            throw e;
+        }
+    }
+
+    public void unsubscribe(String uri) {
+        Objects.requireNonNull(uri, "uri");
+        McpSyncClient c = require(McpFeatures.RESOURCES_SUBSCRIBE, "resources.subscribe",
+                caps -> caps.resources() != null && Boolean.TRUE.equals(caps.resources().subscribe()));
+        listeners.unsubscribe(uri);
+        observe("resources/unsubscribe", uri, () -> {
+            c.unsubscribeResource(McpSchema.UnsubscribeRequest.builder(uri).build());
+            return null;
+        });
+    }
+
+    /** Every prompt the server lists ({@code prompts/list}, all pages). */
+    public List<McpPromptInfo> listPrompts() {
+        McpSyncClient c = require(McpFeatures.PROMPTS, "prompts", caps -> caps.prompts() != null);
+        return observe("prompts/list", "", c::listPrompts).prompts().stream().map(ClientListeners::toInfo).toList();
+    }
+
+    /** Renders a prompt; an unknown prompt or a missing argument fails with {@code INVALID_ARGUMENTS}. */
+    public McpPromptResult getPrompt(String name, Map<String, String> arguments) {
+        Objects.requireNonNull(name, "name");
+        McpSyncClient c = require(McpFeatures.PROMPTS, "prompts", caps -> caps.prompts() != null);
+        Map<String, Object> args = arguments == null ? Map.of() : Map.copyOf(arguments);
+        McpSchema.GetPromptResult result = observe("prompts/get", name,
+                () -> c.getPrompt(McpSchema.GetPromptRequest.builder(name).arguments(args).build()));
+        return new McpPromptResult(result.description(), result.messages() == null ? List.of()
+                : result.messages().stream().map(McpContent::toNeutral).toList());
+    }
+
+    /** Suggests values for an argument of {@code prompt}, given what was typed and the other arguments. */
+    public McpCompletion completePromptArgument(String prompt, String argument, String value,
+                                                Map<String, String> context) {
+        return complete(new McpSchema.PromptReference(prompt), argument, value, context);
+    }
+
+    /** Suggests values for a variable of a resource template, given what was typed and the other variables. */
+    public McpCompletion completeTemplateVariable(String uriTemplate, String variable, String value,
+                                                  Map<String, String> context) {
+        return complete(new McpSchema.ResourceReference(uriTemplate), variable, value, context);
+    }
+
+    private McpCompletion complete(McpSchema.CompleteReference ref, String argument, String value,
+                                   Map<String, String> context) {
+        McpSyncClient c = require(McpFeatures.COMPLETION, "completions", caps -> caps.completions() != null);
+        McpSchema.CompleteRequest request = new McpSchema.CompleteRequest(ref,
+                new McpSchema.CompleteRequest.CompleteArgument(argument, value == null ? "" : value), null,
+                context == null || context.isEmpty() ? null : new McpSchema.CompleteRequest.CompleteContext(context));
+        McpSchema.CompleteResult.CompleteCompletion result = observe("completion/complete", McpContent.refName(ref),
+                () -> c.completeCompletion(request)).completion();
+        return new McpCompletion(result.values(), result.total(), Boolean.TRUE.equals(result.hasMore()));
+    }
+
+    /** Asks the server to send log messages at {@code level} and above ({@code logging/setLevel}). */
+    public void setLogLevel(ToolProgress.Level level) {
+        Objects.requireNonNull(level, "level");
+        McpSyncClient c = require(McpFeatures.LOGGING, "logging", caps -> caps.logging() != null);
+        observe("logging/setLevel", level.name(), () -> {
+            c.setLoggingLevel(McpSchema.LoggingLevel.valueOf(level.name()));
+            return null;
+        });
+    }
+
+    /**
+     * Receives every log message the server sends, in arrival order on the transport's thread,
+     * so keep it quick. Register before or after {@link #start()}.
+     */
+    public void onLog(Consumer<McpLogMessage> listener) {
+        listeners.onLog(Objects.requireNonNull(listener, "listener"));
+    }
+
+    /** Receives the server's tool list each time it announces a change. */
+    public void onToolsChanged(Consumer<List<ToolSpec>> listener) {
+        listeners.onToolsChanged(Objects.requireNonNull(listener, "listener"));
+    }
+
+    /** Receives the server's resource list each time it announces a change. */
+    public void onResourcesChanged(Consumer<List<McpResourceInfo>> listener) {
+        listeners.onResourcesChanged(Objects.requireNonNull(listener, "listener"));
+    }
+
+    /** Receives the server's prompt list each time it announces a change. */
+    public void onPromptsChanged(Consumer<List<McpPromptInfo>> listener) {
+        listeners.onPromptsChanged(Objects.requireNonNull(listener, "listener"));
     }
 
     @Override
@@ -186,16 +317,16 @@ public final class McpClientConnector implements ToolConnector {
         }
     }
 
-    private McpSyncClient requireTools(String feature) {
+    private McpSyncClient require(String feature, String capability, Predicate<McpSchema.ServerCapabilities> offered) {
         McpSyncClient c = client;
         if (c == null) {
             throw new AgentWeaveException(ErrorCategory.CONFIGURATION, ProtocolId.MCP,
                     "connector not started; call start() first");
         }
         report.require(feature);
-        if (!toolsOffered) {
+        if (!offered.test(capabilities)) {
             throw new AgentWeaveException(ErrorCategory.UNSUPPORTED, ProtocolId.MCP,
-                    "server did not declare the 'tools' capability");
+                    "server did not declare the '" + capability + "' capability");
         }
         return c;
     }
@@ -208,22 +339,6 @@ public final class McpClientConnector implements ToolConnector {
                 throw McpErrors.translate(e, operation);
             }
         });
-    }
-
-    private static Content toNeutral(McpSchema.Content part) {
-        if (part instanceof McpSchema.TextContent text) {
-            return new Content.Text(text.text());
-        }
-        if (part instanceof McpSchema.ImageContent image) {
-            return new Content.Data(image.mimeType(), image.data());
-        }
-        if (part instanceof McpSchema.AudioContent audio) {
-            return new Content.Data(audio.mimeType(), audio.data());
-        }
-        if (part instanceof McpSchema.ResourceLink link) {
-            return new Content.Link(link.uri(), link.mimeType(), link.name());
-        }
-        return new Content.Unmapped(part.type());
     }
 
     /** The SDK coordinates, generated from {@code gradle.properties} at build time. */

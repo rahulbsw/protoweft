@@ -2,17 +2,22 @@ package io.agentweave.mcp;
 
 import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.modelcontextprotocol.server.McpServer;
+import io.modelcontextprotocol.server.McpServerFeatures.SyncPromptSpecification;
+import io.modelcontextprotocol.server.McpServerFeatures.SyncResourceSpecification;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A real stdio MCP server built on the official SDK, launched as a subprocess by the tests.
- * Pass {@code --no-tools} to start a server that does not declare the tools capability.
+ * Pass {@code --no-tools} to start a server that declares no capabilities, or {@code --dynamic}
+ * for one whose tool {@code grow} adds a tool, a resource and a prompt, announcing each list change.
  */
 public final class TestMcpServer {
 
@@ -20,7 +25,21 @@ public final class TestMcpServer {
         boolean noTools = List.of(args).contains("--no-tools");
         var transport = new StdioServerTransportProvider(McpJsonDefaults.getMapper());
         var spec = McpServer.sync(transport).serverInfo("agentweave-test-server", "1.0.0");
-        if (noTools) {
+        if (List.of(args).contains("--dynamic")) {
+            AtomicReference<McpSyncServer> server = new AtomicReference<>();
+            server.set(spec.capabilities(McpSchema.ServerCapabilities.builder().tools(true).resources(false, true)
+                            .prompts(true).build())
+                    .tools(tool("grow", "Adds a tool, a resource and a prompt", Map.of(), a -> {
+                        server.get().addTool(echo());
+                        server.get().addResource(new SyncResourceSpecification(
+                                McpSchema.Resource.builder("test://grown", "grown").build(),
+                                (exchange, request) -> McpSchema.ReadResourceResult.builder(List.of()).build()));
+                        server.get().addPrompt(new SyncPromptSpecification(McpSchema.Prompt.builder("grown").build(),
+                                (exchange, request) -> McpSchema.GetPromptResult.builder(List.of()).build()));
+                        return McpSchema.CallToolResult.builder().addTextContent("grown").build();
+                    }))
+                    .build());
+        } else if (noTools) {
             spec.capabilities(McpSchema.ServerCapabilities.builder().build()).build();
         } else {
             spec.capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
