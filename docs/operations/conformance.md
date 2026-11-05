@@ -61,14 +61,16 @@ artifacts.
 
 ## Current results
 
-These come from one local run on 2026-11-05: branch `feat/conformance` at commit `4c1f483`, plus
-the then-uncommitted conformance changes. The apps were built with the JDK 17 toolchain and run
+These come from local runs on 2026-11-05. The MCP server suite and the A2A TCK were re-run on
+`main` after commit `d62edad`, which fixed the two library gaps those suites found (embedded
+resources in MCP tool results, and inline file names in A2A); the MCP client figures are from the
+first run at commit `4c1f483`. The apps were built with the JDK 17 toolchain and run
 on JDK 21.0.10, with Node 26.3.1, Python 3.12.0 and uv 0.5.1. All three scripts exited 0.
 
 ### MCP server: 31 scenarios, 65 checks
 
-59 checks passed. 6 failed, all in the baseline, and each in a different scenario. 25 scenarios
-passed completely.
+61 checks passed. 4 failed, all in the baseline (sampling and elicitation, which AgentWeave does
+not support), each in a different scenario. 27 scenarios passed completely.
 
 | Scenarios | Result |
 |---|---|
@@ -76,9 +78,9 @@ passed completely.
 | `tools-list`, `tools-call-simple-text`, `tools-call-image`, `tools-call-audio`, `tools-call-with-logging`, `tools-call-error`, `tools-call-with-progress` | pass |
 | `resources-list`, `resources-read-text`, `resources-read-binary`, `resources-templates-read`, `resources-subscribe`, `resources-unsubscribe` | pass |
 | `prompts-list`, `prompts-get-simple`, `prompts-get-with-args`, `prompts-get-embedded-resource`, `prompts-get-with-image` | pass |
+| `tools-call-embedded-resource`, `tools-call-mixed-content` | pass (failed before `d62edad`) |
 | `server-sse-multiple-streams`, `dns-rebinding-protection` | pass |
 | `tools-call-sampling`, `tools-call-elicitation`, `elicitation-sep1034-defaults`, `elicitation-sep1330-enums` | 1 baselined check each (unsupported) |
-| `tools-call-embedded-resource`, `tools-call-mixed-content` | 1 baselined check each (library gap) |
 
 In every scenario with a failure, the `wire-schema-valid` check still passed.
 
@@ -95,17 +97,18 @@ In every scenario with a failure, the `wire-schema-valid` check still passed.
 
 ### A2A TCK, MUST level: 235 test cases
 
-87 passed and 1 failed, and that failure is in the baseline. 147 were skipped, and 30 non-MUST
-tests were deselected.
+88 passed and none failed, so the baseline is empty. 147 were skipped, and 30 non-MUST tests were
+deselected.
 
 - **Skipped:** almost all for the gRPC and HTTP+JSON transports, which the card doesn't declare.
   On JSON-RPC, a few were skipped because of capabilities. The server supports push and
   streaming, so it can't produce the "not supported" errors. It declares no extended card and no
   required extension.
-- **Requirement view** (`compatibility.json`): 75 MUST requirements pass, 1 fails (`DM-ART-001`),
-  and 16 are skipped (transport- or capability-gated). Another 22 are "not tested", because this
-  TCK version has no test for them: card signatures, auth, versioning, and binding equivalence.
-  The TCK reports `must_compatibility` as 76.5%, which counts "not tested" as not passed.
+- **Requirement view** (`compatibility.json`): 76 MUST requirements pass, none fail, and 16 are
+  skipped (transport- or capability-gated). Another 22 are "not tested", because this TCK version
+  has no test for them: card signatures, auth, versioning, and binding equivalence. The TCK
+  reports `must_compatibility` as 77.6%, which counts "not tested" as not passed. `DM-ART-001`
+  (an inline file part must keep its file name) failed before `d62edad`.
 
 ## Baselined items
 
@@ -115,16 +118,6 @@ tests were deselected.
 |---|---|
 | `tools-call-sampling:tools-call-sampling` | `McpFeatures.SAMPLING` is unsupported. A tool can't send `sampling/createMessage`, so `test_sampling` isn't published. |
 | `tools-call-elicitation:tools-call-elicitation`, `elicitation-sep1034-defaults:elicitation-sep1034-general`, `elicitation-sep1330-enums:elicitation-sep1330-general` | `McpFeatures.ELICITATION` is unsupported. A tool can't send `elicitation/create`, so the elicitation tools aren't published. |
-| `tools-call-embedded-resource:tools-call-embedded-resource`, `tools-call-mixed-content:tools-call-mixed-content` | Library gap: a tool result can't carry an embedded resource (see below). |
-
-The embedded-resource gap in detail:
-
-- Core `Content` has no embedded-resource part.
-- `ToolServerCore.toResult` maps each part on its own through `McpContent.toMcp(Content)`, which
-  turns a `Link` into a `resource_link`. Only prompt messages turn a `Link` plus its body into an
-  embedded resource.
-- So the fixture's `Link` + `Text` goes out as `resource_link` + `text`.
-- `McpFeatures` still lists `content/resource` as supported by the server.
 
 **MCP client** (`conformance/mcp-client-baseline.yml`):
 
@@ -141,18 +134,7 @@ The SDK bug in detail:
   doesn't reconnect with `Last-Event-ID`.
 - The `tools/call` then times out.
 
-**A2A TCK** (`conformance/a2a-tck-baseline.yml`):
-
-| Entry | Reason |
-|---|---|
-| `tests.compatibility.core_operations.test_artifacts.TestFileArtifact::test_task_has_file_artifact[jsonrpc]` (`DM-ART-001`) | Library gap: an inline-bytes file part can't carry a file name (see below). |
-
-The file-name gap in detail:
-
-- Core `Content.Data(mimeType, base64Data)` has no file name.
-- `A2aMapping` sends `FileWithBytes(mimeType, "", bytes)`, so the TCK finds no `output.txt`
-  filename.
-- File parts by URI keep their name through `Content.Link.name`.
+**A2A TCK** (`conformance/a2a-tck-baseline.yml`): empty.
 
 The TCK has no baseline option. `a2a-tck.sh` compares the failed and errored cases in its JUnit
 report with this list, using the same rules as the MCP suite.
@@ -163,6 +145,7 @@ report with this list, using the same rules as the MCP suite.
   `localhost` and allows only `http://localhost:*`, `http://127.0.0.1:*` and `http://[::1]:*` as
   browser origins; any other `Origin` gets 403, which is what `dns-rebinding-protection` checks.
   Tools AgentWeave can't implement (sampling, elicitation) aren't faked.
+  The embedded-resource tools return `Content.Resource`.
 - `conformance/a2a-sut` follows the TCK's Gherkin scenarios (`scenarios/*.feature`), selecting a
   behavior by `messageId` prefix. Its JSON-RPC endpoint is at `/`, as in a2a-java's SUT. The
   TCK's HTTP client posts to `<interface URL>/`, so an interface at `/a2a` would be called as

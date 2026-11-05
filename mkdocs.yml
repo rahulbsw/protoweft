@@ -92,6 +92,7 @@ nav:
   - Operations:
       - Troubleshooting: operations/troubleshooting.md
       - Security model: operations/security-model.md
+      - Conformance: operations/conformance.md
   - Reference:
       - reference/index.md
       - Changelog: reference/changelog.md
