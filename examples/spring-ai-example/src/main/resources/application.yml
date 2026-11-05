@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: spring-ai-assistant
+  ai:
+    openai:
+      # Empty means "no key": the application still starts, model calls are rejected.
+      api-key: ${OPENAI_API_KEY:}
+      # base-url: http://localhost:11434   # any OpenAI-compatible server, e.g. Ollama
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-4o-mini}
+
+server:
+  port: 8080
+
+agentweave:
+  server:
+    a2a:
+      enabled: true                      # card at /.well-known/agent-card.json, JSON-RPC at /a2a
+      # public-url: https://assistant.example.com
+
+  # More tools for the ChatClient: each client becomes a source in the ToolRegistry, and its tools
+  # reach the model as <name>__<tool>. Or pass --agentweave.mcp.clients.remote.url=<url> at startup.
+  # mcp:
+  #   clients:
+  #     remote: { url: "http://localhost:3001" }   # Streamable HTTP; endpoint defaults to /mcp
