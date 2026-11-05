@@ -14,6 +14,24 @@ Requirements: JDK 17 or newer. The Gradle wrapper is included.
 
 Some tests start real servers on free local ports. None of them need network access or API keys.
 
+## Changing dependencies
+
+The build verifies every dependency and plugin against `gradle/verification-metadata.xml`
+(SHA-256 checksums and PGP signatures, with the public keys in `gradle/verification-keyring.keys`).
+After adding or upgrading a dependency, regenerate the metadata over the whole build, including
+the ARGI snapshot module, and review the diff before committing:
+
+```bash
+scripts/install-argi-snapshot.sh
+./gradlew --write-verification-metadata sha256,pgp --export-keys -PargiSnapshot \
+    build cyclonedxBom publishToMavenLocal -Pversion=0.0.0-verify
+rm gradle/verification-keyring.gpg
+rm -rf ~/.m2/repository/io/agentweave/*/0.0.0-verify
+```
+
+A new trusted key or an unexpected checksum change in the diff deserves a look at who signed the
+artifact.
+
 ## Project layout
 
 | Path | What lives there |
