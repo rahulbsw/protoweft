@@ -21,6 +21,8 @@ dependencies {
     compileOnly(project(":agentweave-mcp"))
     compileOnly(project(":agentweave-a2a"))
     compileOnly(project(":agentweave-utcp"))
+    // Optional tool discovery (agentweave.discovery.enabled).
+    compileOnly(project(":agentweave-discovery"))
 
     annotationProcessor(boot)
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
@@ -31,6 +33,7 @@ dependencies {
     testImplementation(project(":agentweave-mcp"))
     testImplementation(project(":agentweave-a2a"))
     testImplementation(project(":agentweave-utcp"))
+    testImplementation(project(":agentweave-discovery"))
     testImplementation("org.springframework.boot:spring-boot-autoconfigure")
     testImplementation("org.springframework.boot:spring-boot-test")
     testImplementation("org.springframework.boot:spring-boot-tomcat")

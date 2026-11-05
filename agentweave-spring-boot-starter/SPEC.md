@@ -18,6 +18,8 @@ Makes AgentWeave idiomatic in a **Spring Boot 4.x** application (built and teste
 - Serves tools over MCP, UTCP and A2A on the application's servlet container, only for the
   protocols that are opted in.
 - Bridges observations to Micrometer and reports connectors through Actuator.
+- Optionally builds a capability catalog for on-demand tool discovery and serves its meta-tools
+  over MCP.
 
 Nothing here is needed outside Spring. Every capability comes from `agentweave-core`,
 `agentweave-server` and the protocol modules, and nothing depends on this module.
@@ -28,7 +30,8 @@ Nothing here is needed outside Spring. Every capability comes from `agentweave-c
   - `api`: `agentweave-core`, `agentweave-server`.
   - `compileOnly`: Spring Boot (`spring-boot-autoconfigure`, `-health`, `-actuator`,
     `-actuator-autoconfigure`), the servlet API, Micrometer observation, `spring-security-core`
-    and **the protocol modules** (`agentweave-mcp`, `agentweave-utcp`, `agentweave-a2a`).
+    and **the protocol modules** (`agentweave-mcp`, `agentweave-utcp`, `agentweave-a2a`), plus
+    `agentweave-discovery`.
 - Applications add the starter plus each protocol module they use, for example
   `implementation("io.agentweave:agentweave-mcp")`. Each auto-configuration is guarded by
   `@ConditionalOnClass` on its protocol.
@@ -40,6 +43,9 @@ Nothing here is needed outside Spring. Every capability comes from `agentweave-c
   - `AgentWeaveMicrometerAutoConfiguration`: `MicrometerObservationHandler`.
   - `AgentWeaveActuatorAutoConfiguration`: `AgentWeaveHealthIndicator` (`agentweave`) and
     `AgentWeaveInfoContributor` (`agentweave`).
+  - `AgentWeaveDiscoveryAutoConfiguration`: only with `agentweave.discovery.enabled=true`. It
+    provides `CapabilityCatalog` and, with `expose-mcp=true` in a servlet web application, the
+    `agentWeaveDiscoveryMcpEndpoints` registrar.
 - Every bean the starter creates is `@ConditionalOnMissingBean`, so an application bean of the
   same type replaces it. Application beans the starter uses:
   - `@AgentTool` beans and `LocalTools.LocalTool` beans.
@@ -47,6 +53,7 @@ Nothing here is needed outside Spring. Every capability comes from `agentweave-c
   - `CredentialProvider`.
   - `ObservationHandler` (any number).
   - `AgentHandler`, with an optional `AgentDescriptor`.
+  - `Embedder` (optional): enables hybrid discovery search.
 
 ## Properties
 
@@ -59,6 +66,7 @@ Nothing here is needed outside Spring. Every capability comes from `agentweave-c
 | `agentweave.server` | `auth-filter-order` (0) |
 | `agentweave.server.mcp` | `enabled` · `path` (`/mcp`) · `expose` (`local`\|`registry`) · `server-name` · `server-version` · `allowed-origins` · `request-timeout` |
 | `agentweave.server.utcp` | `enabled` · `base-url` · `expose` · `manual-version` · `api-key-header` + `api-key-variable` |
+| `agentweave.discovery` | `enabled` (false) · `fallback` (`progressive`\|`all-schemas`\|`none`) · `sources.<name>.required-scopes` · `expose-mcp` (false) · `mcp-path` (`/mcp-discovery`) |
 | `agentweave.server.a2a` | `enabled` · `public-url` · `path` (`/a2a`) · `name` · `description` · `version` · `skills[]` · `streaming` · `push-notifications` · `agent-timeout` |
 
 `<name>` is the registry source name, so tools appear as `<name>.<tool>`; an A2A agent appears as
@@ -74,7 +82,10 @@ The checks:
 - An A2A agent has a `url`.
 - Names match `[A-Za-z0-9_-]+` and are unique across protocols and the local tools.
 - A protocol that is configured has its module on the classpath.
-- Server paths are exact and don't collide.
+- Server paths are exact and don't collide. That includes `agentweave.discovery.mcp-path`.
+- Discovery is enabled only with `agentweave-discovery` on the classpath, and `expose-mcp` only
+  with `agentweave-mcp`.
+- Each `agentweave.discovery.sources.<name>` names a known source.
 - The UTCP api-key pair is set together, and URLs are absolute http(s).
 
 ## Decisions
@@ -143,6 +154,42 @@ The checks:
     singleton target. Advice such as `@Transactional` is bypassed on tool calls.
   - A tool bean that needs the `ToolRegistry` must inject `ObjectProvider<ToolRegistry>`, because
     the registry depends on the local tools.
+- **Tool discovery (opt-in).**
+  - **Sources.** The `CapabilityCatalog` bean has one source per registry source that exists
+    when it is created: the local tools, plus whatever an application-defined `ToolRegistry`
+    already holds. It also has one per declared connector. A catalog's sources are fixed when it
+    is built, so declared connectors are added up front instead of waiting for the registry.
+  - **Not-yet-started connectors.** Each declared connector is wrapped so that it lists tools
+    only while its state is `UP`. It stays a `ToolConnector`, so cards still carry its protocol
+    and negotiated revision. Its availability probe is `state == UP`. A pending, failed
+    (`fail-fast=false`) or closed connector is reported unavailable with its state; the catalog
+    never calls it.
+  - **Refresh after the connectors start.** `CatalogRefresher` is a `SmartLifecycle` that depends
+    on `AgentWeaveConnectors`, so Spring starts the connectors first (same phase, dependencies
+    first), and then `catalog.refresh()` runs. Sources registered in the registry later are not
+    picked up. Define your own `CapabilityCatalog` bean for those, or for per-tool scopes, tags
+    or a custom index.
+  - **Embedder and observations.** An `Embedder` bean is used if present; otherwise search is
+    keyword-only and says so. Observations go to the same composite handler as the servers.
+  - **Fallback.** `fallback` maps onto `FallbackPolicy.of(mode)` with the module defaults.
+    `sources.<name>.required-scopes` becomes the source's `SourcePolicy.requiredScopes`, matched
+    against the caller attribute `scopes`.
+  - **Spring Security scopes.** `SpringSecurityInboundAuthenticator` also sets `scopes`: the
+    `SCOPE_x` authorities (Spring Security's OAuth2 resource-server convention), with the prefix
+    removed.
+  - **Serving over MCP.** `expose-mcp=true` serves `DiscoveryTools.of(catalog)` with
+    `McpToolServer.http` at `mcp-path`, through an `AgentWeaveEndpointRegistrar`. So it gets the
+    same `InboundAuthFilter`, filter order and authenticator as the other servers, and the
+    caller reaches the catalog's permission filter.
+    - Server name, version, allowed origins and request timeout come from
+      `agentweave.server.mcp.*`. The regular MCP server doesn't have to be enabled.
+    - The meta-tool list is fixed, so this endpoint isn't deferred. Before the connectors have
+      started, their capabilities are reported unavailable.
+    - The MCP server isn't a bean, so it can't clash with the `McpToolServer.Http` bean. Its
+      servlet closes it when the container destroys it.
+  - **Optional module.** `agentweave-discovery` is `compileOnly`, and its beans are guarded by
+    `@ConditionalOnClass`. Enabling discovery without the module fails startup and names the
+    artifact.
 - **Actuator.**
   - Health `agentweave` reports connector lifecycle state; it doesn't probe peers on every check.
     It is DOWN if any connector failed, OUT_OF_SERVICE while any is pending, and UP otherwise.
@@ -165,10 +212,13 @@ Not implemented:
 - A2A extended cards and custom executors through properties. Define an `A2aAgentServer` bean for
   those.
 - Server compliance reports in Actuator info.
+- Discovery through properties: per-tool scopes, source tags, confidence thresholds and a
+  names-only limit; a catalog over sources registered after startup; LangChain4j wiring. Define a
+  `CapabilityCatalog` bean for those.
 
 ## Verification
 
-`./gradlew :agentweave-spring-boot-starter:build` runs 21 tests on Boot 4.1.2:
+`./gradlew :agentweave-spring-boot-starter:build` runs 33 tests on Boot 4.1.2:
 
 - **`ApplicationContextRunner`:**
   - `@AgentTool` and `LocalTool` beans end up in the registry, and the local name is
@@ -180,6 +230,18 @@ Not implemented:
   - Fail-fast startup failure, and `fail-fast=false` leaving the connector out with health DOWN.
   - Validation errors.
   - A missing protocol module.
+  - Discovery (`AgentWeaveDiscoveryConfigurationTest`):
+    - It is opt-in.
+    - The catalog covers the local tools, application-registered sources and a real stdio MCP
+      connector. The connector is cataloged after it starts, with its protocol and revision.
+    - Fallback mode and per-source scopes apply.
+    - An `Embedder` bean makes search hybrid.
+    - A failed connector (`fail-fast=false`) is reported unavailable.
+    - Unknown sources, colliding or relative `mcp-path`, and a missing discovery module are
+      rejected.
+    - With `expose-mcp`, the meta-tools are mounted at `/mcp-discovery` behind the auth filter,
+      next to `/mcp`.
+  - `SpringSecurityInboundAuthenticator` maps `SCOPE_` authorities to `scopes`.
 - **`WebApplicationContextRunner`:**
   - Nothing is exposed without opt-in.
   - Each server is mounted at its configured paths, async, with the auth filter and order.
@@ -194,6 +256,12 @@ Not implemented:
   - An external MCP client sees the whole registry.
   - Micrometer records the server-side `tools/call`.
   - The A2A card carries the local-URL fallback.
+- **Real Tomcat, discovery (`AgentWeaveDiscoveryHttpTest`):**
+  - Our MCP client at `/mcp-discovery` sees exactly the three meta-tools.
+  - `search_capabilities` finds the stdio connector's `files.echo`, and `call_capability` runs it.
+  - The scoped local tools are found and called only with the bearer token that grants the scope,
+    and the caller's name reaches the tool.
+  - Anonymous clients get 401.
 - **Real Tomcat with Spring Security:** HTTP Basic on `/mcp` rejects anonymous MCP clients, and
   the authenticated user reaches the tool as the caller, which proves the filter order.
 
