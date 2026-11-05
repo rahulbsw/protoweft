@@ -1,17 +1,23 @@
 dependencies {
     api(project(":agentweave-core"))
+    // McpToolServer.http() hands its servlet to any host through the server hosting contract.
+    api(project(":agentweave-server"))
+    // Provided by the servlet host; mcp-core declares it the same way.
+    compileOnly("jakarta.servlet:jakarta.servlet-api:${project.property("servletApiVersion")}")
     // Official MCP Java SDK (SDK major 2.x). `mcp` = mcp-core + Jackson 3 JSON mapper.
     implementation("io.modelcontextprotocol.sdk:mcp:${project.property("mcpSdkVersion")}")
 
     testImplementation(platform("org.junit:junit-bom:${project.property("junitVersion")}"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:${project.property("assertjVersion")}")
+    // Embedded Jetty hosts McpToolServer.http() in the HTTP end-to-end tests.
+    testImplementation(project(":agentweave-server-jetty"))
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // slf4j-simple logs to stderr, which keeps the stdio test server's stdout clean for JSON-RPC.
     testRuntimeOnly("org.slf4j:slf4j-simple:${project.property("slf4jVersion")}")
 }
 
-// Tests launch TestMcpServer as a real stdio subprocess on the test runtime classpath.
+// Tests launch stdio servers (TestMcpServer, TestStdioToolServer) as subprocesses on the test runtime classpath.
 tasks.test {
     systemProperty("agentweave.test.classpath", sourceSets.test.get().runtimeClasspath.asPath)
 }

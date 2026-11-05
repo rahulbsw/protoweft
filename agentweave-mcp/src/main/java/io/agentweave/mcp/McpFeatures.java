@@ -1,11 +1,13 @@
 package io.agentweave.mcp;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Feature identifiers used in the MCP connector's
- * {@link io.agentweave.core.ComplianceReport}. The supported and unsupported sets are the
- * connector's honest coverage claim and are asserted by tests.
+ * Feature identifiers used in the {@link io.agentweave.core.ComplianceReport} of the MCP client
+ * ({@link McpClientConnector}) and server ({@link McpToolServer}). An id names a protocol
+ * feature; the report's owner gives the role. Each report lists only the transport actually in
+ * use as supported, and tests assert both sets.
  */
 public final class McpFeatures {
 
@@ -33,14 +35,40 @@ public final class McpFeatures {
     public static final String ROOTS = "roots";
     public static final String ELICITATION = "elicitation";
 
-    static final Set<String> SUPPORTED = Set.of(
-            LIFECYCLE_VERSION_NEGOTIATION, TRANSPORT_STDIO, TOOLS_LIST, TOOLS_CALL,
-            TOOLS_STRUCTURED_OUTPUT, CONTENT_TEXT, CONTENT_IMAGE, CONTENT_AUDIO, CONTENT_RESOURCE_LINK);
+    /** Implemented by both the client connector and the tool server, on either transport. */
+    private static final Set<String> COMMON = Set.of(
+            LIFECYCLE_VERSION_NEGOTIATION, TOOLS_LIST, TOOLS_CALL, TOOLS_STRUCTURED_OUTPUT,
+            CONTENT_TEXT, CONTENT_IMAGE, CONTENT_AUDIO, CONTENT_RESOURCE_LINK);
 
-    static final Set<String> UNSUPPORTED = Set.of(
-            TRANSPORT_STREAMABLE_HTTP, TRANSPORT_SSE, AUTHORIZATION, TOOLS_LIST_CHANGED,
-            CONTENT_RESOURCE, RESOURCES, PROMPTS, COMPLETION, LOGGING,
-            PROGRESS, CANCELLATION, SAMPLING, ROOTS, ELICITATION);
+    /** Defined by MCP, implemented by neither role. */
+    private static final Set<String> NOT_IMPLEMENTED = Set.of(
+            TRANSPORT_SSE, AUTHORIZATION, TOOLS_LIST_CHANGED, CONTENT_RESOURCE, RESOURCES, PROMPTS,
+            COMPLETION, LOGGING, PROGRESS, CANCELLATION, SAMPLING, ROOTS, ELICITATION);
+
+    private static final Set<String> TRANSPORTS = Set.of(TRANSPORT_STDIO, TRANSPORT_STREAMABLE_HTTP);
+
+    /** What a client or server using {@code transport} implements. */
+    static Set<String> supported(String transport) {
+        requireTransport(transport);
+        Set<String> s = new HashSet<>(COMMON);
+        s.add(transport);
+        return Set.copyOf(s);
+    }
+
+    /** What a client or server using {@code transport} does not implement, including the other transport. */
+    static Set<String> unsupported(String transport) {
+        requireTransport(transport);
+        Set<String> s = new HashSet<>(NOT_IMPLEMENTED);
+        s.addAll(TRANSPORTS);
+        s.remove(transport);
+        return Set.copyOf(s);
+    }
+
+    private static void requireTransport(String transport) {
+        if (!TRANSPORTS.contains(transport)) {
+            throw new IllegalArgumentException("not an implemented transport: " + transport);
+        }
+    }
 
     private McpFeatures() {
     }

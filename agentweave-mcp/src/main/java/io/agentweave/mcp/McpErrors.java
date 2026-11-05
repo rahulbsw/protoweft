@@ -3,6 +3,7 @@ package io.agentweave.mcp;
 import io.agentweave.core.AgentWeaveException;
 import io.agentweave.core.ErrorCategory;
 import io.agentweave.core.ProtocolId;
+import io.modelcontextprotocol.client.transport.McpHttpClientTransportAuthorizationException;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema;
 
@@ -20,6 +21,14 @@ final class McpErrors {
     static AgentWeaveException translate(RuntimeException e, String operation) {
         if (e instanceof AgentWeaveException already) {
             return already;
+        }
+        McpHttpClientTransportAuthorizationException denied =
+                findCause(e, McpHttpClientTransportAuthorizationException.class);
+        if (denied != null) {
+            String status = denied.getResponseInfo() == null ? null
+                    : Integer.toString(denied.getResponseInfo().statusCode());
+            return new AgentWeaveException(ErrorCategory.AUTHENTICATION, ProtocolId.MCP, status,
+                    "MCP " + operation + " rejected by the server" + (status == null ? "" : " with HTTP " + status), e);
         }
         if (hasCause(e, TimeoutException.class)) {
             return new AgentWeaveException(ErrorCategory.TIMEOUT, ProtocolId.MCP,
