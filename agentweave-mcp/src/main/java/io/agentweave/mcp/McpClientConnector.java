@@ -213,6 +213,9 @@ public final class McpClientConnector implements ToolConnector {
         if (part instanceof McpSchema.AudioContent audio) {
             return new Content.Data(audio.mimeType(), audio.data());
         }
+        if (part instanceof McpSchema.ResourceLink link) {
+            return new Content.Link(link.uri(), link.mimeType(), link.name());
+        }
         return new Content.Unmapped(part.type());
     }
 

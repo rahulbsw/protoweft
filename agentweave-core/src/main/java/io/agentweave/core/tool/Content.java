@@ -31,6 +31,26 @@ public sealed interface Content {
     }
 
     /**
+     * Structured data, as plain maps/lists/scalars (for example an A2A data part).
+     */
+    record Json(Object value) implements Content {
+    }
+
+    /**
+     * A reference to content by URI rather than inline bytes (for example an MCP resource
+     * link or an A2A file part with a URI).
+     *
+     * @param uri      where the content lives
+     * @param mimeType the media type, or {@code null} if unknown
+     * @param name     a display name, or {@code null}
+     */
+    record Link(String uri, String mimeType, String name) implements Content {
+        public Link {
+            Objects.requireNonNull(uri, "uri");
+        }
+    }
+
+    /**
      * A content part this connector does not map yet.
      *
      * @param protocolType the protocol's own type tag, for example {@code "resource_link"}

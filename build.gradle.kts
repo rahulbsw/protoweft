@@ -4,8 +4,9 @@ allprojects {
     }
 }
 
-// Only real modules (directories with a build file); container directories like `examples/` are skipped.
-configure(subprojects.filter { it.buildFile.exists() }) {
+// Only real Java modules (directories with a build file); container directories like `examples/`
+// and the java-platform BOM are skipped.
+configure(subprojects.filter { it.buildFile.exists() && it.name != "agentweave-bom" }) {
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")
 
