@@ -28,6 +28,13 @@ jobs:
       - name: Check that publishing works (unsigned, local)
         if: matrix.java == '17'
         run: ./gradlew publishToMavenLocal -Pversion=0.0.0-ci --console=plain
+      - name: Build the starter templates against the local publication
+        if: matrix.java == '17'
+        run: |
+          for t in templates/*/; do
+            ./gradlew -p "$t" build --init-script "$PWD/templates/verify-with-maven-local.init.gradle.kts" \
+              -PagentweaveVersion=0.0.0-ci --console=plain
+          done
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
