@@ -67,4 +67,17 @@ class AgentWeaveServerTest {
         }
         return HTTP.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
+
+    @Test
+    void denyChallengeIsSentAsWwwAuthenticate() throws Exception {
+        String challenge = "Bearer resource_metadata=\"https://example.com/.well-known/oauth-protected-resource\"";
+        try (AgentWeaveServer server = AgentWeaveServer.builder().port(0)
+                .endpoint(new ServletEndpoint("whoami", ProtocolId.MCP, List.of("/whoami"), WHOAMI, false))
+                .authenticator(req -> AuthDecision.unauthenticated("token required", challenge))
+                .start()) {
+            HttpResponse<String> denied = get(server, "/whoami", null);
+            assertThat(denied.statusCode()).isEqualTo(401);
+            assertThat(denied.headers().firstValue("WWW-Authenticate")).contains(challenge);
+        }
+    }
 }

@@ -44,10 +44,19 @@ public final class LocalTools implements ToolSource {
     }
 
     /** One tool: its description and implementation. */
-    public record LocalTool(ToolSpec spec, ToolHandler handler) {
+    public record LocalTool(ToolSpec spec, ProgressAwareToolHandler handler) {
         public LocalTool {
             Objects.requireNonNull(spec, "spec");
             Objects.requireNonNull(handler, "handler");
+        }
+
+        /** A tool whose handler doesn't report progress. */
+        public LocalTool(ToolSpec spec, ToolHandler handler) {
+            this(spec, adapt(Objects.requireNonNull(handler, "handler")));
+        }
+
+        private static ProgressAwareToolHandler adapt(ToolHandler handler) {
+            return (args, caller, progress) -> handler.handle(args, caller);
         }
     }
 
@@ -64,12 +73,18 @@ public final class LocalTools implements ToolSource {
 
     @Override
     public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller) {
+        return invoke(invocation, caller, ToolProgress.NOOP);
+    }
+
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress) {
         LocalTool tool = tools.get(invocation.toolName());
         if (tool == null) {
             throw new AgentWeaveException(ErrorCategory.TOOL_NOT_FOUND, null, "unknown tool: " + invocation.toolName());
         }
         try {
-            ToolOutcome outcome = tool.handler().handle(invocation.arguments(), caller == null ? CallerIdentity.ANONYMOUS : caller);
+            ToolOutcome outcome = tool.handler().handle(invocation.arguments(),
+                    caller == null ? CallerIdentity.ANONYMOUS : caller, progress == null ? ToolProgress.NOOP : progress);
             return outcome == null ? new ToolOutcome(List.of(), false, null) : outcome;
         } catch (AgentWeaveException e) {
             throw e;
@@ -85,6 +100,12 @@ public final class LocalTools implements ToolSource {
 
         /** Adds a programmatic tool. */
         public Builder tool(String name, String description, Map<String, Object> inputSchema, ToolHandler handler) {
+            return add(new LocalTool(new ToolSpec(name, description, inputSchema), handler));
+        }
+
+        /** Adds a programmatic tool that reports progress or log messages. */
+        public Builder tool(String name, String description, Map<String, Object> inputSchema,
+                            ProgressAwareToolHandler handler) {
             return add(new LocalTool(new ToolSpec(name, description, inputSchema), handler));
         }
 
@@ -141,7 +162,7 @@ public final class LocalTools implements ToolSource {
             List<String> required = new ArrayList<>();
             for (int i = 0; i < params.length; i++) {
                 Parameter p = params[i];
-                if (p.getType() == CallerIdentity.class) {
+                if (p.getType() == CallerIdentity.class || p.getType() == ToolProgress.class) {
                     continue;
                 }
                 ToolParam tp = p.getAnnotation(ToolParam.class);
@@ -173,11 +194,15 @@ public final class LocalTools implements ToolSource {
             }
             ToolSpec spec = new ToolSpec(toolName, annotation.description(),
                     JavaTypes.objectSchema(properties, required), metadata);
-            return new LocalTool(spec, (args, caller) -> {
+            return new LocalTool(spec, (args, caller, progress) -> {
                 Object[] values = new Object[params.length];
                 for (int i = 0; i < params.length; i++) {
                     if (params[i].getType() == CallerIdentity.class) {
                         values[i] = caller;
+                        continue;
+                    }
+                    if (params[i].getType() == ToolProgress.class) {
+                        values[i] = progress;
                         continue;
                     }
                     Object raw = args.get(names[i]);

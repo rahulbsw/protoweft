@@ -139,4 +139,56 @@ class LocalToolsTest {
         assertThatThrownBy(() -> builder.tool("has.dot", "x", Map.of(), (a, c) -> null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    public static class Slow {
+        @AgentTool(description = "Reports progress")
+        public String work(int steps, ToolProgress progress) {
+            for (int i = 1; i <= steps; i++) {
+                progress.progress(i, (double) steps, "step " + i);
+            }
+            progress.info("done");
+            return "ok";
+        }
+    }
+
+    @Test
+    void injectsToolProgressWithoutPuttingItInTheSchema() {
+        LocalTools slow = LocalTools.builder().scan(new Slow()).build();
+        assertThat(String.valueOf(((Map<?, ?>) slow.listTools().get(0).inputSchema().get("properties")).keySet())).isEqualTo("[steps]");
+
+        List<String> events = new java.util.ArrayList<>();
+        ToolProgress recorder = new ToolProgress() {
+            public void progress(double done, Double total, String message) {
+                events.add(done + "/" + total + " " + message);
+            }
+
+            public void log(Level level, String message) {
+                events.add(level + " " + message);
+            }
+        };
+        ToolRegistry registry = new ToolRegistry().register("s", slow);
+        assertThat(registry.invoke(ToolInvocation.of("s.work", Map.of("steps", 2)), CallerIdentity.ANONYMOUS, recorder)
+                .text()).isEqualTo("ok");
+        assertThat(events).containsExactly("1.0/2.0 step 1", "2.0/2.0 step 2", "INFO done");
+        assertThat(slow.invoke(ToolInvocation.of("work", Map.of("steps", 1))).text()).as("NOOP by default").isEqualTo("ok");
+    }
+
+    @Test
+    void programmaticProgressAwareHandlers() {
+        List<String> logs = new java.util.ArrayList<>();
+        LocalTools tools = LocalTools.builder().tool("p", "progress", Map.of("type", "object"),
+                (ProgressAwareToolHandler) (args, caller, progress) -> {
+                    progress.info("hi " + caller.name());
+                    return ToolOutcome.text("ok");
+                }).build();
+        tools.invoke(ToolInvocation.of("p", Map.of()), CallerIdentity.of("ann"), new ToolProgress() {
+            public void progress(double d, Double t, String m) {
+            }
+
+            public void log(Level level, String message) {
+                logs.add(message);
+            }
+        });
+        assertThat(logs).containsExactly("hi ann");
+    }
 }

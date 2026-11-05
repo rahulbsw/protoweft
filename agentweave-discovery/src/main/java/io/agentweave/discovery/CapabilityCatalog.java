@@ -289,6 +289,12 @@ public final class CapabilityCatalog {
      * A capability the caller may not see is reported exactly like an unknown one.
      */
     public ToolOutcome invoke(String name, Map<String, Object> arguments, CallerIdentity caller) {
+        return invoke(name, arguments, caller, io.agentweave.core.tool.ToolProgress.NOOP);
+    }
+
+    /** As {@link #invoke(String, Map, CallerIdentity)}, forwarding the tool's progress and log messages. */
+    public ToolOutcome invoke(String name, Map<String, Object> arguments, CallerIdentity caller,
+                              io.agentweave.core.tool.ToolProgress progress) {
         CapabilityCard card = cards.get(name);
         if (card == null || !visible(name, caller)) {
             throw new AgentWeaveException(ErrorCategory.TOOL_NOT_FOUND, DISCOVERY, "unknown capability: " + name);
@@ -297,7 +303,7 @@ public final class CapabilityCatalog {
         if (unavailable.isPresent()) {
             return ToolOutcome.failure("capability " + name + " is unavailable: " + unavailable.get());
         }
-        return sources.get(card.source()).tools().invoke(ToolInvocation.of(card.tool(), arguments), caller);
+        return sources.get(card.source()).tools().invoke(ToolInvocation.of(card.tool(), arguments), caller, progress);
     }
 
     /** Builds a {@link CapabilityCatalog} and ingests every source. */

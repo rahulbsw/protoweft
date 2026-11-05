@@ -35,4 +35,13 @@ public interface ToolSource {
     default ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller) {
         return invoke(invocation);
     }
+
+    /**
+     * Calls one tool on behalf of a caller, forwarding the tool's progress and log messages
+     * to {@code progress}. Sources that can't report progress inherit the default, which
+     * ignores it.
+     */
+    default ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress) {
+        return invoke(invocation, caller);
+    }
 }

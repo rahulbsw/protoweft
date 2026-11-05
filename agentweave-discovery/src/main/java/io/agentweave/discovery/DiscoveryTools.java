@@ -84,11 +84,17 @@ public final class DiscoveryTools implements ToolSource {
 
     @Override
     public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller) {
+        return invoke(invocation, caller, io.agentweave.core.tool.ToolProgress.NOOP);
+    }
+
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller,
+                              io.agentweave.core.tool.ToolProgress progress) {
         Map<String, Object> args = invocation.arguments();
         return switch (invocation.toolName()) {
             case SEARCH -> search(args, caller);
             case DESCRIBE -> describe(args, caller);
-            case CALL -> call(args, caller);
+            case CALL -> call(args, caller, progress);
             default -> throw new AgentWeaveException(ErrorCategory.TOOL_NOT_FOUND, CapabilityCatalog.DISCOVERY,
                     "unknown tool: " + invocation.toolName());
         };
@@ -143,7 +149,8 @@ public final class DiscoveryTools implements ToolSource {
                 Map.of("capabilities", described, "not_found", missing));
     }
 
-    private ToolOutcome call(Map<String, Object> args, CallerIdentity caller) {
+    private ToolOutcome call(Map<String, Object> args, CallerIdentity caller,
+                             io.agentweave.core.tool.ToolProgress progress) {
         if (!(args.get("name") instanceof String name)) {
             throw new AgentWeaveException(ErrorCategory.INVALID_ARGUMENTS, CapabilityCatalog.DISCOVERY,
                     "'name' must be a string");
@@ -155,7 +162,7 @@ public final class DiscoveryTools implements ToolSource {
             throw new AgentWeaveException(ErrorCategory.INVALID_ARGUMENTS, CapabilityCatalog.DISCOVERY,
                     "'arguments' must be an object");
         }
-        return catalog.invoke(name, arguments, caller);
+        return catalog.invoke(name, arguments, caller, progress);
     }
 
     static String render(DiscoveryResult r) {

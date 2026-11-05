@@ -71,6 +71,11 @@ public final class ToolRegistry implements ToolSource, AutoCloseable {
 
     @Override
     public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller) {
+        return invoke(invocation, caller, ToolProgress.NOOP);
+    }
+
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress) {
         String qualified = invocation.toolName();
         int dot = qualified.indexOf(SEPARATOR);
         ToolSource source = dot > 0 ? snapshot().get(qualified.substring(0, dot)) : null;
@@ -78,7 +83,7 @@ public final class ToolRegistry implements ToolSource, AutoCloseable {
             throw new AgentWeaveException(ErrorCategory.TOOL_NOT_FOUND, null,
                     "no source for tool '" + qualified + "'; expected '<source>" + SEPARATOR + "<tool>'");
         }
-        return source.invoke(new ToolInvocation(qualified.substring(dot + 1), invocation.arguments()), caller);
+        return source.invoke(new ToolInvocation(qualified.substring(dot + 1), invocation.arguments()), caller, progress);
     }
 
     @Override

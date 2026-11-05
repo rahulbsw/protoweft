@@ -62,7 +62,9 @@ public final class InboundAuthFilter implements Filter {
             response.setStatus(deny.status());
             response.setContentType("application/json");
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            if (deny.status() == 401) {
+            if (deny.challenge() != null) {
+                response.setHeader("WWW-Authenticate", deny.challenge());
+            } else if (deny.status() == 401) {
                 response.setHeader("WWW-Authenticate", "Bearer");
             }
             response.getWriter().write("{\"error\":\"" + escape(deny.reason()) + "\"}");
