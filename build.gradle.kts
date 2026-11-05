@@ -1,12 +1,28 @@
+import com.vanniktech.maven.publish.JavaLibrary
+import com.vanniktech.maven.publish.JavaPlatform
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import com.vanniktech.maven.publish.SourcesJar
+
+plugins {
+    id("com.vanniktech.maven.publish.base") version "0.37.0" apply false
+}
+
 allprojects {
     repositories {
         mavenCentral()
     }
 }
 
-// Published library modules (examples and the BOM excluded).
+val repoUrl = "https://github.com/rahulbsw/agentweave"
+
+// Modules that are libraries but must not be published yet (see their SPEC.md).
+val unpublished = setOf("agentweave-argi-neutral")
+
+// Published library modules: every agentweave-* module except the BOM (published as a platform).
 val libraryProjects = subprojects.filter {
-    it.name.startsWith("agentweave-") && it.name != "agentweave-bom" && it.buildFile.exists()
+    it.name.startsWith("agentweave-") && it.name != "agentweave-bom" && it.name !in unpublished &&
+        it.buildFile.exists()
 }
 
 // One Javadoc site for all library modules, published with the documentation under /api/.
@@ -29,11 +45,49 @@ tasks.register<Javadoc>("aggregateJavadoc") {
     }
 }
 
-// Only real Java modules (directories with a build file); container directories like `examples/`
+/** Maven Central metadata and signing, shared by libraries and the BOM (see RELEASING.md). */
+fun Project.publishToCentral(kind: com.vanniktech.maven.publish.Platform) {
+    apply(plugin = "com.vanniktech.maven.publish.base")
+    configure<MavenPublishBaseExtension> {
+        publishToMavenCentral(true)
+        // Signing only when a key is supplied (CI release); local publishToMavenLocal stays unsigned.
+        if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+            signAllPublications()
+        }
+        coordinates(rootProject.property("group") as String, project.name, project.version.toString())
+        configure(kind)
+        pom {
+            name.set(project.name)
+            description.set(project.description ?: "AgentWeave: interoperable agent and tool protocols for Java")
+            url.set(repoUrl)
+            inceptionYear.set("2026")
+            licenses {
+                license {
+                    name.set("MIT License")
+                    url.set("https://opensource.org/license/mit")
+                    distribution.set("repo")
+                }
+            }
+            developers {
+                developer {
+                    id.set("rahulbsw")
+                    name.set("Rahul Jain")
+                    url.set("https://github.com/rahulbsw")
+                }
+            }
+            scm {
+                url.set(repoUrl)
+                connection.set("scm:git:git://github.com/rahulbsw/agentweave.git")
+                developerConnection.set("scm:git:ssh://git@github.com/rahulbsw/agentweave.git")
+            }
+        }
+    }
+}
+
+// Every Java module (directories with a build file); container directories like `examples/`
 // and the java-platform BOM are skipped.
 configure(subprojects.filter { it.buildFile.exists() && it.name != "agentweave-bom" }) {
     apply(plugin = "java-library")
-    apply(plugin = "maven-publish")
 
     group = rootProject.property("group") as String
     version = rootProject.property("version") as String
@@ -42,8 +96,6 @@ configure(subprojects.filter { it.buildFile.exists() && it.name != "agentweave-b
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(17))
         }
-        withSourcesJar()
-        withJavadocJar()
     }
 
     tasks.withType<JavaCompile>().configureEach {
@@ -65,21 +117,26 @@ configure(subprojects.filter { it.buildFile.exists() && it.name != "agentweave-b
         (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
     }
 
-    configure<PublishingExtension> {
-        publications {
-            create<MavenPublication>("maven") {
-                from(components["java"])
-                pom {
-                    name.set(project.name)
-                    description.set("AgentWeave: interoperable agent and tool protocols for Java")
-                    licenses {
-                        license {
-                            name.set("MIT License")
-                            url.set("https://opensource.org/license/mit")
-                        }
-                    }
-                }
-            }
+    // A stable JPMS name for classpath and module-path users: io.agentweave.<module>.
+    tasks.named<Jar>("jar") {
+        manifest {
+            attributes(
+                "Automatic-Module-Name" to "io.agentweave." +
+                    project.name.removePrefix("agentweave-").replace('-', '.'),
+                "Implementation-Title" to project.name,
+                "Implementation-Version" to project.version.toString(),
+            )
         }
     }
+}
+
+configure(libraryProjects) {
+    publishToCentral(JavaLibrary(JavadocJar.Javadoc(), SourcesJar.Sources()))
+}
+
+project(":agentweave-bom") {
+    group = rootProject.property("group") as String
+    version = rootProject.property("version") as String
+    description = "AgentWeave bill of materials: aligns the versions of every AgentWeave module"
+    pluginManager.withPlugin("java-platform") { publishToCentral(JavaPlatform()) }
 }

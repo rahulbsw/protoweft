@@ -3,10 +3,10 @@ site_description: The protocol backbone for Java agents. MCP, A2A and UTCP behin
 copyright: Copyright &copy; 2026 The AgentWeave Authors. MIT License.
 
 # Set these once the repository's public location is known, for example:
-# site_url: https://<owner>.github.io/<repository>/
-# repo_url: https://github.com/<owner>/<repository>
-# repo_name: <owner>/<repository>
-# edit_uri: edit/main/docs/
+site_url: https://rahulbsw.github.io/agentweave/
+repo_url: https://github.com/rahulbsw/agentweave
+repo_name: rahulbsw/agentweave
+edit_uri: edit/main/docs/
 
 docs_dir: docs
 site_dir: site
