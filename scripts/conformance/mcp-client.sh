@@ -4,14 +4,24 @@
 #
 #   scripts/conformance/mcp-client.sh [scenario...]
 #
-# Default scenarios: the non-auth client scenarios required for 2025-11-25. The auth/* scenarios
-# are not run yet (agentweave-mcp has no MCP authorization flow).
+# Default scenarios: every client scenario required for 2025-11-25 (`conformance list --client
+# --requirements 2025-11-25`): the 4 non-auth ones and the 14 auth/* ones (the suite's `auth` suite),
+# which run McpClientConnector with agentweave-oauth's OAuthClient as authorizer.
 # Env: MCP_CONFORMANCE_VERSION (default 0.2.0-alpha.12), MCP_SPEC_VERSION (default 2025-11-25).
 # Results: build/conformance/mcp-client/. Exits non-zero if any scenario's suite run fails.
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
-DEFAULT_SCENARIOS=(initialize tools_call elicitation-sep1034-client-defaults sse-retry)
+CORE_SCENARIOS=(initialize tools_call elicitation-sep1034-client-defaults sse-retry)
+AUTH_SCENARIOS=(
+  auth/metadata-default auth/metadata-var1 auth/metadata-var2 auth/metadata-var3
+  auth/basic-cimd
+  auth/scope-from-www-authenticate auth/scope-from-scopes-supported auth/scope-omitted-when-undefined
+  auth/scope-step-up auth/scope-retry-limit
+  auth/token-endpoint-auth-basic auth/token-endpoint-auth-post auth/token-endpoint-auth-none
+  auth/pre-registration
+)
+DEFAULT_SCENARIOS=("${CORE_SCENARIOS[@]}" "${AUTH_SCENARIOS[@]}")
 if (( $# > 0 )); then SCENARIOS=("$@"); else SCENARIOS=("${DEFAULT_SCENARIOS[@]}"); fi
 
 OUT="$RESULTS/mcp-client"
@@ -22,6 +32,7 @@ gradle_install :conformance:mcp-client:installDist
 CLIENT="$ROOT/conformance/mcp-client/build/install/mcp-client/bin/mcp-client"
 
 status=0
+failed=()
 for scenario in "${SCENARIOS[@]}"; do
   dir="$OUT/${scenario//\//-}"
   rm -rf "$dir"
@@ -37,7 +48,12 @@ for scenario in "${SCENARIOS[@]}"; do
   code=${PIPESTATUS[0]}
   set -e
   log "scenario ${scenario}: suite exit code ${code}"
-  if (( code != 0 )); then status=$code; fi
+  if (( code != 0 )); then status=$code; failed+=("$scenario"); fi
 done
 
+if (( ${#failed[@]} > 0 )); then
+  log "scenarios with unexpected results (not matching the baseline): ${failed[*]}"
+else
+  log "all ${#SCENARIOS[@]} scenario(s) match the baseline"
+fi
 exit "$status"

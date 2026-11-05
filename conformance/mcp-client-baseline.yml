@@ -5,8 +5,8 @@
 # Every entry names the AgentWeave feature it waits for: an id that McpFeatures (agentweave-mcp)
 # reports as unsupported, or a precise library bug. Entries are per check (<scenario>:<check-id>).
 # The suite exits 1 on any failure not listed here, and on any entry here that now passes.
-# The auth/* scenarios are not run yet (McpFeatures.AUTHORIZATION); they get entries, or pass,
-# when OAuth lands. See docs/operations/conformance.md.
+# The 14 auth/* scenarios run McpClientConnector with agentweave-oauth's OAuthClient as authorizer
+# (conformance/mcp-client AuthScenarios). See docs/operations/conformance.md.
 
 client:
   # McpFeatures.ELICITATION ("elicitation") is unsupported: McpClientConnector declares no
@@ -28,3 +28,55 @@ client:
   # resumability; the fix belongs in the SDK.
   - sse-retry:client-sse-retry-timing
   - sse-retry:client-sse-last-event-id
+
+  # AgentWeave bug, agentweave-oauth: the client refuses the suite's authorization server, which
+  # (like every mock server of the suite) listens on http://localhost:<port>. Uris.requireSecure
+  # (agentweave-oauth/src/main/java/io/agentweave/oauth/Uris.java:121-132) allows plain http only
+  # when Uris.isLoopback (Uris.java:112-118) is true, and isLoopback accepts literal 127.0.0.0/8 and
+  # ::1 only, never the name "localhost". Discovery.authorizationServer (Discovery.java:92) calls it
+  # on the issuer from the protected resource metadata, so OAuthClient.handleUnauthorized gives up
+  # with "authorization server issuer must use https: http://localhost:<port>" right after fetching
+  # the PRM (which is the one check that passes in each scenario). No AS metadata, registration,
+  # authorization or token request is ever sent, so every check about them fails or is missing.
+  # Measured: with isLoopback also accepting "localhost", all 14 scenarios pass every check.
+  - auth/metadata-default:authorization-server-metadata
+  - auth/metadata-default:client-registration
+  - auth/metadata-default:authorization-request
+  - auth/metadata-default:token-request
+  - auth/metadata-default:resource-parameter-in-authorization
+  - auth/metadata-default:resource-parameter-in-token
+  - auth/metadata-var1:authorization-server-metadata
+  - auth/metadata-var1:client-registration
+  - auth/metadata-var1:authorization-request
+  - auth/metadata-var1:token-request
+  - auth/metadata-var1:resource-parameter-in-authorization
+  - auth/metadata-var1:resource-parameter-in-token
+  - auth/metadata-var2:authorization-server-metadata
+  - auth/metadata-var2:client-registration
+  - auth/metadata-var2:authorization-request
+  - auth/metadata-var2:token-request
+  - auth/metadata-var2:resource-parameter-in-authorization
+  - auth/metadata-var2:resource-parameter-in-token
+  - auth/metadata-var3:authorization-server-metadata
+  - auth/metadata-var3:client-registration
+  - auth/metadata-var3:authorization-request
+  - auth/metadata-var3:token-request
+  - auth/metadata-var3:resource-parameter-in-authorization
+  - auth/metadata-var3:resource-parameter-in-token
+  - auth/basic-cimd:cimd-client-id-used
+  - auth/scope-from-www-authenticate:scope-from-www-authenticate
+  - auth/scope-from-scopes-supported:scope-from-scopes-supported
+  - auth/scope-omitted-when-undefined:scope-omitted-when-undefined
+  - auth/scope-step-up:scope-step-up-initial
+  - auth/scope-step-up:scope-step-up-escalation
+  - auth/scope-retry-limit:scope-retry-limit
+  - auth/token-endpoint-auth-basic:token-endpoint-auth-method
+  - auth/token-endpoint-auth-basic:resource-parameter-in-authorization
+  - auth/token-endpoint-auth-basic:resource-parameter-in-token
+  - auth/token-endpoint-auth-post:token-endpoint-auth-method
+  - auth/token-endpoint-auth-post:resource-parameter-in-authorization
+  - auth/token-endpoint-auth-post:resource-parameter-in-token
+  - auth/token-endpoint-auth-none:token-endpoint-auth-method
+  - auth/token-endpoint-auth-none:resource-parameter-in-authorization
+  - auth/token-endpoint-auth-none:resource-parameter-in-token
+  - auth/pre-registration:pre-registration-auth
