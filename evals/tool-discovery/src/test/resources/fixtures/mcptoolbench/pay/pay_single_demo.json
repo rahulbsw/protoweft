@@ -1,0 +1,2 @@
+[{"uuid": "demo-should-be-skipped", "category": "pay", "call_type": "single", "tools": [], "mcp_tools_dict": {},
+  "query": "demo", "function_call_label": [{"name": "create_product", "mcp_server": "paypal", "input": {}}]}]

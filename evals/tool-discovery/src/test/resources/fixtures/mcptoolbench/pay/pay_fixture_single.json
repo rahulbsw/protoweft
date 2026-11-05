@@ -1,0 +1,37 @@
+[
+  {
+    "uuid": "pay-0001",
+    "category": "pay",
+    "call_type": "single",
+    "tools": [
+      {"name": "create_product", "description": "\nCreate a product in PayPal.\n",
+       "input_schema": {"type": "object", "properties": {"name": {"type": "string"}, "type": {"type": "string", "enum": ["PHYSICAL", "DIGITAL", "SERVICE"]}, "description": {"type": "string"}}, "required": ["name", "type"]}},
+      {"name": "create_invoice", "description": "Create an invoice in PayPal.",
+       "input_schema": {"type": "object", "properties": {"recipient_email": {"type": "string"}, "amount": {"type": "number"}}, "required": ["recipient_email", "amount"]}}
+    ],
+    "mcp_tools_dict": {"paypal": ["create_product", "create_invoice"]},
+    "query": "Create a new digital product named E-Book Reader with the description: 'Read thousands of books on the go.'",
+    "function_call_label": [
+      {"name": "create_product", "step": "1", "id": "1", "mcp_server": "paypal", "similar_tools": [],
+       "input": {"name": "E-Book Reader", "type": "DIGITAL", "description": "Read thousands of books on the go."},
+       "output": {"status_code": 200, "result": {}}}
+    ]
+  },
+  {
+    "uuid": "pay-0002",
+    "category": "pay",
+    "call_type": "single",
+    "tools": [
+      {"name": "create_product", "description": "\nCreate a product in PayPal.\n",
+       "input_schema": {"type": "object", "properties": {"name": {"type": "string"}, "type": {"type": "string", "enum": ["PHYSICAL", "DIGITAL", "SERVICE"]}, "description": {"type": "string"}}, "required": ["name", "type"]}},
+      {"name": "create_invoice", "description": "Create an invoice in PayPal.",
+       "input_schema": {"type": "object", "properties": {"recipient_email": {"type": "string"}, "amount": {"type": "number"}}, "required": ["recipient_email", "amount"]}}
+    ],
+    "mcp_tools_dict": {"paypal": ["create_product", "create_invoice"]},
+    "query": "Send an invoice for 25 USD to bob@example.com.",
+    "function_call_label": [
+      {"name": "create_invoice", "step": "1", "id": "1", "mcp_server": "paypal", "similar_tools": [],
+       "input": {"recipient_email": "bob@example.com", "amount": 25}, "output": {"status_code": 200, "result": {}}}
+    ]
+  }
+]

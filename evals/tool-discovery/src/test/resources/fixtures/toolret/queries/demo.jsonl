@@ -1,0 +1,4 @@
+{"id": "demo_query_0", "subset": "demo", "category": "web", "query": "Will it rain in Paris tomorrow?", "instruction": "Given a weather task, retrieve weather tools.", "labels": [{"id": "webdemo_tool_0", "relevance": 1}]}
+{"id": "demo_query_1", "subset": "demo", "category": "web", "query": "Where is my order A17 and what ZIP is it going to?", "instruction": "", "labels": [{"id": "webdemo_tool_2", "relevance": 2}, {"id": "webdemo_tool_1", "relevance": 1}]}
+{"id": "demo_query_2", "subset": "demo", "category": "web", "query": "Message the team that the build is green.", "instruction": null, "labels": "[{\"id\": \"webdemo_tool_3\", \"relevance\": 1, \"doc\": {\"name\": \"send_message\"}}]"}
+{"id": "demo_query_3", "subset": "demo", "category": "web", "query": "No relevant label here.", "instruction": null, "labels": [{"id": "webdemo_tool_6", "relevance": 0}]}

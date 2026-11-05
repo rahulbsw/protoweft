@@ -1,0 +1,42 @@
+[
+  {
+    "uuid": "map-0001",
+    "category": "map",
+    "call_type": "single",
+    "tools": [
+      {"name": "maps_geocode", "description": "\nConvert an address into geographic coordinates\n",
+       "input_schema": {"type": "object", "properties": {"address": {"type": "string", "description": "The address to geocode"}}, "required": ["address"]}},
+      {"name": "maps_reverse_geocode", "description": "Convert coordinates into an address",
+       "input_schema": {"type": "object", "properties": {"latitude": {"type": "number"}, "longitude": {"type": "number"}}, "required": ["latitude", "longitude"]}},
+      {"name": "map_geocode", "description": "Geocode an address (Baidu)",
+       "input_schema": {"type": "object", "properties": {"address": {"type": "string"}}, "required": ["address"]}}
+    ],
+    "mcp_tools_dict": {"google-maps": ["maps_geocode", "maps_reverse_geocode"], "baidu-maps-sse": ["map_geocode"]},
+    "query": "What is the address of the location with latitude 51.5074 and longitude -0.1278?",
+    "function_call_label": [
+      {"name": "maps_reverse_geocode", "step": "1", "id": "1", "mcp_server": "google-maps", "similar_tools": [],
+       "input": {"latitude": 51.5074, "longitude": -0.1278}, "output": {"status_code": 200, "result": {}}}
+    ]
+  },
+  {
+    "uuid": "map-0002",
+    "category": "map",
+    "call_type": "multiple",
+    "tools": [
+      {"name": "maps_geocode", "description": "\nConvert an address into geographic coordinates\n",
+       "input_schema": {"type": "object", "properties": {"address": {"type": "string", "description": "The address to geocode"}}, "required": ["address"]}},
+      {"name": "map_geocode", "description": "Geocode an address (Baidu)",
+       "input_schema": {"type": "object", "properties": {"address": {"type": "string"}}, "required": ["address"]}}
+    ],
+    "mcp_tools_dict": {"google-maps": ["maps_geocode"], "baidu-maps-sse": ["map_geocode"]},
+    "query": "Geocode both Sapporo Station and Odori Park.",
+    "function_call_label": [
+      {"name": "map_geocode", "step": "1", "id": "1", "mcp_server": "baidu-maps-sse",
+       "similar_tools": [{"name": "maps_geocode", "mcp_server": "google-maps"}],
+       "input": {"address": "Sapporo Station"}, "output": {"status_code": 200, "result": {}}},
+      {"name": "map_geocode", "step": "1", "id": "2", "mcp_server": "baidu-maps-sse",
+       "similar_tools": [{"name": "maps_geocode", "mcp_server": "google-maps"}],
+       "input": {"address": "Odori Park"}, "output": {"status_code": 200, "result": {}}}
+    ]
+  }
+]

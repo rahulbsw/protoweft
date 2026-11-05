@@ -1,0 +1,3 @@
+# Local, per-user state of the evaluation harness (datasets and results live under build/).
+.eval-spend.json
+prices.json
