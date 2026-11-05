@@ -35,11 +35,9 @@ gradle bootRun          # or add a Gradle wrapper with: gradle wrapper
 ```
 
 Every `@AgentTool` method on a Spring bean is now an MCP tool at `http://localhost:8080/mcp`.
-Point any MCP client at it, for example the MCP Inspector:
-
-```bash
-npx @modelcontextprotocol/inspector --cli http://localhost:8080/mcp --transport http --method tools/list
-```
+Point any MCP client at it, for example the MCP Inspector (`npx @modelcontextprotocol/inspector`),
+using the Streamable HTTP transport and that URL. The template's own test does the same with
+AgentWeave's MCP client.
 
 To serve the same tools as a UTCP manual, set `agentweave.server.utcp.enabled: true`. To run an
 A2A agent, set `agentweave.server.a2a.enabled: true` and define an `AgentHandler` bean. Before
