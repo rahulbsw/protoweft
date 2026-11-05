@@ -13,44 +13,58 @@ flowchart BT
     mcp["agentweave-mcp"]
     a2a["agentweave-a2a"]
     utcp["agentweave-utcp"]
+    oauth["agentweave-oauth"]
+    disc["agentweave-discovery"]
+    discx["agentweave-discovery-embeddings<br/>-anthropic, -openai"]
     lc4j["agentweave-langchain4j"]
+    sai["agentweave-spring-ai"]
+    argi["agentweave-argi"]
     starter["agentweave-spring-boot-starter"]
-
-    mcpsdk[("MCP Java SDK 2.1.0")]
-    a2asdk[("a2a-java 1.5.0.Final")]
-    jackson[("Jackson 3")]
-    lc4jlib[("LangChain4j 1.23.0")]
-    boot[("Spring Boot 4")]
 
     server --> core
     jetty --> server
     mcp --> server
     a2a --> server
     utcp --> server
-    lc4j --> core
+    oauth --> server
+    disc --> core
+    discx --> disc
+    lc4j --> disc
+    sai --> core
+    sai -. optional .-> disc
+    argi --> sai
+    argi -. optional .-> disc
     starter --> server
     starter -. optional .-> mcp
     starter -. optional .-> a2a
     starter -. optional .-> utcp
-
-    mcp --> mcpsdk
-    a2a --> a2asdk
-    utcp --> jackson
-    lc4j --> lc4jlib
-    starter -. provided .-> boot
+    starter -. optional .-> disc
+    starter -. optional .-> sai
 ```
+
+Each module also depends on its own third-party library (the MCP Java SDK, a2a-java, Jackson 3,
+Nimbus, LangChain4j, Spring AI, ARGI, Spring Boot), as listed below. `agentweave-argi-neutral`, which
+depends on the core and optionally on discovery, is left out of the diagram: it isn't published
+and isn't part of the default build.
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `agentweave-core` | Tool, agent, auth, observation, error and compliance types. | Nothing |
+| `agentweave-core` | Tool, agent, auth, progress, observation, error and compliance types. | Nothing |
 | `agentweave-server` | `ServerEndpointProvider`, `ServletEndpoint` and `InboundAuthFilter`: how protocol servers hand HTTP endpoints to a host. | core; servlet API provided by the host |
 | `agentweave-server-jetty` | `AgentWeaveServer`, an embedded Jetty 12 (Jakarta EE 11, Servlet 6.1) host. | server, Jetty |
-| `agentweave-mcp` | `McpClientConnector`, `McpToolServer`. | server, MCP Java SDK |
+| `agentweave-mcp` | `McpClientConnector`, `McpToolServer`, `McpResources`, `McpPrompts`. | server, MCP Java SDK |
 | `agentweave-a2a` | `A2aAgentConnector`, `A2aAgentServer`. | server, a2a-java client, server-common and JSON-RPC transport |
 | `agentweave-utcp` | `UtcpClientConnector`, `UtcpManualProvider`. | server, Jackson 3 (internal), `java.net.http` |
-| `agentweave-langchain4j` | `AgentWeaveToolProvider`, `LangChain4jAgents`, `LangChain4jTools`. | core, LangChain4j |
-| `agentweave-spring-boot-starter` | Auto-configuration, properties, Micrometer and Actuator. | server; protocol modules and Spring are `compileOnly` |
-| `agentweave-bom` | Version alignment. | — |
+| `agentweave-oauth` | [OAuth 2.1](../integrations/oauth.md): `OAuthClient` (an `HttpAuthorizer`), `BearerTokenAuthenticator`, `ProtectedResourceMetadataEndpoint`. | server, Nimbus (internal) |
+| `agentweave-discovery` | [Tool discovery](../discovery/index.md): `CapabilityCatalog`, search, fallback, meta-tools. | core |
+| `agentweave-discovery-embeddings` | Semantic ranking: offline or LangChain4j `EmbeddingModel` embedders. | discovery, LangChain4j core |
+| `agentweave-discovery-anthropic`, `agentweave-discovery-openai` | Typed native tool-search adapters. | discovery, the provider's Java SDK |
+| `agentweave-langchain4j` | `AgentWeaveToolProvider`, `LangChain4jAgents`, `LangChain4jTools`, `CatalogToolSearchStrategy`. | core, discovery, LangChain4j |
+| `agentweave-spring-ai` | [Spring AI](../integrations/spring-ai.md): `AgentWeaveToolCallbacks`, `CatalogToolIndex`, `SpringAiAgents`, `SpringAiTools`. | core, `spring-ai-model`; Spring AI chat client, tool search and discovery optional |
+| `agentweave-argi` | [ARGI 2.1.0-RC1](../integrations/argi.md): `ArgiTools`, `CatalogToolSelectionInterceptor`, `ArgiAgents`. | spring-ai, ARGI agent framework; discovery optional |
+| `agentweave-argi-neutral` | ARGI's Spring-free API: `ArgiNeutralTools`, `CatalogToolSelectionInterceptor`, `ArgiNeutralAgents`. **Not published**; built only with `-PargiSnapshot`. | core, ARGI `argi-api` and `argi-agent-api` snapshot; discovery optional |
+| `agentweave-spring-boot-starter` | Auto-configuration, properties, Micrometer and Actuator. | server; protocol modules, discovery, Spring AI and Spring are `compileOnly` |
+| `agentweave-bom` | Version alignment of the published modules. | — |
 
 ## Dependency rules
 
@@ -60,17 +74,21 @@ flowchart BT
   leak onto your compile classpath. The servlet API is `compileOnly`: the host provides it.
 - **Protocol modules don't depend on each other.** An A2A agent becomes a tool through the core's
   `ToolConnector` interface, not through a dependency on an MCP module.
-- **Nothing depends on the framework integrations.** Plain Java and other agent frameworks use the
-  core and a protocol module directly. The Spring Boot starter declares the protocol modules
-  `compileOnly`; you add the ones you use.
+- **The core, the protocol modules and discovery don't depend on the framework integrations.**
+  Plain Java and other agent frameworks use the core and a protocol module directly. Integrations
+  may build on each other: the ARGI RC1 adapter reuses the Spring AI adapter, because ARGI RC1 is
+  built on Spring AI. The Spring Boot starter declares the protocol modules, discovery and the
+  Spring AI adapter `compileOnly`; you add the ones you use.
+- **OAuth is optional and protocol-neutral.** `HttpAuthorizer` lives in the core, so the MCP
+  module accepts an authorizer without depending on `agentweave-oauth`.
 
 ## The core API
 
 | Area | Types | Page |
 |---|---|---|
-| Tools | `ToolSource`, `ToolConnector`, `ToolSpec`, `ToolInvocation`, `ToolOutcome`, `Content`, `ToolRegistry`, `LocalTools`, `@AgentTool`, `@ToolParam`, `ToolHandler` | [Tools and the registry](tools.md) |
+| Tools | `ToolSource`, `ToolConnector`, `ToolSpec`, `ToolInvocation`, `ToolOutcome`, `Content`, `ToolRegistry`, `LocalTools`, `@AgentTool`, `@ToolParam`, `ToolHandler`, `ProgressAwareToolHandler`, `ToolProgress` | [Tools and the registry](tools.md) |
 | Agents | `AgentConnector`, `AgentHandler`, `AgentTaskContext`, `AgentRequest`, `AgentMessage`, `AgentReply`, `AgentEvent`, `AgentArtifact`, `AgentDescriptor`, `TaskState` | [Agents](agents.md) |
-| Security | `CredentialProvider`, `Credential`, `InboundAuthenticator`, `InboundRequest`, `AuthDecision`, `CallerIdentity` | [Security and credentials](security.md) |
+| Security | `CredentialProvider`, `Credential`, `HttpAuthorizer`, `InboundAuthenticator`, `InboundRequest`, `AuthDecision`, `CallerIdentity` | [Security and credentials](security.md) |
 | Errors and telemetry | `AgentWeaveException`, `ErrorCategory`, `ObservationHandler` | [Errors and observability](errors-and-observability.md) |
 | Connectors | `ProtocolConnector`, `ProtocolId`, `ComplianceReport` | [Versions and compliance](compliance.md) |
 
@@ -93,6 +111,7 @@ needs async support.
 | `McpToolServer.Http` | `/mcp` | yes |
 | `A2aAgentServer` | `/.well-known/agent-card.json`, `/a2a` | yes |
 | `UtcpManualProvider` | `/utcp`, `/utcp/*` | no |
+| `ProtectedResourceMetadataEndpoint` (`agentweave-oauth`) | `/.well-known/oauth-protected-resource/<resource path>`, optionally the root well-known URI | no |
 
 A host mounts every endpoint and puts an `InboundAuthFilter` in front of it, so one
 `InboundAuthenticator` protects all protocols. Two hosts are provided:

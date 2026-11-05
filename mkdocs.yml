@@ -83,7 +83,10 @@ nav:
       - Evaluation: discovery/evaluation.md
   - Integrations:
       - Spring Boot: integrations/spring-boot.md
+      - Spring AI: integrations/spring-ai.md
       - LangChain4j: integrations/langchain4j.md
+      - ARGI: integrations/argi.md
+      - OAuth: integrations/oauth.md
       - Embedded Jetty: integrations/jetty.md
   - Examples: examples.md
   - Operations:

@@ -33,6 +33,14 @@
 : Over stdio only `Credential.NamedSecret`s are accepted (as environment variables). A
   `BearerToken` can't be used over stdio.
 
+**`start()` fails with `AUTHENTICATION` against an HTTP server that uses OAuth.**
+: The server answered 401 or 403. Supply a token through `credentials(...)`, or let the connector
+  obtain one with `authorizer(oauthClient)` (see [MCP authorization](../protocols/mcp.md#authorization)).
+  If it still fails with an authorizer, the OAuth flow gave up, for example because the client
+  isn't registered, the server doesn't advertise PKCE `S256`, or the retry limit was reached. To
+  see the reason, call `oauthClient.handleUnauthorized(resource, wwwAuthenticate, status)` yourself:
+  its `TokenResult.failure()` says why.
+
 **`403` from the MCP endpoint.**
 : The request carried an `Origin` header that isn't in `allowedOrigins(...)`
   (`agentweave.server.mcp.allowed-origins` in Spring). Browser-based clients, such as the MCP

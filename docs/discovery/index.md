@@ -186,6 +186,19 @@ This uses LangChain4j's own (experimental) tool-search API. The model first sees
 `search_capabilities`. Capabilities it finds become available on later turns and stay available
 through chat memory. Names-only candidates are listed in the text but not loaded.
 
+### Spring AI
+
+`CatalogToolIndex` (in `agentweave-spring-ai`) makes the catalog the index of Spring AI's own
+`ToolSearchToolCallingAdvisor`: the model starts with `toolSearchTool` and loads definitions only
+for what the catalog finds for the caller. Names-only candidates aren't loaded. See
+[Spring AI: tool search](../integrations/spring-ai.md#tool-search-with-the-catalog).
+
+### ARGI
+
+`CatalogToolSelectionInterceptor` (in `agentweave-argi`) narrows the tools of an ARGI agent on each
+model call to the catalog's hits, instead of ARGI's LLM-based tool selector. See
+[ARGI: catalog tool selection](../integrations/argi.md#catalog-tool-selection).
+
 ### Spring Boot
 
 ```yaml

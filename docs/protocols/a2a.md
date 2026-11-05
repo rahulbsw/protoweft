@@ -176,10 +176,13 @@ Both directions:
 | A2A part | AgentWeave content |
 |---|---|
 | `TextPart` | `Content.Text` |
-| `FilePart` with bytes | `Content.Data` (base64 as on the wire; a missing media type becomes `application/octet-stream`) |
+| `FilePart` with bytes | `Content.Data` (base64 as on the wire, file name kept; a missing media type becomes `application/octet-stream`) |
 | `FilePart` with a URI | `Content.Link` |
 | `DataPart` | `Content.Json` |
 | anything else | `Content.Unmapped` (an outgoing `Unmapped` part is rejected) |
+
+An outgoing `Content.Resource` becomes a `FilePart` with bytes (text is UTF-8 encoded), named after
+the last segment of its URI, because A2A has no inline part that keeps a URI.
 
 ## Error mapping
 

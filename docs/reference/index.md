@@ -14,9 +14,16 @@ these entry points:
 | `io.agentweave.mcp` | `McpClientConnector`, `McpToolServer`, `McpFeatures` |
 | `io.agentweave.a2a` | `A2aAgentConnector`, `A2aAgentServer`, `A2aFeatures` |
 | `io.agentweave.utcp` | `UtcpClientConnector`, `UtcpManualProvider`, `UtcpFeatures` |
+| `io.agentweave.core.auth` | `CredentialProvider`, `HttpAuthorizer` |
+| `io.agentweave.mcp` | `McpResources`, `McpPrompts`, `@McpResource`, `@McpPrompt` (resources and prompts) |
 | `io.agentweave.server.jetty` | `AgentWeaveServer` |
-| `io.agentweave.langchain4j` | `AgentWeaveToolProvider`, `LangChain4jAgents`, `LangChain4jTools` |
-| `io.agentweave.spring.boot` | `AgentWeaveConnectors`, `AgentWeaveProperties`, `AgentWeaveServerProperties` |
+| `io.agentweave.oauth` | `OAuthClient`, `ClientRegistration`, `BearerTokenAuthenticator`, `JwtTokenVerifier`, `ProtectedResourceMetadataEndpoint` |
+| `io.agentweave.discovery` | `CapabilityCatalog`, `DiscoveryQuery`, `DiscoveryTools`, `SourcePolicy` |
+| `io.agentweave.discovery.embeddings`, `.anthropic`, `.openai` | `OfflineEmbedders`, `AnthropicDiscovery`, `OpenAiDiscovery` |
+| `io.agentweave.langchain4j` | `AgentWeaveToolProvider`, `LangChain4jAgents`, `LangChain4jTools`, `CatalogToolSearchStrategy` |
+| `io.agentweave.springai` | `AgentWeaveToolCallbacks`, `CatalogToolIndex`, `SpringAiAgents`, `SpringAiTools` |
+| `io.agentweave.argi` | `ArgiTools`, `CatalogToolSelectionInterceptor`, `ArgiAgents` |
+| `io.agentweave.spring.boot` | `AgentWeaveConnectors`, `AgentWeaveProperties`, `AgentWeaveServerProperties`, `AgentWeaveSpringAiProperties` |
 
 ## Coordinates
 
@@ -32,8 +39,18 @@ Group `io.agentweave`, version `0.1.0-SNAPSHOT`, not yet on Maven Central
 | `agentweave-mcp` | MCP client and server |
 | `agentweave-a2a` | A2A client and server |
 | `agentweave-utcp` | UTCP client and provider |
+| `agentweave-oauth` | OAuth 2.1 client and resource server (MCP authorization) |
+| `agentweave-discovery` | Tool discovery: capability catalog and search |
+| `agentweave-discovery-embeddings` | Embedders for semantic discovery search |
+| `agentweave-discovery-anthropic` | Anthropic native tool-search adapter |
+| `agentweave-discovery-openai` | OpenAI native tool-search adapter |
 | `agentweave-langchain4j` | LangChain4j adapter |
+| `agentweave-spring-ai` | Spring AI adapter |
+| `agentweave-argi` | ARGI `2.1.0-RC1` adapter |
 | `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration |
+
+`agentweave-argi-neutral` isn't published, isn't in the BOM and isn't in the aggregated Javadoc; see
+[ARGI](../integrations/argi.md#agentweave-argi-neutral-unpublished).
 
 ## More
 

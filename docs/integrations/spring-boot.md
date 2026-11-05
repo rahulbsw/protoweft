@@ -390,6 +390,30 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `agentweave.server.a2a.streaming` | boolean | `true` | Offer `SendStreamingMessage` and `SubscribeToTask`. |
 | `agentweave.server.a2a.push-notifications` | boolean | `true` | Offer push notifications. |
 | `agentweave.server.a2a.agent-timeout` | duration | 30 s (server default) | How long a blocking `SendMessage` waits for the handler. |
+| `agentweave.server.a2a.from-chat-client` | boolean | `false` | With `agentweave-spring-ai` and no `AgentHandler` bean, serve the application's Spring AI `ChatClient` as the agent. See [Spring AI](spring-ai.md#spring-boot). |
+
+### Tool discovery: `agentweave.discovery.*`
+
+Needs `agentweave-discovery` on the classpath. See [Tool discovery: Spring Boot](../discovery/index.md#spring-boot).
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `agentweave.discovery.enabled` | boolean | `false` | Build a `CapabilityCatalog` bean over the tool registry. |
+| `agentweave.discovery.fallback` | `progressive` \| `all-schemas` \| `none` | `progressive` | What a low-confidence search does. |
+| `agentweave.discovery.sources.<name>.required-scopes` | list | `[]` | Scopes a caller needs to see the source's tools (matched against the caller's `scopes`). |
+| `agentweave.discovery.expose-mcp` | boolean | `false` | Serve the discovery meta-tools over MCP. |
+| `agentweave.discovery.mcp-path` | string | `/mcp-discovery` | Path of that MCP endpoint. |
+
+### Spring AI: `agentweave.spring-ai.*`
+
+Needs `agentweave-spring-ai` on the classpath; everything is off by default. See
+[Spring AI: Spring Boot](spring-ai.md#spring-boot) for why.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `agentweave.spring-ai.tool-callbacks.enabled` | boolean | `false` | Register an `AgentWeaveToolCallbacks` bean and add it to the auto-configured `ChatClient.Builder`. |
+| `agentweave.spring-ai.tool-callbacks.expose` | `local` \| `registry` | `local` | Expose only the `@AgentTool` methods, or every registry tool. |
+| `agentweave.spring-ai.tool-search.enabled` | boolean | `false` | Add Spring AI's tool-search advisor backed by the capability catalog instead (needs `agentweave.discovery.enabled`). |
 
 ### Validation rules
 

@@ -63,10 +63,13 @@ project says "MCP v1/v2", it means **SDK major versions** 1.x and 2.x; AgentWeav
 | Wire revisions, stdio | `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` | same |
 | Wire revisions, Streamable HTTP | `2025-03-26`, `2025-06-18`, `2025-11-25` | same |
 | Negotiated revision | the one in the server's `initialize` result (the SDK offers `2025-11-25`) | per session, not reported |
-| Not supported | SSE transport; revision `2026-07-28` (SDK `2.2.x` milestones are not used) | same |
+| Features | tools, structured output, all content types, resources (with templates and subscriptions), prompts, completion, logging, progress, list-change notifications | the same, except list-change notifications (lists are snapshots) |
+| Authorization (`2025-11-25`) | supported when an `HttpAuthorizer` such as `agentweave-oauth`'s `OAuthClient` is configured | reported unsupported; compose `agentweave-oauth`'s resource-server pieces in the host |
+| Not supported | SSE transport; cancellation; sampling, roots and elicitation; revision `2026-07-28` (SDK `2.2.x` milestones are not used) | same |
 
 Streamable HTTP didn't exist in `2024-11-05`, so it isn't listed for HTTP. The revisions are read
-from the SDK transport in use, not hard-coded.
+from the SDK transport in use, not hard-coded. The [MCP coverage table](../protocols/mcp.md#coverage)
+lists every feature id per role.
 
 ### A2A
 
@@ -94,9 +97,14 @@ from the SDK transport in use, not hard-coded.
 | Java | 17 or newer |
 | Spring Boot (starter) | 4.x, built and tested on `4.1.2`; 3.x isn't supported |
 | LangChain4j (adapter) | `1.23.0` |
+| Spring AI (adapter) | `2.0.2` |
+| ARGI (`agentweave-argi`) | `2.1.0-RC1` (Spring AI based; ARGI itself is built on Spring AI `2.0.1`, aligned to `2.0.2`) |
+| ARGI (`agentweave-argi-neutral`, unpublished) | `2.1.0-RC2-SNAPSHOT` at commit `a869538fcee17230bc8f20f6ed76c0d15926220e`, built from source |
+| Nimbus (OAuth module, internal) | `oauth2-oidc-sdk` `11.39`, `nimbus-jose-jwt` `10.10` |
 | Jetty (embedded host) | `12.1.14` (Jakarta EE 11, Servlet 6.1) |
 | Servlet API (any host) | compiled against Jakarta Servlet `6.1.0` |
 | Jackson (UTCP module, internal) | `3.1.4` |
 
-These versions are pinned in the build's `gradle.properties`. The BOM aligns the AgentWeave modules;
-the protocol SDKs arrive transitively at the versions above.
+These versions are pinned in the build's `gradle.properties` (the ARGI snapshot commit in
+`scripts/install-argi-snapshot.sh`). The BOM aligns the published AgentWeave modules; the protocol
+SDKs arrive transitively at the versions above.

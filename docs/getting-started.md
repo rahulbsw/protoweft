@@ -22,7 +22,8 @@ own over MCP and UTCP.
 ```
 
 Run this from a clone of the AgentWeave repository. It publishes every library module and the BOM
-with group `io.agentweave` and version `0.1.0-SNAPSHOT`. The examples aren't published.
+with group `io.agentweave` and version `0.1.0-SNAPSHOT`. The examples and `agentweave-argi-neutral`
+aren't published.
 
 ## Add the dependencies
 
@@ -98,9 +99,18 @@ Import the BOM so every AgentWeave module has the same version, then add only th
 | `agentweave-utcp` | UTCP client and manual provider. |
 | `agentweave-server` | The servlet hosting contract the protocol servers use. Comes with each protocol module. |
 | `agentweave-server-jetty` | An embedded Jetty 12 host for servers in plain Java. |
-| `agentweave-langchain4j` | LangChain4j adapter: AgentWeave tools in, agents and `@Tool`s out. |
+| `agentweave-oauth` | [OAuth 2.1](integrations/oauth.md) for MCP authorization: a token-obtaining client for the MCP connector, and a bearer-token resource server for any endpoint. |
+| `agentweave-discovery` | [Tool discovery](discovery/index.md): a searchable capability catalog, for when there are too many tools for one prompt. |
+| `agentweave-discovery-embeddings` | Semantic ranking for discovery (an offline model, or any LangChain4j `EmbeddingModel`). |
+| `agentweave-discovery-anthropic`, `agentweave-discovery-openai` | Native tool-search request parts for the Anthropic and OpenAI Java SDKs. |
+| `agentweave-langchain4j` | [LangChain4j](integrations/langchain4j.md) adapter: AgentWeave tools in, agents and `@Tool`s out. |
+| `agentweave-spring-ai` | [Spring AI](integrations/spring-ai.md) adapter: tools in, catalog tool search, `ChatClient` agents and `@Tool`s out. |
+| `agentweave-argi` | [ARGI](integrations/argi.md) `2.1.0-RC1` adapter: tools in, catalog tool selection, agents over A2A with approvals. |
 | `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration. Add the protocol modules you use next to it. |
 | `agentweave-bom` | Version alignment. |
+
+`agentweave-argi-neutral`, the adapter for ARGI's Spring-free API, is in the repository but isn't
+published: it builds only against a pinned ARGI snapshot (see [ARGI](integrations/argi.md#agentweave-argi-neutral-unpublished)).
 
 ## Call a tool on an MCP server
 
@@ -207,4 +217,6 @@ curl -s -X POST -H 'Content-Type: application/json' -d '{"name":"Ada"}' localhos
   combining sources.
 - [Agents](concepts/agents.md): serve and call A2A agents.
 - [Spring Boot](integrations/spring-boot.md): the same with auto-configuration.
+- [Spring AI](integrations/spring-ai.md), [LangChain4j](integrations/langchain4j.md) and
+  [ARGI](integrations/argi.md): AgentWeave tools in your agent framework, and its agents over A2A.
 - [Examples](examples.md): complete runnable programs.

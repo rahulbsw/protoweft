@@ -9,7 +9,8 @@ API, in both the client and the server role.
 
 Write a tool once and serve it over MCP and UTCP. Consume MCP servers, UTCP manuals and remote A2A
 agents through a single tool registry. Publish your own agent over A2A. Use all of it from plain
-Java, [LangChain4j](https://docs.langchain4j.dev) or Spring Boot 4.
+Java, Spring Boot 4, or the [LangChain4j](integrations/langchain4j.md),
+[Spring AI](integrations/spring-ai.md) and [ARGI](integrations/argi.md) agent frameworks.
 
 ```java
 public class Weather {
@@ -60,8 +61,8 @@ System.out.println(out.text());   // 21.5
 
     ---
 
-    The core has no dependencies. Spring Boot and LangChain4j support are optional modules on top;
-    nothing depends on them.
+    The core has no dependencies. Spring Boot, LangChain4j, Spring AI and ARGI support are optional
+    modules on top; the core and protocol modules don't depend on them.
 
 - **Wraps the official SDKs**
 
@@ -111,5 +112,5 @@ Each protocol guide lists exactly what is and isn't covered: [MCP](protocols/mcp
 
 - [Getting started](getting-started.md): add AgentWeave and make your first calls.
 - [Architecture](concepts/architecture.md): the modules and how they fit together.
-- [Examples](examples.md): three runnable applications.
+- [Examples](examples.md): runnable applications and starter templates.
 - [API reference](api/index.html): the aggregated Javadoc.
