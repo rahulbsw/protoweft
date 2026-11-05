@@ -285,6 +285,9 @@ public final class AnthropicDiscovery {
                 parts.add("[link: " + l.uri() + (l.mimeType() == null ? "" : " (" + l.mimeType() + ")") + "]");
             } else if (c instanceof Content.Data d) {
                 parts.add("[" + d.mimeType() + " data, " + d.base64Data().length() + " base64 chars, not shown]");
+            } else if (c instanceof Content.Resource r) {
+                parts.add(r.text() != null ? "[resource: " + r.uri() + "]\n" + r.text()
+                        : "[resource: " + r.uri() + ", " + r.base64Blob().length() + " base64 chars, not shown]");
             } else if (c instanceof Content.Unmapped u) {
                 parts.add("[unmapped " + u.protocolType() + " content]");
             }

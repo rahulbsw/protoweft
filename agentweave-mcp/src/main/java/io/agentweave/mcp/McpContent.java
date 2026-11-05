@@ -19,7 +19,7 @@ final class McpContent {
     private McpContent() {
     }
 
-    /** One MCP part as neutral parts; an embedded resource becomes a link followed by its body. */
+    /** One MCP part as neutral parts; an embedded resource becomes a {@link Content.Resource}. */
     static List<Content> toNeutral(McpSchema.Content part) {
         if (part instanceof McpSchema.TextContent text) {
             return List.of(new Content.Text(text.text()));
@@ -34,7 +34,7 @@ final class McpContent {
             return List.of(new Content.Link(link.uri(), link.mimeType(), link.name()));
         }
         if (part instanceof McpSchema.EmbeddedResource embedded && embedded.resource() != null) {
-            return McpPromptMessage.resource(McpPromptMessage.Role.USER, toNeutral(embedded.resource())).content();
+            return List.of(toResource(toNeutral(embedded.resource())));
         }
         return List.of(new Content.Unmapped(part.type()));
     }
@@ -45,6 +45,11 @@ final class McpContent {
         }
         McpSchema.TextResourceContents text = (McpSchema.TextResourceContents) contents;
         return new McpResourceContents(text.uri(), text.mimeType(), text.text() == null ? "" : text.text(), null);
+    }
+
+    static Content.Resource toResource(McpResourceContents contents) {
+        return contents.isText() ? Content.Resource.text(contents.uri(), contents.mimeType(), contents.text())
+                : Content.Resource.blob(contents.uri(), contents.mimeType(), contents.blob());
     }
 
     static McpSchema.ResourceContents toMcp(McpResourceContents contents) {
@@ -66,26 +71,15 @@ final class McpContent {
         return new McpPromptMessage(role, toNeutral(message.content()));
     }
 
-    /** A prompt message carries one MCP part, or a link plus body that becomes an embedded resource. */
+    /** A prompt message carries exactly one MCP part. */
     static McpSchema.PromptMessage toMcp(McpPromptMessage message) {
         McpSchema.Role role = message.role() == McpPromptMessage.Role.ASSISTANT
                 ? McpSchema.Role.ASSISTANT : McpSchema.Role.USER;
-        List<Content> parts = message.content();
-        if (parts.size() == 1) {
-            return new McpSchema.PromptMessage(role, toMcp(parts.get(0)));
+        if (message.content().size() != 1) {
+            throw new AgentWeaveException(ErrorCategory.UNSUPPORTED, ProtocolId.MCP,
+                    "an MCP prompt message carries exactly one content part");
         }
-        if (parts.size() == 2 && parts.get(0) instanceof Content.Link link) {
-            if (parts.get(1) instanceof Content.Text text) {
-                return new McpSchema.PromptMessage(role, McpSchema.EmbeddedResource.builder(
-                        text(link.uri(), link.mimeType(), text.text())).build());
-            }
-            if (parts.get(1) instanceof Content.Data data) {
-                return new McpSchema.PromptMessage(role, McpSchema.EmbeddedResource.builder(
-                        blob(link.uri(), data.mimeType(), data.base64Data())).build());
-            }
-        }
-        throw new AgentWeaveException(ErrorCategory.UNSUPPORTED, ProtocolId.MCP, "an MCP prompt message carries one "
-                + "content part, or a link followed by the text or data of an embedded resource");
+        return new McpSchema.PromptMessage(role, toMcp(message.content().get(0)));
     }
 
     /** A neutral part as one MCP tool-result or prompt part. */
@@ -105,6 +99,11 @@ final class McpContent {
         }
         if (part instanceof Content.Json json) {
             return McpSchema.TextContent.builder(json(json.value())).build();
+        }
+        if (part instanceof Content.Resource resource) {
+            return McpSchema.EmbeddedResource.builder(resource.text() != null
+                    ? text(resource.uri(), resource.mimeType(), resource.text())
+                    : blob(resource.uri(), resource.mimeType(), resource.base64Blob())).build();
         }
         if (part instanceof Content.Link link) {
             return McpSchema.ResourceLink.builder()

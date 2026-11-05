@@ -8,10 +8,9 @@ import java.util.Objects;
 /**
  * One message of an MCP prompt, in protocol-neutral content.
  *
- * <p>MCP puts exactly one content part in a prompt message. Text, image/audio data and resource
- * links map to one {@link Content} part each. An embedded resource maps to two parts: a
- * {@link Content.Link} naming the resource, followed by its body as {@link Content.Text} or
- * {@link Content.Data}; {@link #resource(Role, McpResourceContents)} builds that pair.
+ * <p>MCP puts exactly one content part in a prompt message: text, image/audio data, a resource
+ * link, or an embedded resource ({@link Content.Resource}, built by
+ * {@link #resource(Role, McpResourceContents)}).
  *
  * @param role    who speaks the message
  * @param content the message content
@@ -42,12 +41,9 @@ public record McpPromptMessage(Role role, List<Content> content) {
         return new McpPromptMessage(role, List.of(new Content.Data(mimeType, base64Data)));
     }
 
-    /** An embedded resource: a link to it followed by its contents. */
+    /** An embedded resource: the resource's URI together with its contents. */
     public static McpPromptMessage resource(Role role, McpResourceContents resource) {
-        Content body = resource.isText() ? new Content.Text(resource.text())
-                : new Content.Data(resource.mimeType() == null ? "application/octet-stream" : resource.mimeType(),
-                        resource.blob());
-        return new McpPromptMessage(role, List.of(new Content.Link(resource.uri(), resource.mimeType(), null), body));
+        return new McpPromptMessage(role, List.of(McpContent.toResource(resource)));
     }
 
     /** The text of a single-part text message, or {@code null}. */

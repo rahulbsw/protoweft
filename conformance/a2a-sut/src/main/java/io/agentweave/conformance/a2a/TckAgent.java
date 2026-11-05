@@ -47,7 +47,7 @@ final class TckAgent implements AgentHandler {
         } else if (id.startsWith("tck-stream-artifact-text")) {
             streamed(task, new Content.Text("Streamed text content"));
         } else if (id.startsWith("tck-stream-artifact-file")) {
-            streamed(task, new Content.Data("text/plain", FILE_BYTES));
+            streamed(task, new Content.Data("text/plain", FILE_BYTES, "output.txt"));
         } else if (id.startsWith("tck-stream-ordering-001")) {
             streamed(task, new Content.Text("Ordered output"));
         } else if (id.startsWith("tck-stream-001")) {
@@ -59,7 +59,7 @@ final class TckAgent implements AgentHandler {
         } else if (id.startsWith("tck-artifact-file-url")) {
             withArtifact(task, new Content.Link("https://example.com/output.txt", "text/plain", "output.txt"));
         } else if (id.startsWith("tck-artifact-file")) {
-            withArtifact(task, new Content.Data("text/plain", FILE_BYTES));
+            withArtifact(task, new Content.Data("text/plain", FILE_BYTES, "output.txt"));
         } else if (id.startsWith("tck-artifact-text")) {
             withArtifact(task, new Content.Text("Generated text content"));
         } else if (id.startsWith("tck-artifact-data")) {

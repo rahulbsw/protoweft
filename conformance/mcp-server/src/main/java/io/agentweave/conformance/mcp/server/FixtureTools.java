@@ -41,19 +41,16 @@ final class FixtureTools {
                         (args, caller) -> outcome(new Content.Data("image/png", RED_PIXEL_PNG)))
                 .tool("test_audio_content", "Returns audio content for testing", NO_ARGS,
                         (args, caller) -> outcome(new Content.Data("audio/wav", MINIMAL_WAV)))
-                // Core Content has no embedded-resource part. The neutral form AgentWeave's own MCP
-                // client produces for an embedded resource is a Link followed by its body, so that
-                // is what is returned here; see the baseline for how the server maps it.
                 .tool("test_embedded_resource", "Returns embedded resource content for testing", NO_ARGS,
                         (args, caller) -> outcome(
-                                new Content.Link("test://embedded-resource", "text/plain", null),
-                                new Content.Text("This is an embedded resource content.")))
+                                Content.Resource.text("test://embedded-resource", "text/plain",
+                                        "This is an embedded resource content.")))
                 .tool("test_multiple_content_types", "Returns multiple content types for testing", NO_ARGS,
                         (args, caller) -> outcome(
                                 new Content.Text("Multiple content types test:"),
                                 new Content.Data("image/png", RED_PIXEL_PNG),
-                                new Content.Link("test://mixed-content-resource", "application/json", null),
-                                new Content.Text("{\"test\":\"data\",\"value\":123}")))
+                                Content.Resource.text("test://mixed-content-resource", "application/json",
+                                        "{\"test\":\"data\",\"value\":123}")))
                 .tool("test_tool_with_logging", "Tool that sends log messages during execution", NO_ARGS,
                         FixtureTools::withLogging)
                 .tool("test_error_handling", "Tool that returns an error for testing error handling", NO_ARGS,

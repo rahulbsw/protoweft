@@ -5,7 +5,7 @@ import io.agentweave.springai.AgentWeaveToolCallbacks;
 import io.agentweave.springai.CatalogToolIndex;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.ChatClientCustomizer;
+import org.springframework.ai.chat.client.ChatClientBuilderCustomizer;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -34,7 +34,7 @@ class AgentWeaveSpringAiConfigurationTest {
     void nothingIsRegisteredByDefault() {
         runner.run(context -> {
             assertThat(context).doesNotHaveBean(AgentWeaveToolCallbacks.class);
-            assertThat(context).doesNotHaveBean(ChatClientCustomizer.class);
+            assertThat(context).doesNotHaveBean(ChatClientBuilderCustomizer.class);
             assertThat(context).doesNotHaveBean(CatalogToolIndex.class);
             assertThat(context).doesNotHaveBean(AgentHandler.class);
         });
@@ -46,7 +46,7 @@ class AgentWeaveSpringAiConfigurationTest {
             ToolCallback[] callbacks = context.getBean(AgentWeaveToolCallbacks.class).getToolCallbacks();
             assertThat(Arrays.stream(callbacks).map(c -> c.getToolDefinition().name()))
                     .containsExactlyInAnyOrder("add", "whoami");
-            assertThat(context).hasSingleBean(ChatClientCustomizer.class);
+            assertThat(context).hasSingleBean(ChatClientBuilderCustomizer.class);
         });
     }
 
@@ -66,7 +66,7 @@ class AgentWeaveSpringAiConfigurationTest {
                 "agentweave.spring-ai.tool-callbacks.enabled=true").run(context -> {
             assertThat(context).hasSingleBean(CatalogToolIndex.class);
             // Only the tool-search customizer: registering both would duplicate tool names.
-            assertThat(context.getBeansOfType(ChatClientCustomizer.class)).containsOnlyKeys("agentWeaveToolSearchCustomizer");
+            assertThat(context.getBeansOfType(ChatClientBuilderCustomizer.class)).containsOnlyKeys("agentWeaveToolSearchCustomizer");
         });
     }
 

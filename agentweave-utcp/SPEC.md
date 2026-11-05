@@ -75,7 +75,8 @@ authority wherever the spec docs are vague or disagree.
   semantics would otherwise put arguments in the query string as strings. Names are made URL-safe
   (`[^A-Za-z0-9_-]` → `_`, collisions rejected), so registry names like `a.b` publish as `a_b`.
   `POST /utcp/tools/<tool>` → 200 with structured content as JSON, text-only results as
-  `text/plain`, other parts as a JSON array; tool failure 500, unknown tool 404, bad body or
+  `text/plain`, other parts as a JSON array of `{"type": "text"|"data"|"json"|"link"|"resource"|
+  "unmapped", ...}` objects; tool failure 500, unknown tool 404, bad body or
   arguments 400, `UNSUPPORTED` 501, `CONNECTION` 502, `TIMEOUT` 504, always `{"error": "..."}`,
   which reference clients surface as `"<reason>: <error>"`. Base URL: configured
   (`String`/`Supplier`) or derived from the request; one containing `$` is refused because

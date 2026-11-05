@@ -20,12 +20,3 @@ server:
   - elicitation-sep1034-defaults:elicitation-sep1034-general
   - elicitation-sep1330-enums:elicitation-sep1330-general
 
-  # Library gap (agentweave-mcp server): a tool result cannot carry an embedded resource.
-  # Core Content has no embedded-resource part, and ToolServerCore.toResult maps each part on its
-  # own through McpContent.toMcp(Content), which turns a Link into resource_link. Only prompt
-  # messages pair Link + Text/Data into an EmbeddedResource (McpContent.toMcp(McpPromptMessage)).
-  # The fixture returns Link + Text, which goes out as resource_link + text, so the check finds no
-  # "resource" part. McpFeatures nevertheless lists CONTENT_RESOURCE ("content/resource") as
-  # supported by the server role.
-  - tools-call-embedded-resource:tools-call-embedded-resource
-  - tools-call-mixed-content:tools-call-mixed-content

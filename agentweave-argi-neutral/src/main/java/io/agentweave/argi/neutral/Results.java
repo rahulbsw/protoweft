@@ -57,6 +57,11 @@ final class Results {
         if (content instanceof Content.Link l) {
             return ContentPart.text(l.uri());
         }
+        if (content instanceof Content.Resource r) {
+            String mime = r.mimeType() != null ? r.mimeType() : "application/octet-stream";
+            return r.text() != null ? ContentPart.text(r.text())
+                    : ContentPart.binary(binaryType(mime), mime, Base64.getDecoder().decode(r.base64Blob()));
+        }
         return ContentPart.text("[unsupported content: " + ((Content.Unmapped) content).protocolType() + "]");
     }
 

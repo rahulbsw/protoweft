@@ -139,8 +139,7 @@ abstract class AuthoringContract {
         List<McpPromptMessage> embedded = c.getPrompt("test_prompt_with_embedded_resource",
                 Map.of("resourceUri", "test://static-text")).messages();
         assertThat(embedded.get(0).content()).containsExactly(
-                new Content.Link("test://static-text", "text/plain", null),
-                new Content.Text(TestAuthoring.EMBEDDED_TEXT));
+                Content.Resource.text("test://static-text", "text/plain", TestAuthoring.EMBEDDED_TEXT));
         assertThat(embedded.get(1).text()).isEqualTo("Please process the embedded resource above.");
 
         List<McpPromptMessage> image = c.getPrompt("test_prompt_with_image", Map.of()).messages();

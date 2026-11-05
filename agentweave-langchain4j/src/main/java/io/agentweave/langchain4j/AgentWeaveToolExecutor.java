@@ -96,6 +96,9 @@ final class AgentWeaveToolExecutor implements ToolExecutor {
                 lines.add(l.uri());
             } else if (part instanceof Content.Data d) {
                 lines.add("[" + d.mimeType() + " data not forwarded]");
+            } else if (part instanceof Content.Resource r) {
+                lines.add(r.text() != null ? "[resource: " + r.uri() + "]\n" + r.text()
+                        : "[resource: " + r.uri() + ", data not forwarded]");
             } else if (part instanceof Content.Unmapped u) {
                 lines.add("[unmapped " + u.protocolType() + " content]");
             }

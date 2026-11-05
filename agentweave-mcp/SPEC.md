@@ -95,15 +95,16 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
 - **Tool failures are outcomes in both directions.** `ToolOutcome.error()` ⇄
   `CallToolResult.isError`.
 - **Content mapping, client** (MCP → core): text → `Text`; image/audio → `Data` (base64 as
-  received); `resource_link` → `Link`; embedded `resource` → two parts, a `Link` (URI, mime
-  type) followed by its body as `Text` or `Data`. Core `Content` has no embedded-resource part,
-  and the pair keeps URI, type and body without inventing one. The same mapping applies to
-  tool results and prompt messages.
+  received); `resource_link` → `Link`; embedded `resource` → `Resource` (URI, mime type, and
+  text or base64 blob). The same mapping applies to tool results and prompt messages.
 - **Content mapping, server** (core → MCP):
   - `Text` → text.
   - `Data` → image or audio content for `image/*` or `audio/*` mime types.
   - `Json` → text holding the serialized JSON.
   - `Link` → `resource_link`. MCP requires a name, so the URI is used when the link has none.
+  - `Resource` → embedded `resource` (text or blob contents). Found by the official conformance
+    suite: before `Resource` existed, a `Link` + `Text` pair went out as `resource_link` + text,
+    so the advertised embedded-resource support did not hold for tool results.
   - `Data` of any other mime type, and `Unmapped`, fail the call with `-32603`. MCP can carry
     them only as embedded resources, which would need an invented URI and the resources
     capability. Rejecting keeps the loss visible.
@@ -132,9 +133,8 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
   `allowedOrigins(...)` gets 403, as MCP requires. Requests with no `Origin` (non-browser
   clients) pass.
 - **Prompt messages** (`McpPromptMessage(role, List<Content>)`). MCP gives a prompt message one
-  content part. On the server, a single part maps like tool content; a `Link` followed by `Text`
-  or `Data` becomes an embedded resource (`McpPromptMessage.resource(...)` builds it); anything
-  else fails the call with `-32603`.
+  content part. On the server, that part maps like tool content (`McpPromptMessage.resource(...)`
+  builds an embedded-resource message); more than one part fails the call with `-32603`.
 - **Resource and prompt authoring.**
   - Builders (`McpResources.builder()`, `McpPrompts.builder()`) and annotation scanning
     (`McpResources.scan(obj)`, `McpPrompts.scan(obj)`, or `.scan(...)` on a builder) produce the

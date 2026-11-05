@@ -36,7 +36,8 @@ final class A2aMapping {
         if (part instanceof FilePart file) {
             if (file.file() instanceof FileWithBytes bytes) {
                 String mime = blankToNull(bytes.mimeType());
-                return new Content.Data(mime == null ? "application/octet-stream" : mime, bytes.bytes());
+                return new Content.Data(mime == null ? "application/octet-stream" : mime, bytes.bytes(),
+                        blankToNull(bytes.name()));
             }
             if (file.file() instanceof FileWithUri uri) {
                 return new Content.Link(uri.uri(), blankToNull(uri.mimeType()), blankToNull(uri.name()));
@@ -64,7 +65,17 @@ final class A2aMapping {
             return new TextPart(text.text());
         }
         if (content instanceof Content.Data data) {
-            return new FilePart(new FileWithBytes(data.mimeType(), "", data.base64Data()));
+            return new FilePart(new FileWithBytes(data.mimeType(), nullToEmpty(data.name()), data.base64Data()));
+        }
+        if (content instanceof Content.Resource resource) {
+            // A2A has no inline resource with a URI: send the bytes as a file named after the URI's last segment.
+            String base64 = resource.base64Blob() != null ? resource.base64Blob()
+                    : java.util.Base64.getEncoder().encodeToString(resource.text().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            String mime = resource.mimeType() != null ? resource.mimeType()
+                    : resource.text() != null ? "text/plain" : "application/octet-stream";
+            String path = java.net.URI.create(resource.uri()).getPath();
+            String name = path == null || path.isEmpty() ? resource.uri() : path.substring(path.lastIndexOf('/') + 1);
+            return new FilePart(new FileWithBytes(mime, name, base64));
         }
         if (content instanceof Content.Link link) {
             return new FilePart(new FileWithUri(nullToEmpty(link.mimeType()), nullToEmpty(link.name()), link.uri()));

@@ -29,4 +29,13 @@ class ToolModelTest {
         assertThat(outcome.text()).isEqualTo("a\nb");
         assertThat(outcome.structuredContent()).isEmpty();
     }
+
+    @Test
+    void aResourceCarriesExactlyOneBody() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new Content.Resource("u", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new Content.Resource("u", null, "t", "AA=="))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThat(Content.Resource.text("u", null, "t").base64Blob()).isNull();
+    }
 }

@@ -63,9 +63,12 @@ Dependency rules, enforced by module boundaries:
     adapters and the registry consume.
   - `ToolSpec` carries the name, description, JSON input schema, and protocol-neutral `metadata`:
     behavior hints, title and tags. MCP tool annotations and UTCP tags map to and from it.
-  - `ToolOutcome` holds ordered `Content` (`Text`, `Data`, `Json`, `Link`, or `Unmapped`, so
-    unmappable parts are visible rather than dropped), an `error` flag, and structured content. A
-    tool that runs and fails is an outcome, not an exception.
+  - `ToolOutcome` holds ordered `Content` (`Text`, `Data` with an optional file name, `Json`,
+    `Link`, `Resource` — a URI delivered with its text or bytes, like an MCP embedded resource —
+    or `Unmapped`, so unmappable parts are visible rather than dropped), an `error` flag, and
+    structured content. A tool that runs and fails is an outcome, not an exception. Adapters that
+    hand results to a model as text include a text `Resource`'s body after its URI and replace
+    binary `Data`/`Resource` bodies with a marker.
   - `ToolRegistry` combines sources under `<source>.<tool>` names.
   - `LocalTools` turns `@AgentTool` methods, or programmatic handlers, into tools, generating JSON
     Schema from the Java types.

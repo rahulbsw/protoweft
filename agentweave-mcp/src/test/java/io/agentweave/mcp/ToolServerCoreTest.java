@@ -51,4 +51,17 @@ class ToolServerCoreTest {
         assertThat(result.content()).singleElement().isInstanceOfSatisfying(McpSchema.ResourceLink.class,
                 link -> assertThat(link.name()).isEqualTo("file:///tmp/a.txt"));
     }
+
+    @Test
+    void resourcesBecomeEmbeddedResources() {
+        McpSchema.CallToolResult result = ToolServerCore.toResult(new ToolOutcome(List.of(
+                Content.Resource.text("test://a", "text/plain", "body"),
+                Content.Resource.blob("test://b", "image/png", "AAAA")), false, null));
+
+        assertThat(result.content()).hasSize(2).allSatisfy(c -> assertThat(c).isInstanceOf(McpSchema.EmbeddedResource.class));
+        assertThat(((McpSchema.EmbeddedResource) result.content().get(0)).resource())
+                .isInstanceOfSatisfying(McpSchema.TextResourceContents.class, t -> assertThat(t.text()).isEqualTo("body"));
+        assertThat(((McpSchema.EmbeddedResource) result.content().get(1)).resource())
+                .isInstanceOfSatisfying(McpSchema.BlobResourceContents.class, b -> assertThat(b.blob()).isEqualTo("AAAA"));
+    }
 }

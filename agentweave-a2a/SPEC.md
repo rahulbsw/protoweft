@@ -59,7 +59,9 @@ Both A2A roles over the **JSON-RPC binding of A2A spec 1.0**, built on the offic
   | anything else | `PROTOCOL` |
 
 - **Content mapping** (both directions): `TextPart` ↔ `Text`; `FilePart` bytes ↔ `Data`
-  (base64 as on the wire, missing media type → `application/octet-stream`); `FilePart` URI ↔
+  (base64 as on the wire, file name kept, missing media type → `application/octet-stream`);
+  outgoing `Resource` → `FilePart` bytes (text UTF-8 encoded, named after the URI's last path
+  segment — A2A has no inline part with a URI); `FilePart` URI ↔
   `Link`; `DataPart` ↔ `Json`; anything else → `Unmapped` (outgoing `Unmapped` is rejected).
 - **Agent card.** Interface URL = public base URL + JSON-RPC path (default `/a2a`). The URL may be
   a `Supplier`, resolved when the card is first needed, so hosts can bind port 0. Default modes are

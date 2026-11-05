@@ -9,7 +9,7 @@ import io.agentweave.springai.AgentWeaveToolCallbacks;
 import io.agentweave.springai.CatalogToolIndex;
 import io.agentweave.springai.SpringAiAgents;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.ChatClientCustomizer;
+import org.springframework.ai.chat.client.ChatClientBuilderCustomizer;
 import org.springframework.ai.chat.client.advisor.toolsearch.ToolSearchToolCallingAdvisor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -46,11 +46,11 @@ public class AgentWeaveSpringAiAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnClass(name = "org.springframework.ai.chat.client.ChatClientCustomizer")
+    @ConditionalOnClass(name = "org.springframework.ai.chat.client.ChatClientBuilderCustomizer")
     @ConditionalOnBean(AgentWeaveToolCallbacks.class)
     @ConditionalOnProperty(prefix = "agentweave.spring-ai.tool-search", name = "enabled", havingValue = "false",
             matchIfMissing = true)
-    ChatClientCustomizer agentWeaveToolCallbacksCustomizer(AgentWeaveToolCallbacks callbacks) {
+    ChatClientBuilderCustomizer agentWeaveToolCallbacksCustomizer(AgentWeaveToolCallbacks callbacks) {
         return builder -> builder.defaultTools(callbacks);
     }
 
@@ -69,7 +69,7 @@ public class AgentWeaveSpringAiAutoConfiguration {
         }
 
         @Bean
-        ChatClientCustomizer agentWeaveToolSearchCustomizer(CatalogToolIndex index) {
+        ChatClientBuilderCustomizer agentWeaveToolSearchCustomizer(CatalogToolIndex index) {
             return builder -> builder
                     .defaultAdvisors(ToolSearchToolCallingAdvisor.builder().toolIndex(index).build())
                     .defaultTools(index.toolCallbacks());

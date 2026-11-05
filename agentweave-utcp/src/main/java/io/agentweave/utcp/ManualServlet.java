@@ -120,6 +120,9 @@ final class ManualServlet extends HttpServlet {
                 part.put("type", "data");
                 part.put("mime_type", d.mimeType());
                 part.put("data", d.base64Data());
+                if (d.name() != null) {
+                    part.put("name", d.name());
+                }
             } else if (c instanceof Content.Json j) {
                 part.put("type", "json");
                 part.put("value", j.value());
@@ -128,6 +131,11 @@ final class ManualServlet extends HttpServlet {
                 part.put("uri", l.uri());
                 part.put("mime_type", l.mimeType());
                 part.put("name", l.name());
+            } else if (c instanceof Content.Resource r) {
+                part.put("type", "resource");
+                part.put("uri", r.uri());
+                part.put("mime_type", r.mimeType());
+                part.put(r.text() != null ? "text" : "data", r.text() != null ? r.text() : r.base64Blob());
             } else if (c instanceof Content.Unmapped u) {
                 part.put("type", "unmapped");
                 part.put("protocol_type", u.protocolType());
