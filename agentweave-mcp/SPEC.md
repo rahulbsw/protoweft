@@ -196,6 +196,32 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
   open-world, title) map to and from MCP tool annotations in both directions. Only the hints a
   server actually sets are carried over.
 
+## Authorization (MCP 2025-11-25)
+
+- **Client.** `McpClientConnector.http(..).authorizer(HttpAuthorizer)` wires the SDK's request
+  customizer and its authorization-error handler.
+  - The authorizer sets `Authorization` on every request, replacing any static header.
+  - On a 401 or 403 it decides whether to retry. The SDK bounds retries.
+  - The OAuth resource is the MCP endpoint URL.
+  - `HttpAuthorizer` is a core interface, so this module doesn't depend on `agentweave-oauth`.
+    `OAuthClient` implements it: discovery, PKCE, registration, refresh and step-up.
+  - The client's report lists `authorization` as supported only when an authorizer is
+    configured.
+- **Server.** Compose `agentweave-oauth`'s `ProtectedResourceMetadataEndpoint` next to
+  `McpToolServer.http(..)`, and use its `BearerTokenAuthenticator` as the host's
+  `InboundAuthenticator`.
+  - The challenge headers come from `InboundAuthFilter`, because the SDK's
+    `ServerHttpHeaderValidator` can only `sendError`.
+  - The token's subject and scopes reach tools as the `CallerIdentity`.
+  - `McpToolServer`'s own report still lists `authorization` as unsupported, because the server
+    module can't see what the host composed. That limits honesty in one direction only: we never
+    over-claim.
+- **Verification.** `agentweave-oauth`'s `McpOAuthEndToEndTest` runs a real MCP client and server.
+  The client discovers the authorization server from the 401, obtains a client-credentials token
+  with `resource` and scope, retries, and calls a protected tool, which sees the token subject and
+  scopes. Without an authorizer the client fails with `AUTHENTICATION`, and an unknown client is
+  rejected without endless retries.
+
 ## SDK workarounds
 
 - **Session sweeper thread leak (SDK 2.1.0; still present on `main` and in `v2.2.0-M2`).**
