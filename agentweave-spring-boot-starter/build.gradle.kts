@@ -23,6 +23,13 @@ dependencies {
     compileOnly(project(":agentweave-utcp"))
     // Optional tool discovery (agentweave.discovery.enabled).
     compileOnly(project(":agentweave-discovery"))
+    // Optional Spring AI integration (agentweave.spring-ai.*).
+    val springAi = project.property("springAiVersion")
+    compileOnly(project(":agentweave-spring-ai"))
+    compileOnly("org.springframework.ai:spring-ai-model:$springAi")
+    compileOnly("org.springframework.ai:spring-ai-client-chat:$springAi")
+    compileOnly("org.springframework.ai:spring-ai-tool-search-tool:$springAi")
+    compileOnly("org.springframework.ai:spring-ai-tool-search-advisor:$springAi")
 
     annotationProcessor(boot)
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
@@ -34,6 +41,10 @@ dependencies {
     testImplementation(project(":agentweave-a2a"))
     testImplementation(project(":agentweave-utcp"))
     testImplementation(project(":agentweave-discovery"))
+    testImplementation(project(":agentweave-spring-ai"))
+    testImplementation("org.springframework.ai:spring-ai-client-chat:$springAi")
+    testImplementation("org.springframework.ai:spring-ai-tool-search-tool:$springAi")
+    testImplementation("org.springframework.ai:spring-ai-tool-search-advisor:$springAi")
     testImplementation("org.springframework.boot:spring-boot-autoconfigure")
     testImplementation("org.springframework.boot:spring-boot-test")
     testImplementation("org.springframework.boot:spring-boot-tomcat")

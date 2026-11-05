@@ -194,6 +194,23 @@ The checks:
   - Health `agentweave` reports connector lifecycle state; it doesn't probe peers on every check.
     It is DOWN if any connector failed, OUT_OF_SERVICE while any is pending, and UP otherwise.
   - Info `agentweave.connectors.<name>` carries each connector's `ComplianceReport`.
+- **Spring AI (`AgentWeaveSpringAiAutoConfiguration`, optional `agentweave-spring-ai`).**
+  Everything is opt-in.
+  - `agentweave.spring-ai.tool-callbacks.enabled` registers an `AgentWeaveToolCallbacks` bean
+    (`expose=local`, the default, or `registry`) and adds it to the auto-configured
+    `ChatClient.Builder`.
+    - *Why opt-in:* Spring AI's MCP server re-serves every `ToolCallbackProvider` bean, so
+      remote tools and their credentials would otherwise be republished silently.
+  - `agentweave.spring-ai.tool-search.enabled` (with discovery enabled) adds Spring AI's
+    `ToolSearchToolCallingAdvisor` backed by a `CatalogToolIndex`, plus the catalog's
+    callbacks.
+    - It replaces the plain-callbacks customizer, because registering both duplicates tool
+      names and Spring AI rejects that.
+  - `agentweave.server.a2a.from-chat-client=true` serves the application's `ChatClient` (or one
+    built from `ChatClient.Builder`) as the A2A agent when there's no `AgentHandler` bean. It
+    streams when `agentweave.server.a2a.streaming` is true.
+  - There's no ordering against the server auto-configuration, which resolves the
+    `AgentHandler` lazily. Ordering it before would form a cycle with discovery.
 
 ## Coverage
 

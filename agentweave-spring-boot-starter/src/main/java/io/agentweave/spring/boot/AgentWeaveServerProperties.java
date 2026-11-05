@@ -212,6 +212,20 @@ public class AgentWeaveServerProperties {
         private boolean enabled;
 
         /**
+         * With Spring AI on the classpath and no AgentHandler bean: serve the application's
+         * ChatClient as the A2A agent (streaming when {@code streaming} is true).
+         */
+        private boolean fromChatClient;
+
+        public boolean isFromChatClient() {
+            return fromChatClient;
+        }
+
+        public void setFromChatClient(boolean fromChatClient) {
+            this.fromChatClient = fromChatClient;
+        }
+
+        /**
          * Externally reachable base URL advertised in the agent card. When unset,
          * http://localhost:<port><context-path> is used, which only local clients can reach.
          */
