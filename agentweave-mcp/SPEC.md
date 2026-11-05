@@ -123,8 +123,8 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
     credential target is the command.
   - Over HTTP: `BearerToken` → `Authorization: Bearer <token>`, and `NamedSecret(name, value)`
     → header `name: value`. Credentials override static `header(...)` values with the same
-    name. The credential target is the base URL as configured. The MCP authorization flow
-    (protected-resource metadata, token acquisition) is not implemented.
+    name. The credential target is the base URL as configured. The MCP authorization flow is
+    an `HttpAuthorizer` instead (see Authorization below).
 - **Telemetry targets carry no secrets.** The observation target is the executable (never its
   arguments) for stdio. For HTTP it is the base URL without user info, query, or fragment. The
   server observes each `tools/call`, with the tool name as target.
@@ -256,11 +256,17 @@ both roles:
 Client only: `tools/list-changed`, `resources/list-changed`, `prompts/list-changed` (the
 server's lists are snapshots).
 
+Authorization: the client lists `authorization` as supported when an `HttpAuthorizer` is set;
+the server never does (see Authorization).
+
 Not implemented in either role:
 - the SSE transport
-- MCP authorization
 - cancellation
 - sampling, roots, and elicitation
+
+Conformance: the official MCP conformance suite runs against `conformance/mcp-server` and
+`conformance/mcp-client` in CI; results and baselined checks are in
+`docs/operations/conformance.md` (decision in `agentweave-architecture`).
 
 ## Verification
 

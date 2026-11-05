@@ -8,7 +8,7 @@ title: AgentWeave — interoperable agent & tool protocols for Java
 # AgentWeave
 
 *The protocol backbone for Java agents: MCP, A2A and UTCP behind one protocol-neutral API, in both
-directions, plugged into LangChain4j, Spring Boot or plain Java.*
+directions, plugged into LangChain4j, Spring AI, ARGI, Spring Boot or plain Java.*
 
 ## Goal
 
@@ -22,8 +22,8 @@ programming model instead of coupling to any one protocol's SDK and wire format:
 - **Publish** their own tools and agents.
 - **Discover** the right capability among thousands without flooding the model's context.
 
-A plain Java app, a bespoke agent framework, a LangChain4j agent or a Spring Boot service all use the
-same stable interfaces.
+A plain Java app, a bespoke agent framework, a LangChain4j, Spring AI or ARGI agent, or a Spring Boot
+service all use the same stable interfaces.
 
 ## Problem
 
@@ -98,7 +98,9 @@ What AgentWeave provides:
   - a neutral agent model covering the full task lifecycle
   - credentials, inbound authentication, observability and one error model
 - **Protocol modules, each with client and server:**
-  - **MCP**, over stdio and Streamable HTTP.
+  - **MCP**, over stdio and Streamable HTTP: tools, resources (with templates and subscriptions),
+    prompts, completion, logging and progress, plus OAuth authorization as a client
+    (machine-to-machine and interactive) and as a protected resource server.
   - **A2A**: an agent client, plus a full-lifecycle agent server (tasks, streaming, input-required,
     cancel, resubscribe, push notifications, extended card).
   - **UTCP**: a manual client, plus a manual provider for the app's own tools.
@@ -113,17 +115,24 @@ What AgentWeave provides:
 - **Integrations:**
   - **LangChain4j:** AgentWeave tools in AI services, AI services served as A2A agents, `@Tool`
     methods served over MCP and UTCP, and catalog-backed tool search.
+  - **Spring AI:** AgentWeave tools as `ToolCallback`s, the catalog as Spring AI's tool-search
+    index, a `ChatClient` served as a streaming A2A agent, and Spring AI tools served over MCP and
+    UTCP.
+  - **ARGI:** AgentWeave tools in ARGI agents, catalog-based tool selection without an extra model
+    call, and ARGI agents served over A2A with human-in-the-loop approvals as `input-required`.
   - **Spring Boot 4 starter:** connectors from configuration, opt-in endpoints, Spring Security,
-    Micrometer and Actuator.
-- **Explicit, tested compatibility reporting** per connector.
+    Micrometer and Actuator, and opt-in Spring AI wiring.
+- **Explicit, tested compatibility reporting** per connector, checked in CI against the official
+  MCP conformance suite and the A2A TCK, with every expected failure tied to a declared
+  unsupported feature or a named bug.
 - **An evaluation harness** that measures discovery against an all-tools baseline.
-- **Runnable examples** and a documentation site.
+- **Runnable examples, starter templates, a JBang demo** and a documentation site.
 
 ## Non-goals
 
 - **Not an agent runtime, orchestration engine or LLM client.** AgentWeave is the protocol layer, not
-  a planner, memory store, prompt-chaining library or RAG framework. LangChain4j and Spring AI are the
-  model layer that AgentWeave plugs into.
+  a planner, memory store, prompt-chaining library or RAG framework. LangChain4j, Spring AI and ARGI
+  are the model and agent-runtime layers that AgentWeave plugs into.
 - **Not a reimplementation of the protocol SDKs.** Where an official Java SDK exists (MCP, A2A),
   AgentWeave wraps it rather than re-deriving the wire format. (UTCP has no official Java SDK, so its
   connector is implemented directly from the specification.)

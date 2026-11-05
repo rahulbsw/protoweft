@@ -211,6 +211,8 @@ The checks:
     streams when `agentweave.server.a2a.streaming` is true.
   - There's no ordering against the server auto-configuration, which resolves the
     `AgentHandler` lazily. Ordering it before would form a cycle with discovery.
+  - Both builder additions are `ChatClientBuilderCustomizer` beans. Spring AI 2.0 deprecates
+    `ChatClientCustomizer` for removal; its `ChatClientAutoConfiguration` applies both kinds.
 
 ## Coverage
 

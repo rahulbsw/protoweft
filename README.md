@@ -3,7 +3,7 @@
 **The protocol backbone for Java agents.** AgentWeave puts the agent and tool interoperability
 protocols — [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org) and
 [UTCP](https://www.utcp.io) — behind one protocol-neutral Java 17 API, in both the client and the
-server role, with optional LangChain4j and Spring Boot 4 integrations.
+server role, with optional LangChain4j, Spring AI, ARGI and Spring Boot 4 integrations.
 
 ```java
 public class Weather {
@@ -39,21 +39,24 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
   (protocol, version, permissions, availability). A low-confidence fallback broadens the search.
   Models use it through generic meta-tools or through Anthropic's and OpenAI's native tool search.
   Effects are [measured](docs/discovery/evaluation.md), not assumed.
-- **Framework-neutral.** The core has no dependencies. LangChain4j and Spring Boot support are
-  optional modules on top.
+- **Conformance-tested.** The official MCP conformance suite and the A2A TCK run in CI; every
+  expected failure is [listed with its reason](docs/operations/conformance.md).
+- **Framework-neutral.** The core has no dependencies. LangChain4j, Spring AI, ARGI and Spring Boot
+  support are optional modules on top.
 
 ## Protocol support
 
 | Protocol | Client | Server | Transport / binding | Specification | Built on |
 |---|---|---|---|---|---|
-| MCP | `McpClientConnector` | `McpToolServer` | stdio, Streamable HTTP | `2024-11-05` to `2025-11-25` | MCP Java SDK `2.1.0` |
+| MCP | `McpClientConnector` | `McpToolServer` | stdio, Streamable HTTP; tools, resources, prompts, completion, logging, progress, OAuth | `2024-11-05` to `2025-11-25` | MCP Java SDK `2.1.0` |
 | A2A | `A2aAgentConnector` | `A2aAgentServer` | JSON-RPC, SSE streaming | `1.0` | a2a-java `1.5.0.Final` |
 | UTCP | `UtcpClientConnector` | `UtcpManualProvider` | HTTP, text and file manuals; `http` and `text` tools | `1.1` (accepts `1.0`) | implemented from the spec |
 
 Coverage and limitations are documented per protocol in the [user guide](docs/index.md).
 
 AgentWeave is not an LLM framework: it has no model clients, chains, memory or RAG. Use it with
-[LangChain4j](https://docs.langchain4j.dev) or [Spring AI](https://spring.io/projects/spring-ai).
+[LangChain4j](https://docs.langchain4j.dev), [Spring AI](https://spring.io/projects/spring-ai) or
+[ARGI](https://github.com/agentic-ai-java/argi).
 
 ## Modules
 
@@ -64,11 +67,14 @@ AgentWeave is not an LLM framework: it has no model clients, chains, memory or R
 | `agentweave-a2a` | A2A client and agent server (JSON-RPC). |
 | `agentweave-utcp` | UTCP client and manual provider. |
 | `agentweave-server`, `agentweave-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
+| `agentweave-oauth` | OAuth 2.1 for MCP authorization: client and resource-server pieces (Nimbus). |
 | `agentweave-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
 | `agentweave-discovery-embeddings` | Offline (bge-small, MiniLM) and LangChain4j-backed embedders. |
 | `agentweave-discovery-anthropic` / `-openai` | Typed native tool-search adapters on the official SDKs. |
 | `agentweave-langchain4j` | LangChain4j adapter: tools in, agents and `@Tool`s out, and catalog tool search. |
-| `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration with opt-in servers, Micrometer and Actuator. |
+| `agentweave-spring-ai` | Spring AI adapter: tools as `ToolCallback`s, catalog tool search, `ChatClient` as an A2A agent. |
+| `agentweave-argi` | ARGI adapter: tools in, catalog tool selection, agents with human-in-the-loop over A2A. |
+| `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration with opt-in servers, Spring AI wiring, Micrometer and Actuator. |
 | `agentweave-bom` | Version alignment. |
 
 ## Getting started
@@ -110,8 +116,11 @@ Run an example:
   [versions and compliance](docs/concepts/compliance.md)
 - Protocols: [MCP](docs/protocols/mcp.md), [A2A](docs/protocols/a2a.md), [UTCP](docs/protocols/utcp.md)
 - Integrations: [Spring Boot](docs/integrations/spring-boot.md),
-  [LangChain4j](docs/integrations/langchain4j.md), [embedded Jetty](docs/integrations/jetty.md)
-- [Examples](docs/examples.md), [troubleshooting](docs/operations/troubleshooting.md)
+  [LangChain4j](docs/integrations/langchain4j.md), [Spring AI](docs/integrations/spring-ai.md),
+  [ARGI](docs/integrations/argi.md), [OAuth](docs/integrations/oauth.md),
+  [embedded Jetty](docs/integrations/jetty.md)
+- [Quickstart](docs/quickstart.md), [examples](docs/examples.md),
+  [conformance](docs/operations/conformance.md), [troubleshooting](docs/operations/troubleshooting.md)
 
 The documentation site is built with [Zensical](https://zensical.org) (`zensical build`), and the
 API reference with `./gradlew aggregateJavadoc`.

@@ -97,7 +97,8 @@ chat.prompt().user(q).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversa
   - **Rethrowing.** `alwaysThrow` or `rethrowExceptions(AgentWeaveException.class)` make
     failures end the call instead.
 - **Result text.** Text parts are kept as-is, JSON parts are serialized, links become their URI,
-  and binary or unmapped parts become visible bracketed markers. With no parts, the model gets
+  a text `Resource` becomes its URI followed by its text, and binary or unmapped parts become
+  visible bracketed markers. With no parts, the model gets
   the structured payload as JSON. This is the same rendering as the LangChain4j adapter.
 - **Caller identity.**
   - **Tools in.** `call(input, ToolContext)` is overridden, because Spring AI's default ignores
@@ -132,6 +133,10 @@ chat.prompt().user(q).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversa
     session-id function applied to the advisor's `toolSearchToolSessionId` tool-context entry. The
     search and the call therefore see the same caller.
 - **Agents.**
+  - **Why AgentWeave serves `ChatClient`s over A2A.** Spring AI has no A2A in core. The community
+    `spring-ai-a2a-server` 0.4.0 (on a2a-java 1.4.0) is one-shot: one string, one artifact, no
+    streaming and no `input-required`. `SpringAiAgents` runs on AgentWeave's full-lifecycle
+    `A2aAgentServer` instead.
   - **Request.** Each message is one `ChatClient` request: `user(text)`, advisor parameter
     `ChatMemory.CONVERSATION_ID` = `contextId` (falling back to the taskId, then a random id), and
     tool context `agentweave.caller` = `request.caller()`. An optional
