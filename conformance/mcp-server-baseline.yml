@@ -1,0 +1,31 @@
+# Expected failures of AgentWeave's MCP server (conformance/mcp-server) in the official MCP
+# conformance suite, @modelcontextprotocol/conformance@0.2.0-alpha.12:
+#   conformance server --suite active --spec-version 2025-11-25 --expected-failures <this file>
+#
+# Every entry names the AgentWeave feature it waits for: an id that McpFeatures (agentweave-mcp)
+# reports as unsupported, or a precise library gap. Entries are per check
+# (<scenario>:<check-id>), so the other checks of each scenario (wire-schema-valid) stay enforced.
+# The suite exits 1 on any failure not listed here, and on any entry here that now passes.
+# See docs/operations/conformance.md.
+
+server:
+  # McpFeatures.SAMPLING ("sampling") is unsupported: a tool cannot send sampling/createMessage
+  # to the client, so the fixture tool test_sampling is not published.
+  - tools-call-sampling:tools-call-sampling
+
+  # McpFeatures.ELICITATION ("elicitation") is unsupported: a tool cannot send elicitation/create,
+  # so test_elicitation, test_elicitation_sep1034_defaults and test_elicitation_sep1330_enums
+  # are not published.
+  - tools-call-elicitation:tools-call-elicitation
+  - elicitation-sep1034-defaults:elicitation-sep1034-general
+  - elicitation-sep1330-enums:elicitation-sep1330-general
+
+  # Library gap (agentweave-mcp server): a tool result cannot carry an embedded resource.
+  # Core Content has no embedded-resource part, and ToolServerCore.toResult maps each part on its
+  # own through McpContent.toMcp(Content), which turns a Link into resource_link. Only prompt
+  # messages pair Link + Text/Data into an EmbeddedResource (McpContent.toMcp(McpPromptMessage)).
+  # The fixture returns Link + Text, which goes out as resource_link + text, so the check finds no
+  # "resource" part. McpFeatures nevertheless lists CONTENT_RESOURCE ("content/resource") as
+  # supported by the server role.
+  - tools-call-embedded-resource:tools-call-embedded-resource
+  - tools-call-mixed-content:tools-call-mixed-content

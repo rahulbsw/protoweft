@@ -1,0 +1,16 @@
+# Expected failures of AgentWeave's A2A server (conformance/a2a-sut, A2aAgentServer) in the
+# official A2A TCK, a2aproject/a2a-tck tag 1.0.0.alpha3, run with --level must.
+#
+# The TCK has no baseline option, so scripts/conformance/a2a-tck.sh compares the failed and
+# errored test cases of the TCK's JUnit report (reports/junitreport.xml) with this list, using the
+# same rules as the MCP suite's --expected-failures: a failure not listed here, or an entry here
+# that no longer fails, exits 1. Ids are "<junit classname>::<junit test name>".
+# Every entry names the precise library gap. See docs/operations/conformance.md.
+
+failures:
+  # DM-ART-001 (MUST), scenario "tck-artifact-file": an artifact FilePart with inline bytes must
+  # carry the filename "output.txt". Library gap (agentweave-core + agentweave-a2a): core
+  # Content.Data(mimeType, base64Data) has no file name, and A2aMapping.toA2a sends
+  # new FileWithBytes(data.mimeType(), "", data.base64Data()) (A2aMapping.java:67), so the part
+  # goes out without a name. (File parts by URI keep their name through Content.Link.name.)
+  - tests.compatibility.core_operations.test_artifacts.TestFileArtifact::test_task_has_file_artifact[jsonrpc]
