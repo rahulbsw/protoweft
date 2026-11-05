@@ -1,0 +1,68 @@
+{
+  "id": "resp_68c1f1b0a1c28190f6cba5d5e6f7a8b9",
+  "object": "response",
+  "created_at": 1767225700,
+  "status": "completed",
+  "error": null,
+  "incomplete_details": null,
+  "instructions": null,
+  "model": "gpt-5.4",
+  "output": [
+    {
+      "type": "tool_search_call",
+      "id": "tsc_68c1f1b1b2d38190a7dcb6e6f7a8b9c0",
+      "execution": "server",
+      "call_id": null,
+      "status": "completed",
+      "arguments": {
+        "paths": ["files"]
+      }
+    },
+    {
+      "type": "tool_search_output",
+      "id": "tso_68c1f1b2c3e48190b8edc7f7a8b9c0d1",
+      "execution": "server",
+      "call_id": null,
+      "status": "completed",
+      "tools": [
+        {
+          "type": "namespace",
+          "name": "files",
+          "description": "Tools from files",
+          "tools": [
+            {
+              "type": "function",
+              "name": "files__readFile",
+              "description": "Read the contents of a file from disk. Large files are truncated.",
+              "defer_loading": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "path": { "type": "string", "description": "Path of the file" }
+                },
+                "required": ["path"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "id": "fc_68c1f1b3d4f58190c9fed8a8b9c0d1e2",
+      "call_id": "call_def789",
+      "name": "files__readFile",
+      "namespace": "files",
+      "arguments": "{\"path\":\"notes.txt\"}",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": false,
+  "temperature": 1.0,
+  "tool_choice": "auto",
+  "tools": [
+    { "type": "tool_search" }
+  ],
+  "top_p": 1.0,
+  "metadata": {}
+}
