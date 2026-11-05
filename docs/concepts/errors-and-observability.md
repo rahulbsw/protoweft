@@ -80,8 +80,8 @@ ObservationHandler logging = new ObservationHandler() {
 };
 ```
 
-Pass it to a builder: `observations(handler)` on the MCP and A2A builders and on `McpToolServer`,
-`observationHandler(handler)` on `UtcpClientConnector.Builder`.
+Pass it to a builder: `observations(handler)` on the MCP, A2A and UTCP builders and on
+`McpToolServer`.
 
 Each event carries an `Observation`: the protocol, a stable operation name, and a target.
 

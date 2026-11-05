@@ -179,7 +179,7 @@ class ManualRegistrationTest {
                     assertThat(target).isEqualTo(backend.url("/utcp"));
                     return List.of(new Credential.BearerToken("bt"), new Credential.NamedSecret("X-Secret", "ns"));
                 })
-                .observationHandler(new ObservationHandler() {
+                .observations(new ObservationHandler() {
                     @Override
                     public void onSuccess(Observation o, Duration elapsed) {
                         ops.add(o.operation() + ":" + o.target());

@@ -180,7 +180,7 @@ public final class UtcpManualProvider implements ServerEndpointProvider {
         /**
          * Tells clients to send an API key header on every tool call: emits
          * {@code {"auth_type":"api_key","api_key":"${<variable>}","var_name":<header>,"location":"header"}}.
-         * A UTCP client resolves the variable namespaced by its manual name ({@code <manual>_<variable>}).
+         * A UTCP client resolves the variable namespaced by its manual name ({@code <manual>_<variable>}, with each {@code _} in the manual name doubled).
          */
         public Builder apiKeyAuth(String headerName, String variable) {
             if (headerName == null || headerName.isBlank()) {

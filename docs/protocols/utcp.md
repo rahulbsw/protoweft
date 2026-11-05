@@ -69,7 +69,7 @@ Tools whose type isn't allowed are dropped at registration with a warning; calli
 | `dotenv(path)` | none | A `.env` file, consulted after configured variables, in the order added. |
 | `environment(lookup)` | `System::getenv` | The last variable source; `k -> null` disables it. |
 | `credentials(provider)` | none | Credentials for the discovery request of an http manual. |
-| `observationHandler(handler)` | none | Observability hook. Note the method name, which differs from the other builders' `observations`. |
+| `observations(handler)` | none | Observability hook. |
 | `discoveryTimeout(duration)` | 10 s | Manual discovery timeout. |
 | `callTimeout(duration)` | 30 s | Tool call and OAuth2 token timeout. |
 | `httpClient(client)` | a JDK client, HTTP/1.1 | A custom `java.net.http.HttpClient`. It must use `HttpClient.Redirect.NEVER`: every redirect is re-validated by the connector. |

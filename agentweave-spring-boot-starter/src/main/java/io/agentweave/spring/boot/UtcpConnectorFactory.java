@@ -29,7 +29,7 @@ final class UtcpConnectorFactory implements ConnectorFactory {
             if (m.getCallTimeout() != null) {
                 b.callTimeout(m.getCallTimeout());
             }
-            out.put(name, b.credentials(credentials).observationHandler(observations).build());
+            out.put(name, b.credentials(credentials).observations(observations).build());
         });
         return out;
     }

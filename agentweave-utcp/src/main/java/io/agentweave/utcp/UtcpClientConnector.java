@@ -397,7 +397,7 @@ public final class UtcpClientConnector implements ToolConnector {
             return this;
         }
 
-        public Builder observationHandler(ObservationHandler handler) {
+        public Builder observations(ObservationHandler handler) {
             this.observations = Objects.requireNonNull(handler, "handler");
             return this;
         }
