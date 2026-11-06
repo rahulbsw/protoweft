@@ -1,11 +1,11 @@
-# Expected failures of AgentWeave's MCP client (conformance/mcp-client, McpClientConnector) in the
+# Expected failures of Protoweft's MCP client (conformance/mcp-client, McpClientConnector) in the
 # official MCP conformance suite, @modelcontextprotocol/conformance@0.2.0-alpha.12:
 #   conformance client --scenario <s> --spec-version 2025-11-25 --expected-failures <this file>
 #
-# Every entry names the AgentWeave feature it waits for: an id that McpFeatures (agentweave-mcp)
+# Every entry names the Protoweft feature it waits for: an id that McpFeatures (protoweft-mcp)
 # reports as unsupported, or a precise library bug. Entries are per check (<scenario>:<check-id>).
 # The suite exits 1 on any failure not listed here, and on any entry here that now passes.
-# The 14 auth/* scenarios run McpClientConnector with agentweave-oauth's OAuthClient as authorizer
+# The 14 auth/* scenarios run McpClientConnector with protoweft-oauth's OAuthClient as authorizer
 # (conformance/mcp-client AuthScenarios). See docs/operations/conformance.md.
 
 client:
@@ -24,7 +24,7 @@ client:
   # resumable stream (consumeSseStream(body, null)), and never reads the SSE "retry" field. When
   # the server closes that stream before the response (SEP-1699), the client neither waits
   # "retry" ms nor reconnects with Last-Event-ID, so the tools/call never completes. The SDK's own
-  # conformance baseline lists sse-retry for the same reason. No AgentWeave feature id covers SSE
+  # conformance baseline lists sse-retry for the same reason. No Protoweft feature id covers SSE
   # resumability; the fix belongs in the SDK.
   - sse-retry:client-sse-retry-timing
   - sse-retry:client-sse-last-event-id

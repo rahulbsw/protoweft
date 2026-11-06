@@ -1,7 +1,7 @@
-# Contributing to AgentWeave
+# Contributing to Protoweft
 
 Thanks for helping. This guide covers how to build the project, what a change must include,
-and the rules that keep AgentWeave's protocol support honest.
+and the rules that keep Protoweft's protocol support honest.
 
 ## Build and test
 
@@ -9,7 +9,7 @@ Requirements: JDK 17 or newer. The Gradle wrapper is included.
 
 ```bash
 ./gradlew build          # compile, test and build Javadoc for every module
-./gradlew :agentweave-mcp:test --tests '*McpClientConnectorTest'   # one module or test class
+./gradlew :protoweft-mcp:test --tests '*McpClientConnectorTest'   # one module or test class
 ```
 
 Some tests start real servers on free local ports. None of them need network access or API keys.
@@ -26,7 +26,7 @@ scripts/install-argi-snapshot.sh
 ./gradlew --write-verification-metadata sha256,pgp --export-keys -PargiSnapshot \
     build cyclonedxBom publishToMavenLocal -Pversion=0.0.0-verify
 rm gradle/verification-keyring.gpg
-rm -rf ~/.m2/repository/io/agentweave/*/0.0.0-verify
+rm -rf ~/.m2/repository/io/github/rahulbsw/protoweft/*/0.0.0-verify
 ```
 
 A new trusted key or an unexpected checksum change in the diff deserves a look at who signed the
@@ -36,11 +36,11 @@ artifact.
 
 | Path | What lives there |
 |---|---|
-| `agentweave-core` | Protocol-neutral API. Has no dependencies. |
-| `agentweave-server`, `agentweave-server-jetty` | The servlet hosting contract and the embedded host |
-| `agentweave-mcp`, `agentweave-a2a`, `agentweave-utcp` | One module per protocol |
-| `agentweave-langchain4j`, `agentweave-spring-boot-starter` | Framework integrations |
-| `agentweave-bom` | Version alignment for users |
+| `protoweft-core` | Protocol-neutral API. Has no dependencies. |
+| `protoweft-server`, `protoweft-server-jetty` | The servlet hosting contract and the embedded host |
+| `protoweft-mcp`, `protoweft-a2a`, `protoweft-utcp` | One module per protocol |
+| `protoweft-langchain4j`, `protoweft-spring-boot-starter` | Framework integrations |
+| `protoweft-bom` | Version alignment for users |
 | `examples/` | Runnable examples (not published) |
 | `docs/` | Documentation site sources |
 | `*.md` specs with `id`/`type` frontmatter | Design specs: goals, architecture, module decisions |
@@ -57,7 +57,7 @@ automatically.
   `unsupported`.
 - **No invented protocol behavior.** Follow the official specification and reference SDK. If you
   must deviate, record the deviation and the reason in that module's `SPEC.md`.
-- **Keep protocol types out of the core API.** `agentweave-core` must not depend on any protocol
+- **Keep protocol types out of the core API.** `protoweft-core` must not depend on any protocol
   SDK.
 - **Docs.** Update the user guide in `docs/` when you change behavior users can see, and update
   the owning `SPEC.md` when you change a decision, boundary or invariant. Rationale belongs in

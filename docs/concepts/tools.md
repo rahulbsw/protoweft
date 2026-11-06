@@ -21,7 +21,7 @@ one-part outcomes.
 
 !!! note "Tool failures are outcomes, not exceptions"
     When a tool runs and reports a failure, you get a `ToolOutcome` with `error() == true` and the
-    details in its content. An `AgentWeaveException` means the call itself couldn't be made: an
+    details in its content. An `ProtoweftException` means the call itself couldn't be made: an
     unknown tool, invalid arguments, a connection failure or a timeout.
 
 `Content.Unmapped` stands for a part a connector can't translate. It carries the protocol's type tag, so the loss is visible instead of silent.
@@ -75,7 +75,7 @@ LocalTools tools = LocalTools.builder().scan(new Weather()).build();
 
 ### Generated schema
 
-AgentWeave generates the input schema from the parameter types. For the `forecast` tool above:
+Protoweft generates the input schema from the parameter types. For the `forecast` tool above:
 
 ```json
 {
@@ -118,13 +118,13 @@ a protected endpoint, and a parameter of type `ToolProgress` receives a
 [progress reporter](#progress-and-log-messages). Neither appears in the schema.
 
 !!! tip "Parameter names"
-    Compile with `-parameters` so AgentWeave can read parameter names, or name every parameter with
+    Compile with `-parameters` so Protoweft can read parameter names, or name every parameter with
     `@ToolParam(name = "...")`. Without either, `scan` fails and says so.
 
 ### Argument binding
 
 Arguments are converted to the parameter types. Values that can't represent the type fail the call
-with `AgentWeaveException` and `ErrorCategory.INVALID_ARGUMENTS`, for example `1.5` for an `int`, an
+with `ProtoweftException` and `ErrorCategory.INVALID_ARGUMENTS`, for example `1.5` for an `int`, an
 unknown enum constant, or a missing required argument. Some lenient conversions are accepted:
 numeric strings for numbers, `"true"`/`"false"` for booleans, and enum names in any case.
 
@@ -140,7 +140,7 @@ numeric strings for numbers, `"true"`/`"false"` for booleans, and enum names in 
 | `void` or `null` | An empty outcome |
 
 If the method throws, the result is a failure outcome carrying the exception message. An
-`AgentWeaveException` thrown by the method propagates unchanged.
+`ProtoweftException` thrown by the method propagates unchanged.
 
 ### Progress and log messages
 
@@ -192,7 +192,7 @@ LocalTools tools = LocalTools.builder()
 The `ToolHandler` receives the raw argument map and the caller. A `ProgressAwareToolHandler`
 `(arguments, caller, progress) -> ...` also receives the call's
 [`ToolProgress`](#progress-and-log-messages); `tool(...)` accepts either. As with annotated methods,
-an exception becomes a failure outcome unless it is an `AgentWeaveException`. `add(LocalTool)` and
+an exception becomes a failure outcome unless it is an `ProtoweftException`. `add(LocalTool)` and
 `addAll(List<LocalTool>)` add prepared tools, for example
 [LangChain4j `@Tool` methods](../integrations/langchain4j.md#tool-methods-out).
 

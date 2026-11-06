@@ -16,7 +16,7 @@ Sources (--source):
   avx2    cross-encoder/ms-marco-MiniLM-L*-v2 onnx/model_quint8_avx2.onnx (Optimum, x86 avx2)
 
 The vocabulary must be the 30,522-entry bert-base-uncased list that bge-small-en-v1.5 uses (same git blob
-fb140275...), so AgentWeave's WordPieceTokenizer applies unchanged; the script checks that.
+fb140275...), so Protoweft's WordPieceTokenizer applies unchanged; the script checks that.
 
 Output: <out>/<model-dir>/model.onnx, vocab.txt, manifest.json (repo, revision, file, size, sha256, source).
 Default <out>: evals/tool-discovery/build/models (ignored by git via build/).
@@ -73,7 +73,7 @@ MODELS = {
 
 def http_get(urls, retries=4):
     """GETs the first URL that answers; returns (bytes, url)."""
-    headers = {"User-Agent": "agentweave-evals/0.1"}
+    headers = {"User-Agent": "protoweft-evals/0.1"}
     token = os.environ.get("HF_TOKEN")
     if token:
         headers["Authorization"] = "Bearer " + token

@@ -1,25 +1,25 @@
 # ARGI
 
 [ARGI](https://github.com/agentic-ai-java/argi) is a Java agent framework (`io.github.agentic-ai-java`).
-AgentWeave has two adapters for it, one per ARGI API generation:
+Protoweft has two adapters for it, one per ARGI API generation:
 
 | Module | ARGI version | API | Published |
 |---|---|---|---|
-| `agentweave-argi` | `2.1.0-RC1`, from Maven Central | Spring AI based (`io.github.agentic.ai.graph.*`, `ReactAgent`) | yes, with the other modules |
-| `agentweave-argi-neutral` | `2.1.0-RC2-SNAPSHOT`, a pinned commit of ARGI `main` | Spring-free neutral API (`argi-api`, `argi-agent-api`, `ReActAgent`) | **no**: built from source only, see [below](#agentweave-argi-neutral-unpublished) |
+| `protoweft-argi` | `2.1.0-RC1`, from Maven Central | Spring AI based (`io.github.agentic.ai.graph.*`, `ReactAgent`) | yes, with the other modules |
+| `protoweft-argi-neutral` | `2.1.0-RC2-SNAPSHOT`, a pinned commit of ARGI `main` | Spring-free neutral API (`argi-api`, `argi-agent-api`, `ReActAgent`) | **no**: built from source only, see [below](#protoweft-argi-neutral-unpublished) |
 
-Both connect AgentWeave and ARGI in the same directions: AgentWeave tools in, catalog-based tool
+Both connect Protoweft and ARGI in the same directions: Protoweft tools in, catalog-based tool
 selection without an extra model call, and ARGI agents served over A2A with human approvals carried
 as `input-required`.
 
-## `agentweave-argi` (ARGI 2.1.0-RC1)
+## `protoweft-argi` (ARGI 2.1.0-RC1)
 
 ```kotlin
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
-    implementation("io.agentweave:agentweave-argi")        // brings argi-agent-framework 2.1.0-RC1 and agentweave-spring-ai
-    implementation("io.agentweave:agentweave-discovery")   // only for CatalogToolSelectionInterceptor
-    implementation("io.agentweave:agentweave-a2a")         // to serve agents over A2A
+    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation("io.github.rahulbsw:protoweft-argi")        // brings argi-agent-framework 2.1.0-RC1 and protoweft-spring-ai
+    implementation("io.github.rahulbsw:protoweft-discovery")   // only for CatalogToolSelectionInterceptor
+    implementation("io.github.rahulbsw:protoweft-a2a")         // to serve agents over A2A
 }
 ```
 
@@ -27,13 +27,13 @@ ARGI RC1 is built on Spring AI and takes Spring AI `ToolCallback`s, so this modu
 [Spring AI adapter](spring-ai.md) for every callback: tool names, schemas, error handling and result
 rendering are identical (`weather.forecast` becomes `weather__forecast`). It pins
 `spring-ai-client-chat` 2.0.2 so ARGI's Spring AI 2.0.1 lines up with the `spring-ai-model` 2.0.2
-that `agentweave-spring-ai` exports. ARGI also brings Jackson 2 and its own older A2A client
-(`io.github.a2asdk` 0.3.3); those packages differ from the a2a-java SDK that `agentweave-a2a` uses,
+that `protoweft-spring-ai` exports. ARGI also brings Jackson 2 and its own older A2A client
+(`io.github.a2asdk` 0.3.3); those packages differ from the a2a-java SDK that `protoweft-a2a` uses,
 so both can be on the classpath.
 
 !!! warning "Release candidate"
     This module targets the published RC1 only. ARGI `main` has moved to the Spring-free API that
-    `agentweave-argi-neutral` covers, and package names, `ModelRequest`, `InterruptionMetadata` and
+    `protoweft-argi-neutral` covers, and package names, `ModelRequest`, `InterruptionMetadata` and
     the human-in-the-loop resume pattern may change in later releases.
 
 ### Tools in
@@ -50,12 +50,12 @@ agent.call("Weather in Paris?",
         ArgiTools.withCaller(RunnableConfig.builder().threadId("thread-1"), caller).build());
 ```
 
-`ArgiTools.callbackProvider(source)` is an `AgentWeaveToolCallbacks`; use
-`AgentWeaveToolCallbacks.builder(source)` directly for filters or other names.
+`ArgiTools.callbackProvider(source)` is an `ProtoweftToolCallbacks`; use
+`ProtoweftToolCallbacks.builder(source)` directly for filters or other names.
 
 **The caller travels in the run's metadata.** ARGI builds each tool's `ToolContext` from the agent's
 static `toolContext(Map)` plus the run's `RunnableConfig` metadata, so a `CallerIdentity` under
-`agentweave.caller` (`ArgiTools.CALLER_KEY`) reaches the tool either way:
+`protoweft.caller` (`ArgiTools.CALLER_KEY`) reaches the tool either way:
 
 - per run, with `ArgiTools.withCaller(configBuilder, caller)`, which `ArgiAgents` does for every A2A
   request;
@@ -115,7 +115,7 @@ How it works, on **every** model call, including those after tool results:
 | `whenNothingFound(NoMatch)` | `KEEP_ALL` | `KEEP_ALL` or `KEEP_NONE`, as above. |
 | `registerCatalogTools(boolean)` | `true` | Let ARGI register the catalog's callbacks; turn off to register `toolCallbacks()` yourself. |
 | `toolNames(mapper)` | `ToolNames::sanitize` | Names for both the hits and the callbacks. |
-| `callerIdentity(supplier)`, `callerIdentityFrom(function)` | `agentweave.caller` from the request context | Where the caller comes from. |
+| `callerIdentity(supplier)`, `callerIdentityFrom(function)` | `protoweft.caller` from the request context | Where the caller comes from. |
 | `queryCustomizer((request, query) -> ...)` | none | Tighten every query, for example `query.exclude(CapabilityHint.DESTRUCTIVE)`. |
 | `onResult((request, result) -> ...)` | none | Observe every catalog result. |
 
@@ -207,9 +207,9 @@ tools are chosen per request by the starter's catalog through `CatalogToolSelect
 with a transfer tool that needs approval, served over A2A by `ArgiAgents.handler`. Its test uses a
 scripted `ChatModel`, so it needs no API key.
 
-## `agentweave-argi-neutral` (unpublished)
+## `protoweft-argi-neutral` (unpublished)
 
-`agentweave-argi-neutral` targets ARGI's Spring-free neutral API (`argi-api`, `argi-agent-api`),
+`protoweft-argi-neutral` targets ARGI's Spring-free neutral API (`argi-api`, `argi-agent-api`),
 which exists only on ARGI `main` as `2.1.0-RC2-SNAPSHOT`. Maven Central has only the Spring-based
 RC1, so this module:
 
@@ -224,10 +224,10 @@ RC1, so this module:
 
 ```bash
 scripts/install-argi-snapshot.sh                         # clone, check out the pinned SHA, mvn install
-./gradlew -PargiSnapshot :agentweave-argi-neutral:build
+./gradlew -PargiSnapshot :protoweft-argi-neutral:build
 ```
 
-The script clones ARGI into `~/.cache/agentweave/argi-src` (`ARGI_SRC_DIR`), checks out the pinned
+The script clones ARGI into `~/.cache/protoweft/argi-src` (`ARGI_SRC_DIR`), checks out the pinned
 commit, and installs only the Spring-free modules (`argi-api`, `argi-runtime-api`,
 `argi-runtime-core`, `argi-agent-api`, `argi-agent-core`) into your local Maven repository
 (`MAVEN_REPO_LOCAL`, default `~/.m2/repository`). It needs network access to GitHub and runs ARGI's
@@ -237,39 +237,39 @@ CI runs the same two commands in a separate job.
 
 ### What it provides
 
-Package `io.agentweave.argi.neutral`:
+Package `io.github.rahulbsw.protoweft.argi.neutral`:
 
 | Type | Does |
 |---|---|
-| `ArgiNeutralTools` | `registry(source)` turns any AgentWeave `ToolSource` into an ARGI `ToolRegistry` of `Tool`s (names via `ToolNames.sanitize`; `builder(source)` adds `filter`, `toolNames`, `callerIdentity`, `callerIdentityFrom`, `executor`, and ends in `build()`, `tools()` or `dynamic()` for `ReActAgent.Builder.dynamicTools`). `toLocalTools(...)` turns ARGI `Tool`s into `LocalTools.LocalTool`s, so AgentWeave's MCP and UTCP servers can serve them. |
+| `ArgiNeutralTools` | `registry(source)` turns any Protoweft `ToolSource` into an ARGI `ToolRegistry` of `Tool`s (names via `ToolNames.sanitize`; `builder(source)` adds `filter`, `toolNames`, `callerIdentity`, `callerIdentityFrom`, `executor`, and ends in `build()`, `tools()` or `dynamic()` for `ReActAgent.Builder.dynamicTools`). `toLocalTools(...)` turns ARGI `Tool`s into `LocalTools.LocalTool`s, so Protoweft's MCP and UTCP servers can serve them. |
 | `CatalogToolSelectionInterceptor` | A `ModelInterceptor` that searches the catalog for the last user message on each model turn and shows the model only the hits, plus tools that aren't catalog capabilities (`keepOtherTools`) and `alwaysInclude` names. |
 | `ArgiNeutralAgents` | `handler(agent)` / `builder(agent)` serve an ARGI `Agent` (for example `ReActAgent`) as an `AgentHandler`: deltas and progress become `working` statuses, and a `Suspension` becomes `input-required`. |
 
 ```java
-ReActAgent agent = ReActAgent.builder(ArgiNeutralAgents.withoutAgentWeaveAttributes(chatClient))
-        .tools(ArgiNeutralTools.registry(registry))                       // AgentWeave tools in
+ReActAgent agent = ReActAgent.builder(ArgiNeutralAgents.withoutProtoweftAttributes(chatClient))
+        .tools(ArgiNeutralTools.registry(registry))                       // Protoweft tools in
         .interceptors(List.of(CatalogToolSelectionInterceptor.of(catalog)))
         .build();
 AgentHandler handler = ArgiNeutralAgents.handler(agent);                  // serve with A2aAgentServer
 ```
 
-- **Caller.** The handler passes `agentweave.caller`, `agentweave.taskId` and
-  `agentweave.contextId` as agent inputs. `ReActAgent` hands its inputs to every tool's
+- **Caller.** The handler passes `protoweft.caller`, `protoweft.taskId` and
+  `protoweft.contextId` as agent inputs. `ReActAgent` hands its inputs to every tool's
   `ToolContext`, which is where the tools read the caller.
-- **`withoutAgentWeaveAttributes(chatClient)`.** `ReActAgent` also forwards its inputs as
+- **`withoutProtoweftAttributes(chatClient)`.** `ReActAgent` also forwards its inputs as
   `ChatRequest` attributes, and some ARGI chat-client adapters (Google ADK, LangChain4j streaming)
-  reject any attribute. This wrapper strips the `agentweave.*` keys before the model call; tools
+  reject any attribute. This wrapper strips the `protoweft.*` keys before the model call; tools
   still receive them.
 - **Suspensions.** A `SUSPENDED` outcome stores the run (resume token, messages, outputs) under the
   task id, in memory by default (`suspensions(map)` for shared storage), and asks the suspension's
   prompts as the `input-required` question. The reply on the same task resumes the run with the
-  token; its text is passed as input `agentweave.reply` (`REPLY_KEY`) and the value of a JSON part as
-  `agentweave.replyData` (`REPLY_DATA_KEY`), not as a user message.
-- **Execution context.** By default tenant `agentweave/default`, principal
-  `agentweave/<caller>`, run id = task id; multi-tenant deployments supply
+  token; its text is passed as input `protoweft.reply` (`REPLY_KEY`) and the value of a JSON part as
+  `protoweft.replyData` (`REPLY_DATA_KEY`), not as a user message.
+- **Execution context.** By default tenant `protoweft/default`, principal
+  `protoweft/<caller>`, run id = task id; multi-tenant deployments supply
   `executionContext(...)`.
 
 Limitations: suspensions are lost on restart unless you supply a shared store; cancelling ARGI's
-tool stage doesn't interrupt a running AgentWeave call; tool search runs once per model turn on the
+tool stage doesn't interrupt a running Protoweft call; tool search runs once per model turn on the
 last user message, and `NAMES_ONLY` fallback candidates aren't offered; usage updates and tool
 results aren't reported as task status. The module's `SPEC.md` has the full design.

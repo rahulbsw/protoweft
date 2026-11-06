@@ -1,8 +1,8 @@
 {
   "catalogs": {},
   "aliases": {
-    "agentweave-demo": {
-      "script-ref": "jbang/AgentWeaveDemo.java",
+    "protoweft-demo": {
+      "script-ref": "jbang/ProtoweftDemo.java",
       "description": "Serve one Java method over MCP, UTCP and A2A, then call it back through all three"
     }
   },

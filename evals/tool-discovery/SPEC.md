@@ -3,7 +3,7 @@ id: evals-tool-discovery
 type: module-design
 status: draft
 title: evals/tool-discovery — evaluation harness for on-demand tool discovery
-parent: agentweave-architecture
+parent: protoweft-architecture
 ---
 
 # evals/tool-discovery
@@ -18,20 +18,20 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 
 ## Boundary
 
-- The module is eval-only. It is an `application` (`io.agentweave.evals.discovery.EvalMain`) with
+- The module is eval-only. It is an `application` (`io.github.rahulbsw.protoweft.evals.discovery.EvalMain`) with
   publishing disabled. Nothing depends on it.
-- It depends on `agentweave-core`, `com.anthropic:anthropic-java:3.5.0`,
+- It depends on `protoweft-core`, `com.anthropic:anthropic-java:3.5.0`,
   `com.openai:openai-java:4.100.0`, `com.knuddels:jtokkit:1.1.0` and Jackson 3. The SDKs never reach
   a published module, so the "ships no LLM clients" non-goal holds.
-- It depends on `agentweave-discovery` and `agentweave-discovery-embeddings` (bge-small through
-  `agentweave-model-bge-small-en-v15`) to evaluate them. Discovery retrievers and arms are
+- It depends on `protoweft-discovery` and `protoweft-discovery-embeddings` (bge-small through
+  `protoweft-model-bge-small-en-v15`) to evaluate them. Discovery retrievers and arms are
   registered through `RetrieverFactory`/`ArmFactory` (ServiceLoader); the CLI has no
   discovery-specific code except the `calibrate` command. The discovery modules make no model
   calls; only this module's own clients do.
 - Data is downloaded by `scripts/fetch_*.py` into `build/data/` and never committed. ToolRet's HF
   cards have no license, so it is used locally only. MCPToolBench++ is MIT.
 
-## Public API (package `io.agentweave.evals.discovery`)
+## Public API (package `io.github.rahulbsw.protoweft.evals.discovery`)
 
 - `data`:
   - `EvalTool(id, dataset, ToolSpec, rawDocument)` and

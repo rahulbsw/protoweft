@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # Builds ARGI's Spring-free neutral API at a pinned commit and installs it into the local Maven
-# repository, so `./gradlew -PargiSnapshot :agentweave-argi-neutral:build` can resolve it.
+# repository, so `./gradlew -PargiSnapshot :protoweft-argi-neutral:build` can resolve it.
 #
 # ARGI publishes only 2.1.0-RC1 (Spring-based) to Maven Central; the neutral API
 # (argi-api, argi-agent-api, argi-agent-core) exists only on ARGI main as 2.1.0-RC2-SNAPSHOT.
-# See agentweave-argi-neutral/SPEC.md.
+# See protoweft-argi-neutral/SPEC.md.
 #
 # Idempotent: a marker file in the local repository records the installed commit, and the run is
 # skipped when it matches ARGI_SHA and every artifact is present.
 #
 # Environment overrides:
-#   ARGI_SRC_DIR       where the ARGI clone lives (default: ~/.cache/agentweave/argi-src)
+#   ARGI_SRC_DIR       where the ARGI clone lives (default: ~/.cache/protoweft/argi-src)
 #   MAVEN_REPO_LOCAL   local Maven repository (default: ~/.m2/repository)
 #   ARGI_FORCE=1       rebuild even when the marker matches
 set -euo pipefail
 
 # Pinned ARGI main commit (2026-11-05, "Merge pull request #355"). Bump together with
-# agentweave-argi-neutral/SPEC.md.
+# protoweft-argi-neutral/SPEC.md.
 ARGI_SHA="a869538fcee17230bc8f20f6ed76c0d15926220e"
 ARGI_REPO="https://github.com/agentic-ai-java/argi.git"
 ARGI_VERSION="2.1.0-RC2-SNAPSHOT"
@@ -26,10 +26,10 @@ ARGI_VERSION="2.1.0-RC2-SNAPSHOT"
 MODULES="argi-api/argi-api-base,argi-runtime/argi-runtime-api,argi-runtime/argi-runtime-core,argi-agent/argi-agent-api,argi-agent/argi-agent-core"
 ARTIFACTS="argi-api argi-runtime-api argi-runtime-core argi-agent-api argi-agent-core"
 
-SRC_DIR="${ARGI_SRC_DIR:-$HOME/.cache/agentweave/argi-src}"
+SRC_DIR="${ARGI_SRC_DIR:-$HOME/.cache/protoweft/argi-src}"
 REPO_LOCAL="${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}"
 GROUP_DIR="$REPO_LOCAL/io/github/agentic-ai-java"
-MARKER="$GROUP_DIR/.agentweave-argi-sha"
+MARKER="$GROUP_DIR/.protoweft-argi-sha"
 
 installed() {
     [[ -f "$MARKER" && "$(cat "$MARKER")" == "$ARGI_SHA" ]] || return 1

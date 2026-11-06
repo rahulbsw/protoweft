@@ -1,6 +1,6 @@
 name: Release
 
-# Publishes every agentweave-* library and the BOM to Maven Central when a version tag is pushed,
+# Publishes every protoweft-* library and the BOM to Maven Central when a version tag is pushed,
 # for example `git tag v0.1.0 && git push origin v0.1.0`. The `maven-central` environment should
 # require a reviewer: that approval is the release gate. See RELEASING.md.
 on:
@@ -38,13 +38,13 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: 'agentweave-*/build/libs/*.jar'
+          subject-path: 'protoweft-*/build/libs/*.jar'
       - name: Attest the SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: 'agentweave-*/build/libs/*.jar'
+          subject-path: 'protoweft-*/build/libs/*.jar'
           sbom-path: build/reports/cyclonedx/bom.json
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "AgentWeave $VERSION" --notes-file CHANGELOG.md agentweave-*/build/libs/*.jar build/reports/cyclonedx/bom.json
+        run: gh release create "$GITHUB_REF_NAME" --title "Protoweft $VERSION" --notes-file CHANGELOG.md protoweft-*/build/libs/*.jar build/reports/cyclonedx/bom.json

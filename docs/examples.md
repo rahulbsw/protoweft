@@ -9,8 +9,8 @@ JDK (17 or newer).
 | [`mcp-client-example`](#mcp-client) | The MCP client through the neutral `ToolConnector` API | nothing (Node.js optional) |
 | [`plain-java-gateway`](#plain-java-gateway) | One tool and one agent over MCP, UTCP and A2A from plain Java | nothing |
 | [`spring-boot-example`](#spring-boot) | The Spring Boot starter serving all three protocols | nothing |
-| [`langchain4j-example`](#langchain4j) | A LangChain4j AI Service with AgentWeave tools, served over A2A | an OpenAI-compatible API key to run the agent |
-| [`spring-ai-example`](#spring-ai) | A Spring AI `ChatClient` with AgentWeave tools, served over A2A with streaming | an OpenAI-compatible API key to run; its test needs none |
+| [`langchain4j-example`](#langchain4j) | A LangChain4j AI Service with Protoweft tools, served over A2A | an OpenAI-compatible API key to run the agent |
+| [`spring-ai-example`](#spring-ai) | A Spring AI `ChatClient` with Protoweft tools, served over A2A with streaming | an OpenAI-compatible API key to run; its test needs none |
 | [`argi-example`](#argi) | An ARGI agent with catalog tool selection and approvals over A2A | an OpenAI-compatible API key to run; its test needs none |
 
 ## MCP client
@@ -38,7 +38,7 @@ Tools:
   [observe] tools/list  ok in 16 ms
   - greet: Greets someone by name
   [observe] tools/call greet ok in 24 ms
-greet -> Hello, AgentWeave!
+greet -> Hello, Protoweft!
 ```
 
 Pass a server command line to use another server, for example the official reference server
@@ -80,7 +80,7 @@ Compliance:
 The port differs on every run. Things the output shows:
 
 - The same `forecast` method answers over all three protocols.
-- The UTCP call passes its arguments as `{"body": {"city": "Oslo"}}`, because AgentWeave's UTCP
+- The UTCP call passes its arguments as `{"body": {"city": "Oslo"}}`, because Protoweft's UTCP
   provider [publishes the argument object as the JSON body](protocols/utcp.md#manual-shape).
 - The A2A agent appears as one `ask` tool.
 - MCP over Streamable HTTP lists only the revisions that have that transport.
@@ -91,7 +91,7 @@ The program exits when it's done; closing the registry and the server releases e
 
 `examples/spring-boot-example` is a Spring Boot 4 application. One set of `@AgentTool` bean methods
 (`WeatherTools`) is served over MCP and UTCP, and an `AgentHandler` bean (`WeatherAgent`) over A2A.
-All the wiring comes from the starter and `application.yml`. Every AgentWeave endpoint requires
+All the wiring comes from the starter and `application.yml`. Every Protoweft endpoint requires
 `Authorization: Bearer demo-token` (`TokenAuthenticator`), except the public A2A agent card.
 
 ```bash
@@ -158,10 +158,10 @@ npx -y @modelcontextprotocol/inspector --cli http://localhost:8080/mcp --transpo
 The `whoami` tool returns the caller name set by `TokenAuthenticator` (`demo-client`). The
 example's README also shows the raw MCP exchange with curl.
 
-**Actuator:** `curl localhost:8080/actuator/health` includes `"agentweave":{"status":"UP"}`. The
-example declares no client connectors, so `/actuator/info` shows `{"agentweave":{"connectors":{}}}`
-until you uncomment the `agentweave.mcp.clients`, `agentweave.utcp.manuals` or
-`agentweave.a2a.agents` entries in `application.yml`.
+**Actuator:** `curl localhost:8080/actuator/health` includes `"protoweft":{"status":"UP"}`. The
+example declares no client connectors, so `/actuator/info` shows `{"protoweft":{"connectors":{}}}`
+until you uncomment the `protoweft.mcp.clients`, `protoweft.utcp.manuals` or
+`protoweft.a2a.agents` entries in `application.yml`.
 
 ### Test
 
@@ -170,14 +170,14 @@ until you uncomment the `agentweave.mcp.clients`, `agentweave.utcp.manuals` or
 ```
 
 `SpringBootExampleTest` starts the application on a random port and calls it through each
-protocol with AgentWeave's own clients, including an A2A follow-up question, and checks the 401
+protocol with Protoweft's own clients, including an A2A follow-up question, and checks the 401
 responses and the health endpoint.
 
 ## LangChain4j
 
 `examples/langchain4j-example` scans an `@AgentTool` method into a `ToolRegistry`, hands it to a
-LangChain4j AI Service through `AgentWeaveToolProvider`, serves the AI Service over A2A with
-`LangChain4jAgents.handler`, and asks it a question through AgentWeave's A2A client.
+LangChain4j AI Service through `ProtoweftToolProvider`, serves the AI Service over A2A with
+`LangChain4jAgents.handler`, and asks it a question through Protoweft's A2A client.
 
 ```bash
 ./gradlew :examples:langchain4j-example:run
@@ -190,16 +190,16 @@ OpenAI-compatible server. See [LangChain4j](integrations/langchain4j.md).
 ## Spring AI
 
 `examples/spring-ai-example` is a Spring Boot 4 application where a Spring AI `ChatClient` calls
-AgentWeave tools and is served as an A2A agent, using
-[`agentweave-spring-ai`](integrations/spring-ai.md).
+Protoweft tools and is served as an A2A agent, using
+[`protoweft-spring-ai`](integrations/spring-ai.md).
 
 - `AssistantTools` has plain `@AgentTool` bean methods. The starter registers them in its
   `ToolRegistry` as source `local`, so the model sees `local__temperature`, `local__time` and
   `local__whoami`.
-- `AssistantConfiguration` builds the `ChatClient` with `AgentWeaveToolCallbacks.from(registry)` and
+- `AssistantConfiguration` builds the `ChatClient` with `ProtoweftToolCallbacks.from(registry)` and
   a `MessageChatMemoryAdvisor`, and declares the `AgentHandler` bean
   `SpringAiAgents.streamingHandler(chatClient)`, which the starter serves over A2A
-  (`agentweave.server.a2a.enabled: true`). The callbacks are deliberately not a bean, so a Spring
+  (`protoweft.server.a2a.enabled: true`). The callbacks are deliberately not a bean, so a Spring
   AI MCP server added later wouldn't re-export them.
 - The model is Spring AI's OpenAI chat model.
 
@@ -219,9 +219,9 @@ curl -s -X POST localhost:8080/a2a -H 'Content-Type: application/json' -H 'A2A-V
 
 The answer is the task's `response` artifact; `SendStreamingMessage` clients also receive each
 chunk as a `working` status. Send the next message with the returned `contextId` to continue the
-conversation. Every client under `agentweave.mcp.clients` (or `agentweave.utcp.manuals`,
-`agentweave.a2a.agents`) adds its tools to the registry, and the `ChatClient` sees them on its next
-request, for example `--args='--agentweave.mcp.clients.remote.url=http://localhost:3001'`.
+conversation. Every client under `protoweft.mcp.clients` (or `protoweft.utcp.manuals`,
+`protoweft.a2a.agents`) adds its tools to the registry, and the `ChatClient` sees them on its next
+request, for example `--args='--protoweft.mcp.clients.remote.url=http://localhost:3001'`.
 
 ```bash
 ./gradlew :examples:spring-ai-example:test
@@ -234,11 +234,11 @@ caller, and conversation memory across two tasks in one context.
 ## ARGI
 
 `examples/argi-example` is a Spring Boot 4 application where an ARGI `2.1.0-RC1` `ReactAgent` calls
-AgentWeave tools, chosen per request by the capability catalog, and is served as an A2A agent;
-transfers wait for the caller's approval. It uses [`agentweave-argi`](integrations/argi.md).
+Protoweft tools, chosen per request by the capability catalog, and is served as an A2A agent;
+transfers wait for the caller's approval. It uses [`protoweft-argi`](integrations/argi.md).
 
 - `BankTools` has `@AgentTool` bean methods: `local__balance`, `local__rate` and `local__transfer`.
-- `agentweave.discovery.enabled: true` makes the starter build a `CapabilityCatalog` over the
+- `protoweft.discovery.enabled: true` makes the starter build a `CapabilityCatalog` over the
   registry.
 - `AgentConfiguration` builds the agent with `CatalogToolSelectionInterceptor` (up to 3 tools per
   model call, no extra LLM call), `HumanInTheLoopHook.approvalOn("local__transfer", ...)`, a
@@ -272,15 +272,15 @@ a rejected transfer never runs.
 
 | Template | What it is |
 |---|---|
-| `templates/spring-boot-mcp-server` | A Spring Boot 4 application whose `@AgentTool` bean methods are served over MCP at `/mcp`, with a test that calls them with AgentWeave's MCP client. |
+| `templates/spring-boot-mcp-server` | A Spring Boot 4 application whose `@AgentTool` bean methods are served over MCP at `/mcp`, with a test that calls them with Protoweft's MCP client. |
 | `templates/plain-java-client` | A plain Java program that connects to the MCP servers, UTCP manuals and A2A agents named on the command line, lists every tool through one `ToolRegistry`, and optionally calls one. |
 
-The templates depend on the published `io.agentweave` artifacts (`agentweaveVersion` in their
+The templates depend on the published `io.github.rahulbsw` artifacts (`protoweftVersion` in their
 `gradle.properties`) from Maven Central. Until a release exists, build them against your local
 publication, as CI does:
 
 ```bash
 ./gradlew publishToMavenLocal -Pversion=0.0.0-templates
 ./gradlew -p templates/spring-boot-mcp-server build \
-    --init-script templates/verify-with-maven-local.init.gradle.kts -PagentweaveVersion=0.0.0-templates
+    --init-script templates/verify-with-maven-local.init.gradle.kts -PprotoweftVersion=0.0.0-templates
 ```

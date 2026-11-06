@@ -2,7 +2,7 @@
 
 Tools are functions. **Agents** are peers you hold a conversation with: you send a message, and an
 agent either replies directly or starts a **task** that moves through states, produces
-**artifacts**, and may pause to ask you for more input. The agent model in `agentweave-core` is
+**artifacts**, and may pause to ask you for more input. The agent model in `protoweft-core` is
 protocol-neutral; [A2A](../protocols/a2a.md) is the protocol that carries it.
 
 ## Task states
@@ -19,7 +19,7 @@ protocol-neutral; [A2A](../protocols/a2a.md) is the protocol that carries it.
 | `FAILED` | terminal | Finished with an error. |
 | `CANCELED` | terminal | Canceled by the caller. |
 | `REJECTED` | terminal | The agent declined the work. |
-| `UNKNOWN` | | The peer reported a state AgentWeave doesn't know. |
+| `UNKNOWN` | | The peer reported a state Protoweft doesn't know. |
 
 `isTerminal()` and `isInterrupted()` classify a state.
 

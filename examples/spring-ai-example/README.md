@@ -1,16 +1,16 @@
 # Spring AI example
 
-A Spring Boot 4 application where a Spring AI `ChatClient` calls AgentWeave tools and is served
-as an **A2A** agent, using `agentweave-spring-ai`.
+A Spring Boot 4 application where a Spring AI `ChatClient` calls Protoweft tools and is served
+as an **A2A** agent, using `protoweft-spring-ai`.
 
-- `AssistantTools` holds plain `@AgentTool` bean methods. The AgentWeave starter registers them in
+- `AssistantTools` holds plain `@AgentTool` bean methods. The Protoweft starter registers them in
   its `ToolRegistry` bean as source `local`, so the model sees `local__temperature`,
   `local__time` and `local__whoami`.
 - `AssistantConfiguration` wires everything with explicit beans:
-  - The `ChatClient` gets every registry tool through `AgentWeaveToolCallbacks.from(registry)`.
+  - The `ChatClient` gets every registry tool through `ProtoweftToolCallbacks.from(registry)`.
   - A `MessageChatMemoryAdvisor` keeps one conversation per A2A context.
   - The `AgentHandler` bean is `SpringAiAgents.streamingHandler(chatClient)`. The starter serves
-    it over A2A (`agentweave.server.a2a.enabled: true`), and each answer chunk is streamed as a
+    it over A2A (`protoweft.server.a2a.enabled: true`), and each answer chunk is streamed as a
     `working` status.
 - The model is Spring AI's OpenAI chat model, configured from the environment.
 
@@ -31,17 +31,17 @@ server, such as Ollama, set `spring.ai.openai.base-url`.
 
 ### More tools from an MCP server
 
-Every client configured under `agentweave.mcp.clients` becomes a registry source, and the
+Every client configured under `protoweft.mcp.clients` becomes a registry source, and the
 `ChatClient` sees its tools on its next request (the callbacks list the registry on each request):
 
 ```bash
 ./gradlew :examples:spring-ai-example:bootRun \
-  --args='--agentweave.mcp.clients.remote.url=http://localhost:3001'
+  --args='--protoweft.mcp.clients.remote.url=http://localhost:3001'
 ```
 
 The model then also sees `remote__<tool>` for each tool of that server. The URL is the server's
-base URL, and the Streamable HTTP endpoint defaults to `/mcp` (`agentweave.mcp.clients.remote.endpoint`).
-UTCP manuals (`agentweave.utcp.manuals`) and A2A agents (`agentweave.a2a.agents`) work the same way.
+base URL, and the Streamable HTTP endpoint defaults to `/mcp` (`protoweft.mcp.clients.remote.endpoint`).
+UTCP manuals (`protoweft.utcp.manuals`) and A2A agents (`protoweft.a2a.agents`) work the same way.
 
 ## Try it
 
@@ -66,7 +66,7 @@ Without `OPENAI_API_KEY` the task fails with the model client's error, reported 
 ```
 
 `SpringAiExampleTest` runs the application with a scripted `ChatModel` bean marked `@Primary`
-instead of OpenAI, so it needs no network. It talks to the application through AgentWeave's A2A
+instead of OpenAI, so it needs no network. It talks to the application through Protoweft's A2A
 client and checks three things:
 
 - a blocking answer that uses `local__temperature`;

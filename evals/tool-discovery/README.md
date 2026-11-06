@@ -1,10 +1,10 @@
 # Tool-discovery evaluation harness
 
-Measures AgentWeave's tool-discovery layer against an **all-tools baseline** (every tool's full
+Measures Protoweft's tool-discovery layer against an **all-tools baseline** (every tool's full
 schema in every request). It covers retrieval quality, wrong-tool selection, a task-completion
 proxy, discovery calls, context tokens, latency and cost. Results are bound to the exact git commit
 and dataset revisions. This module is eval-only and never published. The LLM SDKs it uses never
-reach an AgentWeave library.
+reach an Protoweft library.
 
 Status: the harness, datasets, metrics, cost guard, both model clients, the two baseline arms
 (all-tools, top-k injected), the discovery-backed retrievers (`catalog-bm25`, `catalog-dense`,
@@ -140,7 +140,7 @@ For large ToolRet catalogs, give the JVM room (`JAVA_OPTS=-Xmx8g` with the insta
 
 ### Discovery retrievers
 
-Each `catalog-*` retriever ingests the eval catalog into a real AgentWeave `CapabilityCatalog` and
+Each `catalog-*` retriever ingests the eval catalog into a real Protoweft `CapabilityCatalog` and
 ranks with `catalog.search`, so ranking, the vector floor and `Confidence` are the product's:
 
 | Retriever | Ranking |
@@ -170,7 +170,7 @@ ranks with `catalog.search`, so ranking, the vector floor and `Confidence` are t
 ### Reranking experiment
 
 An offline cross-encoder reranker on top of hybrid search, measured but **not part of the product**
-(`CrossEncoderReranker` in `agentweave-discovery-embeddings`, `RerankingIndex` here).
+(`CrossEncoderReranker` in `protoweft-discovery-embeddings`, `RerankingIndex` here).
 
 ```bash
 python3 scripts/fetch_reranker.py        # build/models/ms-marco-minilm-{l6,l2}-v2: model.onnx, vocab.txt, manifest.json

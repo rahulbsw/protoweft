@@ -15,13 +15,13 @@ repositories {
     mavenCentral()
 }
 
-val agentweaveVersion: String by project
+val protoweftVersion: String by project
 
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:$agentweaveVersion"))
-    implementation("io.agentweave:agentweave-mcp")
-    implementation("io.agentweave:agentweave-utcp")
-    implementation("io.agentweave:agentweave-a2a")
+    implementation(platform("io.github.rahulbsw:protoweft-bom:$protoweftVersion"))
+    implementation("io.github.rahulbsw:protoweft-mcp")
+    implementation("io.github.rahulbsw:protoweft-utcp")
+    implementation("io.github.rahulbsw:protoweft-a2a")
     runtimeOnly("org.slf4j:slf4j-simple:2.0.17") // logs go to stderr
 }
 

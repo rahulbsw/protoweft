@@ -1,30 +1,32 @@
-# Releasing AgentWeave
+# Releasing Protoweft
 
-Releases publish every `agentweave-*` library and `agentweave-bom` to Maven Central, under groupId
-`io.agentweave`. Examples, the evaluation harness, the conformance apps and
-`agentweave-argi-neutral` are never published.
+Releases publish every `protoweft-*` library and `protoweft-bom` to Maven Central, under groupId
+`io.github.rahulbsw`. Examples, the evaluation harness, the conformance apps and
+`protoweft-argi-neutral` are never published.
 
 Publishing is gated: the release workflow runs only for a version tag, and it waits for approval
 on the `maven-central` GitHub environment.
 
 ## One-time setup (repository owner)
 
-1. **Central Portal account and namespace.**
-   1. Sign in at <https://central.sonatype.com>, then open your username menu and choose
-      **View Namespaces → Add Namespace**. Enter `io.agentweave`.
-   2. Copy the verification key it shows, and add it as a DNS **TXT** record on exactly
-      `agentweave.io`, not a subdomain.
-   3. Before you press **Verify**, confirm the record is visible with `dig TXT agentweave.io`.
-      If you verify too early, the negative answer can be cached and verification is delayed.
+1. **Central Portal account and namespace.** `io.github.rahulbsw` is a GitHub namespace, so no
+   domain is involved ([Central docs](https://central.sonatype.org/register/namespace/)).
+   - Sign up at <https://central.sonatype.com> **with the GitHub account `rahulbsw`**. Central then
+     grants `io.github.rahulbsw` automatically; check it under your username menu → **View
+     Namespaces**.
+   - If it isn't there (for example, the account was created another way): **Add Namespace**,
+     enter `io.github.rahulbsw`, copy the verification key, create a temporary **public** GitHub
+     repository `rahulbsw/<verification-key>`, then press **Verify**. Delete that repository once
+     the namespace shows as verified.
 2. **Portal user token.** In the Portal, open **View Account → Generate User Token**. Keep the
    username/password pair it produces; it is not your login.
 3. **Signing key.**
    ```bash
-   gpg --quick-generate-key "Rahul Jain (AgentWeave releases)" ed25519 sign 2y
+   gpg --quick-generate-key "Rahul Jain (Protoweft releases)" ed25519 sign 2y
    gpg --keyserver keys.openpgp.org --send-keys <KEY_ID>
    gpg --export-secret-keys --armor <KEY_ID>      # value for SIGNING_KEY
    ```
-4. **GitHub repository `rahulbsw/agentweave`:**
+4. **GitHub repository `rahulbsw/protoweft`:**
    - Create an environment named `maven-central`, and add yourself as a required reviewer.
    - Add these environment secrets:
 
@@ -35,7 +37,7 @@ on the `maven-central` GitHub environment.
      | `SIGNING_KEY` | ASCII-armored private key |
      | `SIGNING_KEY_PASSWORD` | its passphrase |
    - Under **Settings → Pages**, set the source to **GitHub Actions**. The docs then deploy to
-     <https://rahulbsw.github.io/agentweave/>.
+     <https://rahulbsw.github.io/github/rahulbsw/protoweft/>.
 
 ## Cutting a release
 
@@ -62,4 +64,4 @@ build uses 9.8.2.
 - `.asc` signatures and checksums, added by the plugin at upload.
 - A POM with name, description, url, the MIT license, the developer and SCM. CI checks this on
   every build by publishing to Maven Local.
-- An `Automatic-Module-Name` of `io.agentweave.<module>`.
+- An `Automatic-Module-Name` of `io.github.rahulbsw.protoweft.<module>`.

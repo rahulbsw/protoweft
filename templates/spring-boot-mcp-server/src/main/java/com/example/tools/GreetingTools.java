@@ -1,7 +1,7 @@
 package com.example.tools;
 
-import io.agentweave.core.tool.AgentTool;
-import io.agentweave.core.tool.ToolParam;
+import io.github.rahulbsw.protoweft.core.tool.AgentTool;
+import io.github.rahulbsw.protoweft.core.tool.ToolParam;
 import org.springframework.stereotype.Component;
 
 /** Every @AgentTool method on a Spring bean becomes an MCP tool. Replace these with your own. */

@@ -1,6 +1,6 @@
 # MCP
 
-`agentweave-mcp` speaks the [Model Context Protocol](https://modelcontextprotocol.io) in both roles,
+`protoweft-mcp` speaks the [Model Context Protocol](https://modelcontextprotocol.io) in both roles,
 over **stdio** and **Streamable HTTP**, on the official MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`
 `2.1.0`):
 
@@ -11,8 +11,8 @@ over **stdio** and **Streamable HTTP**, on the official MCP Java SDK (`io.modelc
   connector) to MCP clients, plus optional `McpResources` and `McpPrompts`, with logging, progress
   and completion.
 
-MCP SDK types never appear in AgentWeave's public API. Resources and prompts are MCP-only concepts,
-so their types live in `io.agentweave.mcp`, not in the core.
+MCP SDK types never appear in Protoweft's public API. Resources and prompts are MCP-only concepts,
+so their types live in `io.github.rahulbsw.protoweft.mcp`, not in the core.
 
 ## Client over stdio
 
@@ -35,7 +35,7 @@ files.start();
 | `env(name, value)` | none | An environment variable for the server process. |
 | `credentials(provider)` | none | Looked up with the command as target. Only `NamedSecret`s apply; each becomes an environment variable. Any other credential fails `start()` with `AUTHENTICATION` before the process starts. |
 | `requestTimeout(duration)` | 20 s | Timeout for initialization and for each request. |
-| `clientInfo(name, version)` | `agentweave` `0.1.0` | The `clientInfo` sent in `initialize`. |
+| `clientInfo(name, version)` | `protoweft` `0.1.0` | The `clientInfo` sent in `initialize`. |
 | `observations(handler)` | none | See [observability](../concepts/errors-and-observability.md#observability-hooks). |
 
 `close()` ends the session and the subprocess.
@@ -59,7 +59,7 @@ remote.start();
 | `credentials(provider)` | none | Looked up with the base URL as target. `BearerToken` → `Authorization: Bearer <token>`; `NamedSecret(name, value)` → header `name: value`. |
 | `authorizer(httpAuthorizer)` | none | Obtains tokens on demand, for example with OAuth. See [Authorization](#authorization). |
 | `requestTimeout(duration)` | 20 s | Timeout for connecting, initialization and each request. |
-| `clientInfo(name, version)` | `agentweave` `0.1.0` | The `clientInfo` sent in `initialize`. |
+| `clientInfo(name, version)` | `protoweft` `0.1.0` | The `clientInfo` sent in `initialize`. |
 | `observations(handler)` | none | Observability hook. |
 
 Without an authorizer, a 401 or 403 from the server becomes `ErrorCategory.AUTHENTICATION` with the
@@ -155,14 +155,14 @@ McpToolServer.Http mcp = McpToolServer.http(tools)
         .allowedOrigins("https://app.example.com", "http://localhost:*")
         .requestTimeout(Duration.ofSeconds(30));
 
-try (AgentWeaveServer server = AgentWeaveServer.builder().port(8080).endpoints(mcp).start()) {
+try (ProtoweftServer server = ProtoweftServer.builder().port(8080).endpoints(mcp).start()) {
     server.join();
 }
 ```
 
 | Method | Default | Meaning |
 |---|---|---|
-| `serverInfo(name, version)` | `agentweave` `0.1.0` | Returned in `initialize`. |
+| `serverInfo(name, version)` | `protoweft` `0.1.0` | Returned in `initialize`. |
 | `endpointPath(path)` | `/mcp` | Exact path starting with `/`, no wildcards. The endpoint is named `mcp` for `/mcp` and `mcp:<path>` otherwise. |
 | `allowedOrigins(origins...)` | none | Browser origins allowed to call the endpoint; `:*` matches any port. |
 | `requestTimeout(duration)` | 60 s | The longest a `tools/call` (or a resource, prompt or completion handler) may run before it fails with JSON-RPC `-32603`. The call is abandoned, but its thread isn't guaranteed to stop. |
@@ -203,7 +203,7 @@ public static void main(String[] args) {
 
 `run()` blocks until stdin reaches end of input, then closes the server. `Stdio` has the same
 `serverInfo`, `requestTimeout`, `resources`, `prompts`, `observations` and `compliance` methods as
-`Http`. Any MCP client can launch it, including AgentWeave's: `McpClientConnector.stdio("java",
+`Http`. Any MCP client can launch it, including Protoweft's: `McpClientConnector.stdio("java",
 "-cp", classpath, "com.example.GreeterServer")`.
 
 !!! warning "Keep stdout clean"
@@ -276,7 +276,7 @@ base64)` and `resource(role, contents)` (an embedded resource) build messages.
 public class DocsResources {
     @McpResource(uri = "docs://readme", mimeType = "text/markdown", description = "The project README")
     public String readme() {
-        return "# AgentWeave";
+        return "# Protoweft";
     }
 
     @McpResourceTemplate(uriTemplate = "weather://{city}/today", mimeType = "application/json")
@@ -335,8 +335,8 @@ Handlers run on a worker pool with the server's `requestTimeout`, and are observ
 
 | From a resource, prompt or completion handler | MCP response |
 |---|---|
-| `AgentWeaveException` with `INVALID_ARGUMENTS` (including a missing required prompt argument) | JSON-RPC `-32602` |
-| Any other `AgentWeaveException` | `-32603` with its message |
+| `ProtoweftException` with `INVALID_ARGUMENTS` (including a missing required prompt argument) | JSON-RPC `-32602` |
+| Any other `ProtoweftException` | `-32603` with its message |
 | Any other exception | `-32603` `"internal error"` |
 | An unknown resource URI | the SDK's `-32002` |
 | An unknown prompt | the SDK's `-32602` |
@@ -372,7 +372,7 @@ On the MCP server, each `tools/call` gets a session-bound `ToolProgress`:
 ## Authorization
 
 MCP authorization (revision `2025-11-25`) is OAuth 2.1 for the Streamable HTTP transport. The
-OAuth logic lives in [`agentweave-oauth`](../integrations/oauth.md); this module only accepts the
+OAuth logic lives in [`protoweft-oauth`](../integrations/oauth.md); this module only accepts the
 core `HttpAuthorizer` interface, so it doesn't depend on the OAuth module.
 
 ### Client
@@ -418,7 +418,7 @@ token storage, refresh and step-up.
 
 ### Server
 
-Compose `agentweave-oauth`'s resource-server pieces with `McpToolServer.http(...)` on one host:
+Compose `protoweft-oauth`'s resource-server pieces with `McpToolServer.http(...)` on one host:
 `ProtectedResourceMetadataEndpoint` publishes the RFC 9728 metadata, and `BearerTokenAuthenticator`
 is the host's `InboundAuthenticator`.
 
@@ -438,7 +438,7 @@ BearerTokenAuthenticator auth = BearerTokenAuthenticator.builder(metadata,
         .requiredScopes("mcp:tools")
         .build();
 
-try (AgentWeaveServer server = AgentWeaveServer.builder().port(8080)
+try (ProtoweftServer server = ProtoweftServer.builder().port(8080)
         .endpoints(new ProtectedResourceMetadataEndpoint(metadata), McpToolServer.http(tools))
         .authenticator(auth)
         .start()) {
@@ -454,12 +454,12 @@ try (AgentWeaveServer server = AgentWeaveServer.builder().port(8080)
   server module can't see what the host composed in front of it. The report never over-claims.
 
 See [OAuth: resource server](../integrations/oauth.md#resource-server) for the verifier, scope
-rules and exact challenges. `McpOAuthEndToEndTest` in `agentweave-oauth` runs exactly this setup
+rules and exact challenges. `McpOAuthEndToEndTest` in `protoweft-oauth` runs exactly this setup
 with a real client and server.
 
 ## Content mapping
 
-| MCP → AgentWeave (client) | |
+| MCP → Protoweft (client) | |
 |---|---|
 | text | `Content.Text` |
 | image, audio | `Content.Data` (base64 as received) |
@@ -469,7 +469,7 @@ with a real client and server.
 
 The same mapping applies to tool results and prompt messages.
 
-| AgentWeave → MCP (server) | |
+| Protoweft → MCP (server) | |
 |---|---|
 | `Content.Text` | text |
 | `Content.Data` with an `image/*` or `audio/*` type | image or audio |
@@ -504,9 +504,9 @@ execution errors:
 | From the `ToolSource` | MCP response |
 |---|---|
 | A `ToolOutcome` with `error() == true` | `CallToolResult` with `isError: true` |
-| `AgentWeaveException` with `TOOL_NOT_FOUND` | JSON-RPC `-32602`, like the SDK's own unknown-tool reply |
-| `AgentWeaveException` with `INVALID_ARGUMENTS` | a tool execution error (`isError: true`, message as text), so a model can correct itself |
-| `AgentWeaveException` with any other category | JSON-RPC `-32603` with the exception's message |
+| `ProtoweftException` with `TOOL_NOT_FOUND` | JSON-RPC `-32602`, like the SDK's own unknown-tool reply |
+| `ProtoweftException` with `INVALID_ARGUMENTS` | a tool execution error (`isError: true`, message as text), so a model can correct itself |
+| `ProtoweftException` with any other category | JSON-RPC `-32603` with the exception's message |
 | Any other exception | JSON-RPC `-32603` `"internal error"` (its message may carry internals) |
 | The call exceeds `requestTimeout` | JSON-RPC `-32603` |
 
@@ -531,7 +531,7 @@ use as supported.
 | `prompts`, `completion` | ✓ | ✓ |
 | `logging`, `progress` | ✓ | ✓ |
 | `tools/list-changed`, `resources/list-changed`, `prompts/list-changed` | ✓ | — (lists are snapshots) |
-| `authorization` | ✓ only with an `authorizer(...)` | — (compose `agentweave-oauth` in the host; see [above](#server)) |
+| `authorization` | ✓ only with an `authorizer(...)` | — (compose `protoweft-oauth` in the host; see [above](#server)) |
 | `transport/sse` | — | — |
 | `cancellation` | — | — |
 | `sampling`, `roots`, `elicitation` | — | — |

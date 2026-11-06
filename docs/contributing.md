@@ -9,7 +9,7 @@ You need JDK 17 or newer; the Gradle wrapper is included.
 
 ```bash
 ./gradlew build                                                    # compile, test and build Javadoc
-./gradlew :agentweave-mcp:test --tests '*McpClientConnectorTest'   # one module or test class
+./gradlew :protoweft-mcp:test --tests '*McpClientConnectorTest'   # one module or test class
 ./gradlew aggregateJavadoc                                         # the combined API reference
 ```
 
@@ -23,7 +23,7 @@ Some tests start real servers on free local ports. None of them needs network ac
   a protocol feature that isn't implemented belongs in `unsupported`.
 - **No invented protocol behavior.** Follow the official specification and reference SDK. Record
   any deviation, with the reason, in the module's `SPEC.md`.
-- **Protocol types stay out of the core API.** `agentweave-core` must not depend on any protocol
+- **Protocol types stay out of the core API.** `protoweft-core` must not depend on any protocol
   SDK.
 - **Docs.** Update this site (`docs/`) when behavior users can see changes, and the owning
   `SPEC.md` when a decision, boundary or invariant changes.
@@ -35,11 +35,11 @@ Commit subjects are imperative prose ("Add UTCP OAuth token expiry").
 
 | Path | Contents |
 |---|---|
-| `agentweave-core` | The protocol-neutral API; no dependencies. |
-| `agentweave-server`, `agentweave-server-jetty` | The servlet hosting contract and the embedded host. |
-| `agentweave-mcp`, `agentweave-a2a`, `agentweave-utcp` | One module per protocol. |
-| `agentweave-langchain4j`, `agentweave-spring-boot-starter` | Framework integrations. |
-| `agentweave-bom` | Version alignment. |
+| `protoweft-core` | The protocol-neutral API; no dependencies. |
+| `protoweft-server`, `protoweft-server-jetty` | The servlet hosting contract and the embedded host. |
+| `protoweft-mcp`, `protoweft-a2a`, `protoweft-utcp` | One module per protocol. |
+| `protoweft-langchain4j`, `protoweft-spring-boot-starter` | Framework integrations. |
+| `protoweft-bom` | Version alignment. |
 | `examples/` | Runnable examples (not published). |
 | `docs/`, `mkdocs.yml` | This documentation site. |
 | `*.md` files with `id`/`type` front matter | Design specs: goals, architecture, module decisions. |

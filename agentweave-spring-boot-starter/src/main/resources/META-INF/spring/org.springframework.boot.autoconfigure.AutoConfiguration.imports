@@ -1,6 +1,0 @@
-io.agentweave.spring.boot.AgentWeaveAutoConfiguration
-io.agentweave.spring.boot.AgentWeaveServerAutoConfiguration
-io.agentweave.spring.boot.AgentWeaveMicrometerAutoConfiguration
-io.agentweave.spring.boot.AgentWeaveActuatorAutoConfiguration
-io.agentweave.spring.boot.AgentWeaveDiscoveryAutoConfiguration
-io.agentweave.spring.boot.AgentWeaveSpringAiAutoConfiguration

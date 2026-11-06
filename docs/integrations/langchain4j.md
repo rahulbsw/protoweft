@@ -1,9 +1,9 @@
 # LangChain4j
 
-`agentweave-langchain4j` connects AgentWeave to [LangChain4j](https://docs.langchain4j.dev)
+`protoweft-langchain4j` connects Protoweft to [LangChain4j](https://docs.langchain4j.dev)
 **1.23.0** in three directions, without Spring and without depending on any protocol module:
 
-1. **Tools in:** any AgentWeave `ToolSource` (MCP, UTCP, A2A, local tools, a `ToolRegistry`) is
+1. **Tools in:** any Protoweft `ToolSource` (MCP, UTCP, A2A, local tools, a `ToolRegistry`) is
    offered to a LangChain4j AI Service as a `ToolProvider`.
 2. **Agents out:** a LangChain4j AI Service becomes an `AgentHandler`, so the
    [A2A server](../protocols/a2a.md#serving-an-agent) can serve it.
@@ -12,9 +12,9 @@
 
 ```kotlin
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
-    implementation("io.agentweave:agentweave-langchain4j")   // brings dev.langchain4j:langchain4j
-    implementation("io.agentweave:agentweave-mcp")            // and whichever protocols you use
+    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation("io.github.rahulbsw:protoweft-langchain4j")   // brings dev.langchain4j:langchain4j
+    implementation("io.github.rahulbsw:protoweft-mcp")            // and whichever protocols you use
 }
 ```
 
@@ -30,17 +30,17 @@ ToolRegistry registry = new ToolRegistry()
 
 Assistant assistant = AiServices.builder(Assistant.class)
         .chatModel(model)
-        .toolProvider(AgentWeaveToolProvider.from(registry))
+        .toolProvider(ProtoweftToolProvider.from(registry))
         .build();
 ```
 
-`AgentWeaveToolProvider.builder(source)` offers more control:
+`ProtoweftToolProvider.builder(source)` offers more control:
 
 | Method | Default | Meaning |
 |---|---|---|
 | `dynamic(boolean)` | `false` | List tools before every model call in the tool loop, not only once per AI Service invocation (LangChain4j's `isDynamic`). |
-| `filter(predicate)` | all tools | Offer only matching tools, tested against the AgentWeave `ToolSpec`. |
-| `toolNames(mapper)` | `ToolNames::sanitize` | How AgentWeave names become model-facing names; the result must be unique and accepted by your provider. |
+| `filter(predicate)` | all tools | Offer only matching tools, tested against the Protoweft `ToolSpec`. |
+| `toolNames(mapper)` | `ToolNames::sanitize` | How Protoweft names become model-facing names; the result must be unique and accepted by your provider. |
 | `callerIdentity(supplier)` | anonymous | The `CallerIdentity` passed to `ToolSource.invoke`. |
 | `callerIdentityFrom(function)` | anonymous | Derive the caller from LangChain4j's `InvocationContext` (which may be `null`). |
 | `asyncExecutor(executor)` | a shared cached pool of daemon threads | Runs blocking tool calls for asynchronous AI Services. |
@@ -56,8 +56,8 @@ characters to `_`, and shortens names over 64 characters to 55 characters plus `
 hex hash. So `weather.forecast` is offered as `weather__forecast`.
 
 The mapping isn't reversed by parsing: each executor is bound to its original name, which is also
-stored in the tool specification's metadata under `AgentWeaveToolProvider.TOOL_NAME_METADATA`
-(`agentweave.toolName`). `provider.originalName("weather__forecast")` returns the original name.
+stored in the tool specification's metadata under `ProtoweftToolProvider.TOOL_NAME_METADATA`
+(`protoweft.toolName`). `provider.originalName("weather__forecast")` returns the original name.
 Two tools that map to the same name fail `provideTools` with `IllegalStateException` instead of one
 silently shadowing the other.
 
@@ -79,13 +79,13 @@ for your code; LangChain4j doesn't send it to the model.
 
 Errors follow LangChain4j's own conventions:
 
-| AgentWeave result | LangChain4j behavior |
+| Protoweft result | LangChain4j behavior |
 |---|---|
 | `ToolOutcome.error() == true` | A `ToolExecutionResult` with `isError` set and the outcome text, sent to the model as an error result, as for a throwing `@Tool`. |
-| `AgentWeaveException` with `INVALID_ARGUMENTS`, or arguments that aren't a JSON object | `ToolArgumentsException`, handled by the AI Service's `ToolArgumentsErrorHandler` (the default fails a synchronous invocation). |
-| Any other `AgentWeaveException` | `ToolExecutionException`, handled by the `ToolExecutionErrorHandler` (the synchronous default sends the message to the model; the asynchronous default fails the invocation). |
+| `ProtoweftException` with `INVALID_ARGUMENTS`, or arguments that aren't a JSON object | `ToolArgumentsException`, handled by the AI Service's `ToolArgumentsErrorHandler` (the default fails a synchronous invocation). |
+| Any other `ProtoweftException` | `ToolExecutionException`, handled by the `ToolExecutionErrorHandler` (the synchronous default sends the message to the model; the asynchronous default fails the invocation). |
 
-In both exception cases the handler receives the `AgentWeaveException` itself as the cause.
+In both exception cases the handler receives the `ProtoweftException` itself as the cause.
 
 ## Agents out
 
@@ -139,9 +139,9 @@ McpToolServer.http(tools);   // or UtcpManualProvider.builder(tools).build()
 Specifications come from LangChain4j's `ToolSpecifications`, and calls run through its
 `DefaultToolExecutor`, so argument binding and result formatting are exactly LangChain4j's. An
 exception from the method becomes a failure outcome; an argument-binding error becomes
-`AgentWeaveException(INVALID_ARGUMENTS)`. The AgentWeave caller reaches the method through
+`ProtoweftException(INVALID_ARGUMENTS)`. The Protoweft caller reaches the method through
 LangChain4j's `InvocationParameters`, under `LangChain4jTools.CALLER_PARAMETER`
-(`agentweave.caller`).
+(`protoweft.caller`).
 
 ## Limitations
 

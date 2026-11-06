@@ -1,25 +1,25 @@
 # Architecture
 
-AgentWeave is a small, protocol-neutral core with one module per protocol on top of it. Framework
+Protoweft is a small, protocol-neutral core with one module per protocol on top of it. Framework
 integrations sit on top of those, and nothing depends on them.
 
 ## Modules
 
 ```mermaid
 flowchart BT
-    core["agentweave-core<br/><small>neutral API, no dependencies</small>"]
-    server["agentweave-server<br/><small>servlet hosting contract</small>"]
-    jetty["agentweave-server-jetty<br/><small>embedded Jetty 12</small>"]
-    mcp["agentweave-mcp"]
-    a2a["agentweave-a2a"]
-    utcp["agentweave-utcp"]
-    oauth["agentweave-oauth"]
-    disc["agentweave-discovery"]
-    discx["agentweave-discovery-embeddings<br/>-anthropic, -openai"]
-    lc4j["agentweave-langchain4j"]
-    sai["agentweave-spring-ai"]
-    argi["agentweave-argi"]
-    starter["agentweave-spring-boot-starter"]
+    core["protoweft-core<br/><small>neutral API, no dependencies</small>"]
+    server["protoweft-server<br/><small>servlet hosting contract</small>"]
+    jetty["protoweft-server-jetty<br/><small>embedded Jetty 12</small>"]
+    mcp["protoweft-mcp"]
+    a2a["protoweft-a2a"]
+    utcp["protoweft-utcp"]
+    oauth["protoweft-oauth"]
+    disc["protoweft-discovery"]
+    discx["protoweft-discovery-embeddings<br/>-anthropic, -openai"]
+    lc4j["protoweft-langchain4j"]
+    sai["protoweft-spring-ai"]
+    argi["protoweft-argi"]
+    starter["protoweft-spring-boot-starter"]
 
     server --> core
     jetty --> server
@@ -43,28 +43,28 @@ flowchart BT
 ```
 
 Each module also depends on its own third-party library (the MCP Java SDK, a2a-java, Jackson 3,
-Nimbus, LangChain4j, Spring AI, ARGI, Spring Boot), as listed below. `agentweave-argi-neutral`, which
+Nimbus, LangChain4j, Spring AI, ARGI, Spring Boot), as listed below. `protoweft-argi-neutral`, which
 depends on the core and optionally on discovery, is left out of the diagram: it isn't published
 and isn't part of the default build.
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `agentweave-core` | Tool, agent, auth, progress, observation, error and compliance types. | Nothing |
-| `agentweave-server` | `ServerEndpointProvider`, `ServletEndpoint` and `InboundAuthFilter`: how protocol servers hand HTTP endpoints to a host. | core; servlet API provided by the host |
-| `agentweave-server-jetty` | `AgentWeaveServer`, an embedded Jetty 12 (Jakarta EE 11, Servlet 6.1) host. | server, Jetty |
-| `agentweave-mcp` | `McpClientConnector`, `McpToolServer`, `McpResources`, `McpPrompts`. | server, MCP Java SDK |
-| `agentweave-a2a` | `A2aAgentConnector`, `A2aAgentServer`. | server, a2a-java client, server-common and JSON-RPC transport |
-| `agentweave-utcp` | `UtcpClientConnector`, `UtcpManualProvider`. | server, Jackson 3 (internal), `java.net.http` |
-| `agentweave-oauth` | [OAuth 2.1](../integrations/oauth.md): `OAuthClient` (an `HttpAuthorizer`), `BearerTokenAuthenticator`, `ProtectedResourceMetadataEndpoint`. | server, Nimbus (internal) |
-| `agentweave-discovery` | [Tool discovery](../discovery/index.md): `CapabilityCatalog`, search, fallback, meta-tools. | core |
-| `agentweave-discovery-embeddings` | Semantic ranking: the offline bge-small embedder and a pure-Java WordPiece tokenizer. | discovery, ONNX Runtime, `agentweave-model-bge-small-en-v15` |
-| `agentweave-discovery-anthropic`, `agentweave-discovery-openai` | Typed native tool-search adapters. | discovery, the provider's Java SDK |
-| `agentweave-langchain4j` | `AgentWeaveToolProvider`, `LangChain4jAgents`, `LangChain4jTools`, `CatalogToolSearchStrategy`. | core, discovery, LangChain4j |
-| `agentweave-spring-ai` | [Spring AI](../integrations/spring-ai.md): `AgentWeaveToolCallbacks`, `CatalogToolIndex`, `SpringAiAgents`, `SpringAiTools`. | core, `spring-ai-model`; Spring AI chat client, tool search and discovery optional |
-| `agentweave-argi` | [ARGI 2.1.0-RC1](../integrations/argi.md): `ArgiTools`, `CatalogToolSelectionInterceptor`, `ArgiAgents`. | spring-ai, ARGI agent framework; discovery optional |
-| `agentweave-argi-neutral` | ARGI's Spring-free API: `ArgiNeutralTools`, `CatalogToolSelectionInterceptor`, `ArgiNeutralAgents`. **Not published**; built only with `-PargiSnapshot`. | core, ARGI `argi-api` and `argi-agent-api` snapshot; discovery optional |
-| `agentweave-spring-boot-starter` | Auto-configuration, properties, Micrometer and Actuator. | server; protocol modules, discovery, Spring AI and Spring are `compileOnly` |
-| `agentweave-bom` | Version alignment of the published modules. | — |
+| `protoweft-core` | Tool, agent, auth, progress, observation, error and compliance types. | Nothing |
+| `protoweft-server` | `ServerEndpointProvider`, `ServletEndpoint` and `InboundAuthFilter`: how protocol servers hand HTTP endpoints to a host. | core; servlet API provided by the host |
+| `protoweft-server-jetty` | `ProtoweftServer`, an embedded Jetty 12 (Jakarta EE 11, Servlet 6.1) host. | server, Jetty |
+| `protoweft-mcp` | `McpClientConnector`, `McpToolServer`, `McpResources`, `McpPrompts`. | server, MCP Java SDK |
+| `protoweft-a2a` | `A2aAgentConnector`, `A2aAgentServer`. | server, a2a-java client, server-common and JSON-RPC transport |
+| `protoweft-utcp` | `UtcpClientConnector`, `UtcpManualProvider`. | server, Jackson 3 (internal), `java.net.http` |
+| `protoweft-oauth` | [OAuth 2.1](../integrations/oauth.md): `OAuthClient` (an `HttpAuthorizer`), `BearerTokenAuthenticator`, `ProtectedResourceMetadataEndpoint`. | server, Nimbus (internal) |
+| `protoweft-discovery` | [Tool discovery](../discovery/index.md): `CapabilityCatalog`, search, fallback, meta-tools. | core |
+| `protoweft-discovery-embeddings` | Semantic ranking: the offline bge-small embedder and a pure-Java WordPiece tokenizer. | discovery, ONNX Runtime, `protoweft-model-bge-small-en-v15` |
+| `protoweft-discovery-anthropic`, `protoweft-discovery-openai` | Typed native tool-search adapters. | discovery, the provider's Java SDK |
+| `protoweft-langchain4j` | `ProtoweftToolProvider`, `LangChain4jAgents`, `LangChain4jTools`, `CatalogToolSearchStrategy`. | core, discovery, LangChain4j |
+| `protoweft-spring-ai` | [Spring AI](../integrations/spring-ai.md): `ProtoweftToolCallbacks`, `CatalogToolIndex`, `SpringAiAgents`, `SpringAiTools`. | core, `spring-ai-model`; Spring AI chat client, tool search and discovery optional |
+| `protoweft-argi` | [ARGI 2.1.0-RC1](../integrations/argi.md): `ArgiTools`, `CatalogToolSelectionInterceptor`, `ArgiAgents`. | spring-ai, ARGI agent framework; discovery optional |
+| `protoweft-argi-neutral` | ARGI's Spring-free API: `ArgiNeutralTools`, `CatalogToolSelectionInterceptor`, `ArgiNeutralAgents`. **Not published**; built only with `-PargiSnapshot`. | core, ARGI `argi-api` and `argi-agent-api` snapshot; discovery optional |
+| `protoweft-spring-boot-starter` | Auto-configuration, properties, Micrometer and Actuator. | server; protocol modules, discovery, Spring AI and Spring are `compileOnly` |
+| `protoweft-bom` | Version alignment of the published modules. | — |
 
 ## Dependency rules
 
@@ -80,7 +80,7 @@ and isn't part of the default build.
   built on Spring AI. The Spring Boot starter declares the protocol modules, discovery and the
   Spring AI adapter `compileOnly`; you add the ones you use.
 - **OAuth is optional and protocol-neutral.** `HttpAuthorizer` lives in the core, so the MCP
-  module accepts an authorizer without depending on `agentweave-oauth`.
+  module accepts an authorizer without depending on `protoweft-oauth`.
 
 ## The core API
 
@@ -89,7 +89,7 @@ and isn't part of the default build.
 | Tools | `ToolSource`, `ToolConnector`, `ToolSpec`, `ToolInvocation`, `ToolOutcome`, `Content`, `ToolRegistry`, `LocalTools`, `@AgentTool`, `@ToolParam`, `ToolHandler`, `ProgressAwareToolHandler`, `ToolProgress` | [Tools and the registry](tools.md) |
 | Agents | `AgentConnector`, `AgentHandler`, `AgentTaskContext`, `AgentRequest`, `AgentMessage`, `AgentReply`, `AgentEvent`, `AgentArtifact`, `AgentDescriptor`, `TaskState` | [Agents](agents.md) |
 | Security | `CredentialProvider`, `Credential`, `HttpAuthorizer`, `InboundAuthenticator`, `InboundRequest`, `AuthDecision`, `CallerIdentity` | [Security and credentials](security.md) |
-| Errors and telemetry | `AgentWeaveException`, `ErrorCategory`, `ObservationHandler` | [Errors and observability](errors-and-observability.md) |
+| Errors and telemetry | `ProtoweftException`, `ErrorCategory`, `ObservationHandler` | [Errors and observability](errors-and-observability.md) |
 | Connectors | `ProtocolConnector`, `ProtocolId`, `ComplianceReport` | [Versions and compliance](compliance.md) |
 
 Every connector is a `ProtocolConnector`: it is built by a protocol-specific builder, started
@@ -97,7 +97,7 @@ explicitly with `start()`, and closed with `close()` (safe to call more than onc
 (MCP, UTCP, and A2A's `ask` tool) also implement `ToolConnector`; the A2A connector additionally
 implements `AgentConnector`.
 
-The core API is blocking. The MCP SDK is reactive internally; AgentWeave uses its synchronous
+The core API is blocking. The MCP SDK is reactive internally; Protoweft uses its synchronous
 facade on the client and keeps Reactor off the public API.
 
 ## How servers are hosted
@@ -111,12 +111,12 @@ needs async support.
 | `McpToolServer.Http` | `/mcp` | yes |
 | `A2aAgentServer` | `/.well-known/agent-card.json`, `/a2a` | yes |
 | `UtcpManualProvider` | `/utcp`, `/utcp/*` | no |
-| `ProtectedResourceMetadataEndpoint` (`agentweave-oauth`) | `/.well-known/oauth-protected-resource/<resource path>`, optionally the root well-known URI | no |
+| `ProtectedResourceMetadataEndpoint` (`protoweft-oauth`) | `/.well-known/oauth-protected-resource/<resource path>`, optionally the root well-known URI | no |
 
 A host mounts every endpoint and puts an `InboundAuthFilter` in front of it, so one
 `InboundAuthenticator` protects all protocols. Two hosts are provided:
 
-- [`AgentWeaveServer`](../integrations/jetty.md) (embedded Jetty) for plain Java.
+- [`ProtoweftServer`](../integrations/jetty.md) (embedded Jetty) for plain Java.
 - The [Spring Boot starter](../integrations/spring-boot.md), which registers the endpoints on
   Boot's servlet container.
 

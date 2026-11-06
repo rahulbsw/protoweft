@@ -43,12 +43,12 @@
 
 **`403` from the MCP endpoint.**
 : The request carried an `Origin` header that isn't in `allowedOrigins(...)`
-  (`agentweave.server.mcp.allowed-origins` in Spring). Browser-based clients, such as the MCP
+  (`protoweft.server.mcp.allowed-origins` in Spring). Browser-based clients, such as the MCP
   Inspector UI, need their origin listed; `:*` matches any port, for example
   `http://localhost:*`.
 
 **`503` with `Retry-After: 1` from `/mcp` in Spring.**
-: With `agentweave.server.mcp.expose=registry`, the MCP endpoint is built only once the client
+: With `protoweft.server.mcp.expose=registry`, the MCP endpoint is built only once the client
   connectors have started. Retry after startup.
 
 **New tools don't appear over MCP.**
@@ -57,18 +57,18 @@
 
 **`listTools`/`invoke` fail with `UNSUPPORTED`: "server did not declare the 'tools' capability".**
 : The server offers no tools capability; it may be a resources- or prompts-only server, which
-  AgentWeave doesn't support.
+  Protoweft doesn't support.
 
 **The JVM doesn't exit after stopping an MCP HTTP server.**
 : MCP SDK 2.1.0 runs its idle-session sweeper on a non-daemon thread that it never shuts down.
-  AgentWeave works around this: `McpToolServer.Http.close()` stops the thread, and hosts call it
+  Protoweft works around this: `McpToolServer.Http.close()` stops the thread, and hosts call it
   when they destroy the servlet (Jetty `close()`, Spring shutdown). If you called `endpoints()`
   yourself without handing the server to a host, call `close()` on it.
 
 ## A2A
 
 **Clients can't reach the agent, or connect to `localhost`.**
-: The agent card advertises `publicUrl` + path. In Spring, set `agentweave.server.a2a.public-url`;
+: The agent card advertises `publicUrl` + path. In Spring, set `protoweft.server.a2a.public-url`;
   without it the card advertises `http://localhost:<port>` and a WARN is logged. Behind a proxy,
   use the externally visible URL.
 
@@ -79,7 +79,7 @@
   `permitAll()` it.
 
 **`-32009` from the JSON-RPC endpoint.**
-: A2A 1.0 requires the `A2A-Version: 1.0` header. The AgentWeave client and the official SDKs send
+: A2A 1.0 requires the `A2A-Version: 1.0` header. The Protoweft client and the official SDKs send
   it; hand-written requests must too.
 
 **`start()` fails with `VERSION_MISMATCH` or `UNSUPPORTED`.**
@@ -113,7 +113,7 @@
 **"Variable … not found".**
 : Variables are namespaced by the manual name: `${API_KEY}` in manual `weather` looks up
   `weather_API_KEY`, and in `my_api` looks up `my__api_API_KEY`. There's no fallback to the bare
-  name. In Spring, `agentweave.utcp.manuals.<name>.variables` takes the bare name and namespaces it
+  name. In Spring, `protoweft.utcp.manuals.<name>.variables` takes the bare name and namespaces it
   for you.
 
 **An inline (`text`) manual fails registration with a missing variable such as `schema`.**
@@ -125,12 +125,12 @@
   `allowedCommunicationProtocols("http")`. Check `skippedTools()` for the reason a tool was left
   out.
 
-**Calling an AgentWeave-served UTCP tool with plain arguments fails with 400.**
-: AgentWeave's provider publishes the whole argument object as the `body` argument. A UTCP client
+**Calling an Protoweft-served UTCP tool with plain arguments fails with 400.**
+: Protoweft's provider publishes the whole argument object as the `body` argument. A UTCP client
   calls it with `{"body": {...}}`; a raw HTTP client posts the argument object itself as the body.
 
 **UTCP tool URLs in the manual point at the wrong host behind a proxy.**
-: Set `baseUrl(...)` (`agentweave.server.utcp.base-url`), or in Spring set
+: Set `baseUrl(...)` (`protoweft.server.utcp.base-url`), or in Spring set
   `server.forward-headers-strategy` so request-derived URLs are correct.
 
 ## Spring Boot
@@ -141,12 +141,12 @@
   [Spring Boot: security](../integrations/spring-boot.md#security).
 
 **No endpoints appear.**
-: Servers are opt-in: set `agentweave.server.<protocol>.enabled=true`, add the protocol module, and
+: Servers are opt-in: set `protoweft.server.<protocol>.enabled=true`, add the protocol module, and
   run a servlet web application (`spring-boot-starter-webmvc`).
 
 **Startup fails naming a missing artifact.**
 : A protocol is configured but its module isn't on the classpath. Add
-  `io.agentweave:agentweave-<protocol>`.
+  `io.github.rahulbsw:protoweft-<protocol>`.
 
 **Remote tools are missing from the `ToolRegistry` at startup.**
 : Connectors start after the web server and are added once started. Use the registry from

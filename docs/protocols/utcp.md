@@ -1,6 +1,6 @@
 # UTCP
 
-`agentweave-utcp` speaks the [Universal Tool Calling Protocol](https://www.utcp.io) **1.1** in both
+`protoweft-utcp` speaks the [Universal Tool Calling Protocol](https://www.utcp.io) **1.1** in both
 roles:
 
 - **Client:** `UtcpClientConnector` registers one UTCP manual and exposes its tools through the
@@ -17,7 +17,7 @@ A UTCP **manual** is a JSON document listing tools. Each tool carries a **call t
 the client how to call it directly, for example an HTTP method and URL, without a wrapper server. A
 **manual call template** tells the client where to get the manual.
 
-AgentWeave uses **one connector per manual**. Register the connector in a `ToolRegistry` under the
+Protoweft uses **one connector per manual**. Register the connector in a `ToolRegistry` under the
 manual's name: tools are listed unprefixed, so the registry yields `<manual>.<tool>`, the same
 namespacing UTCP applies.
 
@@ -221,7 +221,7 @@ host, use HTTPS.
 
 ## Serving tools as a UTCP manual
 
-`UtcpManualProvider` publishes any `ToolSource`. It's a `ServerEndpointProvider`, so any AgentWeave
+`UtcpManualProvider` publishes any `ToolSource`. It's a `ServerEndpointProvider`, so any Protoweft
 host mounts it, with the host's `InboundAuthenticator` in front.
 
 ```java
@@ -232,7 +232,7 @@ UtcpManualProvider utcp = UtcpManualProvider.builder(tools)
         .apiKeyAuth("X-Api-Key", "WEATHER_KEY")
         .build();
 
-AgentWeaveServer.builder().port(8080).endpoints(utcp).start();
+ProtoweftServer.builder().port(8080).endpoints(utcp).start();
 ```
 
 | Method | Default | Meaning |
@@ -325,16 +325,16 @@ The provider has no observations hook and publishes no `ComplianceReport`.
 
 ## Deviations
 
-**Specification documents vs. the reference client** (AgentWeave follows the reference):
+**Specification documents vs. the reference client** (Protoweft follows the reference):
 
 - The documents' examples carry `utcp_version: "1.0.1"` and an `info` block; the reference ignores
-  `info` and never checks `utcp_version`. So does AgentWeave.
+  `info` and never checks `utcp_version`. So does Protoweft.
 - The documents order argument placement path → body → header → query; the reference applies
   `header_fields`, then `body_field`, then path, then query. Only overlapping names are affected.
 
 **Deliberate differences from the reference client:**
 
-- OAuth2 honors `expires_in`. When both the body and the Basic attempt fail, AgentWeave raises
+- OAuth2 honors `expires_in`. When both the body and the Basic attempt fail, Protoweft raises
   `AUTHENTICATION` instead of sending `Bearer None`, and an unset `scope` is omitted instead of
   posted as `scope=None`.
 - Tools of unknown or unimplemented template types are skipped and declared, instead of rejecting
@@ -363,4 +363,4 @@ Feature ids are in `UtcpFeatures`.
 | `security/https-or-loopback` | |
 
 The provider and client have been checked against the Python reference client: it registered an
-AgentWeave manual with API-key authentication and called its tools with matching results.
+Protoweft manual with API-key authentication and called its tools with matching results.

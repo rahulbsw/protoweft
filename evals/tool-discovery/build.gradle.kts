@@ -1,14 +1,14 @@
 // Evaluation harness for tool discovery. Eval-only: never published, so the LLM SDKs below do
-// not leak into any AgentWeave library (the "ships no LLM clients" non-goal holds).
+// not leak into any Protoweft library (the "ships no LLM clients" non-goal holds).
 plugins {
     application
 }
 
 dependencies {
-    implementation(project(":agentweave-core"))
+    implementation(project(":protoweft-core"))
     // The discovery layer under test: catalog retrievers, the generic search arm, native payloads.
-    implementation(project(":agentweave-discovery"))
-    implementation(project(":agentweave-discovery-embeddings"))
+    implementation(project(":protoweft-discovery"))
+    implementation(project(":protoweft-discovery-embeddings"))
     implementation("com.microsoft.onnxruntime:onnxruntime:1.23.2") // reranker experiment (rerank package)
     implementation("tools.jackson.core:jackson-databind:${project.property("jackson3Version")}")
     implementation("com.anthropic:anthropic-java:3.5.0")
@@ -22,7 +22,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("io.agentweave.evals.discovery.EvalMain")
+    mainClass.set("io.github.rahulbsw.protoweft.evals.discovery.EvalMain")
     applicationName = "tool-discovery-eval"
 }
 

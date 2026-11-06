@@ -1,11 +1,11 @@
 ---
-id: agentweave-goal
+id: protoweft-goal
 type: goal-and-requirements
 status: draft
-title: AgentWeave — interoperable agent & tool protocols for Java
+title: Protoweft — interoperable agent & tool protocols for Java
 ---
 
-# AgentWeave
+# Protoweft
 
 *The protocol backbone for Java agents: MCP, A2A and UTCP behind one protocol-neutral API, in both
 directions, plugged into LangChain4j, Spring AI, ARGI, Spring Boot or plain Java.*
@@ -71,18 +71,18 @@ These are durable design commitments; every change is held against them.
 5. **Compatibility is explicit and testable.** Each connector publishes a machine-readable report of
    the protocol, SDK version, and wire revisions it targets, plus which features it supports — and
    tests assert it.
-6. **Honest compliance.** AgentWeave never claims support for a protocol feature it has not
+6. **Honest compliance.** Protoweft never claims support for a protocol feature it has not
    implemented; unsupported features are declared, not silently ignored.
 7. **No invented protocol behavior.** Behavior follows the official specifications and reference
    implementations; any deviation is recorded in the owning spec.
 8. **SDK version ≠ wire version.** Where a protocol has independent SDK and wire-format version axes
-   (notably MCP), AgentWeave models them as separate, explicit fields and never collapses them.
+   (notably MCP), Protoweft models them as separate, explicit fields and never collapses them.
 9. **Protocol-specific types stay out of the shared core API** unless genuinely needed by more than
    one integration.
 10. **Both directions.** Every supported protocol has a client and a server role, behind one hosting
     contract and one inbound-authentication hook.
-11. **No model calls.** AgentWeave never calls an LLM. Where a model provider has a native feature
-    (such as tool search), AgentWeave builds the request parts and the application or its framework
+11. **No model calls.** Protoweft never calls an LLM. Where a model provider has a native feature
+    (such as tool search), Protoweft builds the request parts and the application or its framework
     sends them.
 12. **Claims follow measurement.** Effects on model behavior, such as tool-selection accuracy with
     discovery, are stated only as measured by the evaluation harness, bound to a commit, never
@@ -90,7 +90,7 @@ These are durable design commitments; every change is held against them.
 
 ## Capabilities
 
-What AgentWeave provides:
+What Protoweft provides:
 
 - **A protocol-neutral core:**
   - tool sources, connectors and a namespaced tool registry
@@ -113,12 +113,12 @@ What AgentWeave provides:
   - Generic search meta-tools for any model.
   - Native tool-search request parts for Anthropic and OpenAI.
 - **Integrations:**
-  - **LangChain4j:** AgentWeave tools in AI services, AI services served as A2A agents, `@Tool`
+  - **LangChain4j:** Protoweft tools in AI services, AI services served as A2A agents, `@Tool`
     methods served over MCP and UTCP, and catalog-backed tool search.
-  - **Spring AI:** AgentWeave tools as `ToolCallback`s, the catalog as Spring AI's tool-search
+  - **Spring AI:** Protoweft tools as `ToolCallback`s, the catalog as Spring AI's tool-search
     index, a `ChatClient` served as a streaming A2A agent, and Spring AI tools served over MCP and
     UTCP.
-  - **ARGI:** AgentWeave tools in ARGI agents, catalog-based tool selection without an extra model
+  - **ARGI:** Protoweft tools in ARGI agents, catalog-based tool selection without an extra model
     call, and ARGI agents served over A2A with human-in-the-loop approvals as `input-required`.
   - **Spring Boot 4 starter:** connectors from configuration, opt-in endpoints, Spring Security,
     Micrometer and Actuator, and opt-in Spring AI wiring.
@@ -130,11 +130,11 @@ What AgentWeave provides:
 
 ## Non-goals
 
-- **Not an agent runtime, orchestration engine or LLM client.** AgentWeave is the protocol layer, not
+- **Not an agent runtime, orchestration engine or LLM client.** Protoweft is the protocol layer, not
   a planner, memory store, prompt-chaining library or RAG framework. LangChain4j, Spring AI and ARGI
-  are the model and agent-runtime layers that AgentWeave plugs into.
+  are the model and agent-runtime layers that Protoweft plugs into.
 - **Not a reimplementation of the protocol SDKs.** Where an official Java SDK exists (MCP, A2A),
-  AgentWeave wraps it rather than re-deriving the wire format. (UTCP has no official Java SDK, so its
+  Protoweft wraps it rather than re-deriving the wire format. (UTCP has no official Java SDK, so its
   connector is implemented directly from the specification.)
 - **Not a lowest-common-denominator façade.** The core does not force MCP, A2A, and UTCP into a single
   unified model where their domains genuinely differ (e.g. A2A tasks vs. tool calls).
@@ -146,10 +146,10 @@ What AgentWeave provides:
 |---|---|---|
 | Language baseline | Java 17 (LTS) | The floor of every wrapped SDK (MCP, a2a-java, LangChain4j, the Anthropic and OpenAI SDKs) and of Spring Boot 4; widest enterprise reach. |
 | Build | Gradle (Kotlin DSL), multi-module, with a BOM | Multi-module ergonomics; one BOM aligns versions for users. |
-| JSON | No JSON library in the core; Jackson 3 where AgentWeave needs JSON | Matches MCP SDK 2.x and Spring Boot 4; the core stays dependency-free. |
+| JSON | No JSON library in the core; Jackson 3 where Protoweft needs JSON | Matches MCP SDK 2.x and Spring Boot 4; the core stays dependency-free. |
 | Spring | Spring Boot 4.x only | 3.5 is out of OSS support, and 4.x defaults to Jackson 3. |
 | Docs | Zensical (`mkdocs.yml`) on GitHub Pages, plus aggregated Javadoc | The maintained successor of Material for MkDocs. |
 | License | MIT | Chosen by the project owner. |
 
-See the architecture spec (`agentweave-architecture`) for the module layout, the per-protocol
+See the architecture spec (`protoweft-architecture`) for the module layout, the per-protocol
 compatibility matrix, and the cited sources.

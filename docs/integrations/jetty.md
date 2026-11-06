@@ -1,11 +1,11 @@
 # Embedded Jetty
 
-`agentweave-server-jetty` hosts AgentWeave server endpoints (MCP, A2A, UTCP) in an embedded Jetty
+`protoweft-server-jetty` hosts Protoweft server endpoints (MCP, A2A, UTCP) in an embedded Jetty
 12 server (Jakarta EE 11, Servlet 6.1), for applications that don't run in a servlet container or
 Spring Boot.
 
 ```java
-try (AgentWeaveServer server = AgentWeaveServer.builder()
+try (ProtoweftServer server = ProtoweftServer.builder()
         .port(8080)
         .authenticator(myAuthenticator)
         .endpoints(McpToolServer.http(tools), UtcpManualProvider.builder(tools).build(), a2aServer)
@@ -54,7 +54,7 @@ after start, pass a `Supplier`:
 ```java
 AtomicReference<String> base = new AtomicReference<>();
 try (A2aAgentServer agent = A2aAgentServer.builder(handler, descriptor).publicUrl(base::get).build();
-     AgentWeaveServer server = AgentWeaveServer.builder()
+     ProtoweftServer server = ProtoweftServer.builder()
              .port(0)
              .endpoints(McpToolServer.http(tools),
                         UtcpManualProvider.builder(tools).baseUrl(base::get).build(),

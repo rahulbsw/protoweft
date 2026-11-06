@@ -5,7 +5,7 @@ Source: https://github.com/mcp-tool-bench/MCPToolBenchPP (MIT License, (c) 2026 
 Fetches the six single-call data files (1,509 instances over 87 tools) plus the LICENSE into
 evals/tool-discovery/build/data/mcptoolbench/ (ignored by git via `build/`), and writes a
 manifest.json with the commit and per-file sha256. The Java loader
-(io.agentweave.evals.discovery.data.McpToolBenchLoader) reads that directory.
+(io.github.rahulbsw.protoweft.evals.discovery.data.McpToolBenchLoader) reads that directory.
 """
 import argparse
 import hashlib
@@ -35,7 +35,7 @@ def get(url, retries=5):
     delay = 2.0
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "agentweave-evals/0.1"})
+            req = urllib.request.Request(url, headers={"User-Agent": "protoweft-evals/0.1"})
             with urllib.request.urlopen(req, timeout=120) as r:
                 return r.read()
         except (urllib.error.HTTPError, urllib.error.URLError):

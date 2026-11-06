@@ -55,7 +55,7 @@ jobs:
       fail-fast: false
       matrix:
         # Every client scenario required for 2025-11-25: the 4 non-auth ones and the 14 auth/*
-        # ones (the suite's `auth` suite; McpClientConnector with agentweave-oauth's OAuthClient).
+        # ones (the suite's `auth` suite; McpClientConnector with protoweft-oauth's OAuthClient).
         scenario:
           - initialize
           - tools_call

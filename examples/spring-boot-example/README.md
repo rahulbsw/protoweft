@@ -2,8 +2,8 @@
 
 A Spring Boot 4 application where one set of plain bean methods (`WeatherTools`, annotated
 `@AgentTool`) is served over **MCP** and **UTCP**, and an `AgentHandler` bean (`WeatherAgent`) is
-served over **A2A**. All the wiring comes from `agentweave-spring-boot-starter` and
-`application.yml`. Every AgentWeave endpoint requires `Authorization: Bearer demo-token`
+served over **A2A**. All the wiring comes from `protoweft-spring-boot-starter` and
+`application.yml`. Every Protoweft endpoint requires `Authorization: Bearer demo-token`
 (`TokenAuthenticator`), except the public A2A agent card.
 
 | Endpoint | Protocol |
@@ -86,11 +86,11 @@ If the message names no city, the agent asks for one: the task is returned in st
 
 ## Consuming other services
 
-Uncomment the `agentweave.mcp.clients`, `agentweave.utcp.manuals` or `agentweave.a2a.agents`
+Uncomment the `protoweft.mcp.clients`, `protoweft.utcp.manuals` or `protoweft.a2a.agents`
 entries in `application.yml`. Each declared connector is started with the application, and its
 tools are registered in the `ToolRegistry` bean as `<name>.<tool>`. A remote A2A agent appears as
 `<name>.ask`. You can then inject the `ToolRegistry` bean anywhere, or hand it to LangChain4j
-through `AgentWeaveToolProvider`. Set `agentweave.server.mcp.expose=registry` to re-serve all of
+through `ProtoweftToolProvider`. Set `protoweft.server.mcp.expose=registry` to re-serve all of
 those tools over MCP.
 
 ## Test
@@ -100,6 +100,6 @@ those tools over MCP.
 ```
 
 `SpringBootExampleTest` starts the application on a random port. It calls the application through
-each protocol with AgentWeave's own clients (`McpClientConnector`, `UtcpClientConnector`,
+each protocol with Protoweft's own clients (`McpClientConnector`, `UtcpClientConnector`,
 `A2aAgentConnector`), including an A2A follow-up question, and checks the 401 responses and the
 health endpoint.

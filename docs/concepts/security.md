@@ -1,9 +1,9 @@
 # Security and credentials
 
-AgentWeave separates **outbound** credentials, which it presents to servers it calls, from
+Protoweft separates **outbound** credentials, which it presents to servers it calls, from
 **inbound** authentication, which decides who may call the endpoints you expose. It ships no
 identity provider: both sides are hooks you implement or connect to your existing security stack.
-The optional [`agentweave-oauth`](../integrations/oauth.md) module implements both hooks for OAuth
+The optional [`protoweft-oauth`](../integrations/oauth.md) module implements both hooks for OAuth
 2.1, as MCP authorization specifies it.
 
 ## Outbound: `CredentialProvider`
@@ -39,13 +39,13 @@ Each connector presents credentials the way its protocol and transport expect:
   authenticates through the `auth` object in its own call template (`api_key`, `basic` or
   `oauth2`), whose values usually come from UTCP variables. See
   [UTCP authentication](../protocols/utcp.md#authentication).
-- A2A agent cards may declare `securitySchemes` (OAuth, OIDC, mTLS). AgentWeave doesn't interpret
+- A2A agent cards may declare `securitySchemes` (OAuth, OIDC, mTLS). Protoweft doesn't interpret
   them; it sends the static credentials your provider returns.
 
 ### On-demand tokens: `HttpAuthorizer`
 
 A `CredentialProvider` hands out credentials you already have. An `HttpAuthorizer`, also in the
-core (`io.agentweave.core.auth`), obtains them when a server asks for them:
+core (`io.github.rahulbsw.protoweft.core.auth`), obtains them when a server asks for them:
 
 ```java
 public interface HttpAuthorizer {
@@ -55,7 +55,7 @@ public interface HttpAuthorizer {
 ```
 
 The MCP Streamable HTTP connector accepts one with `McpClientConnector.http(..).authorizer(..)`;
-its `Authorization` header replaces a static header of the same name. `agentweave-oauth`'s
+its `Authorization` header replaces a static header of the same name. `protoweft-oauth`'s
 `OAuthClient` implements it with the full MCP authorization flow: protected resource metadata,
 authorization server discovery, client registration, PKCE, refresh and step-up. See
 [MCP authorization](../protocols/mcp.md#authorization) and [OAuth](../integrations/oauth.md). The
@@ -66,7 +66,7 @@ stdio (never its arguments), and a URL without user info, query or fragment for 
 
 ## Inbound: `InboundAuthenticator`
 
-Every AgentWeave server endpoint runs one `InboundAuthenticator` before handling a request. That
+Every Protoweft server endpoint runs one `InboundAuthenticator` before handling a request. That
 covers MCP over HTTP, **both** A2A endpoints (the agent card and JSON-RPC), and the UTCP manual and
 tool routes, so one implementation protects all three protocols.
 
@@ -111,7 +111,7 @@ The A2A server also uses the caller's name for [task ownership](../protocols/a2a
 
 ### OAuth resource server
 
-`agentweave-oauth`'s `BearerTokenAuthenticator` is a ready-made `InboundAuthenticator` for OAuth 2.1
+`protoweft-oauth`'s `BearerTokenAuthenticator` is a ready-made `InboundAuthenticator` for OAuth 2.1
 bearer tokens, as the MCP authorization specification requires them: it validates the token
 (`JwtTokenVerifier` by default), checks that its audience is this server, enforces required scopes,
 and answers with the exact `WWW-Authenticate` challenges clients use to discover the authorization
@@ -131,11 +131,11 @@ server. Pair it with a `ProtectedResourceMetadataEndpoint` on the same host. See
 ## Scopes and permissions
 
 By convention, the caller's granted OAuth scopes are the `scopes` attribute of `CallerIdentity`, a
-collection of strings. AgentWeave's authenticators fill it:
+collection of strings. Protoweft's authenticators fill it:
 
 | Authenticator | `scopes` attribute |
 |---|---|
-| `BearerTokenAuthenticator` (`agentweave-oauth`) | The token's `scope` or `scp` claim, as a sorted list (`BearerTokenAuthenticator.SCOPES`); the verified claims are under `claims`. |
+| `BearerTokenAuthenticator` (`protoweft-oauth`) | The token's `scope` or `scp` claim, as a sorted list (`BearerTokenAuthenticator.SCOPES`); the verified claims are under `claims`. |
 | `SpringSecurityInboundAuthenticator` (Spring Boot starter) | Spring Security's `SCOPE_x` authorities with the prefix removed. |
 | Your own | Whatever you put there, for example `Map.of("scopes", claims.scopes())` as above. |
 
@@ -143,7 +143,7 @@ Where scopes take effect:
 
 - **Tool discovery.** A [`CapabilityCatalog`](../discovery/index.md#source-policies) gives sources
   and tools required scopes (`SourcePolicy.requiredScopes`, `toolScopes`; in Spring Boot,
-  `agentweave.discovery.sources.<name>.required-scopes`). A search only returns capabilities whose
+  `protoweft.discovery.sources.<name>.required-scopes`). A search only returns capabilities whose
   required scopes the caller holds (`DiscoveryQuery.SCOPES_ATTRIBUTE`), never names the hidden
   ones, and `call_capability` or `CapabilityCatalog.invoke` re-checks before calling. The
   [Spring AI](../integrations/spring-ai.md#tool-search-with-the-catalog) and
@@ -166,7 +166,7 @@ after Spring Security's filter chain, so both can apply:
 1. **Spring Security** protects the protocol paths like any other route (HTTP Basic, OAuth2
    resource server, and so on). Its CSRF protection must ignore the protocol paths, because
    protocol clients don't send CSRF tokens.
-2. **The AgentWeave authenticator** then runs. If you define no `InboundAuthenticator` bean and
+2. **The Protoweft authenticator** then runs. If you define no `InboundAuthenticator` bean and
    Spring Security is on the classpath, the starter uses `SpringSecurityInboundAuthenticator`: it
    never rejects, and it names the caller after Spring Security's `Authentication`, with the
    sorted authority names as the `authorities` attribute and the `SCOPE_x` authorities, prefix

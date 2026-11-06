@@ -17,12 +17,12 @@ repositories {
     mavenCentral()
 }
 
-val agentweaveVersion: String by project
+val protoweftVersion: String by project
 
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:$agentweaveVersion"))
-    implementation("io.agentweave:agentweave-spring-boot-starter")
-    implementation("io.agentweave:agentweave-mcp")
+    implementation(platform("io.github.rahulbsw:protoweft-bom:$protoweftVersion"))
+    implementation("io.github.rahulbsw:protoweft-spring-boot-starter")
+    implementation("io.github.rahulbsw:protoweft-mcp")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")

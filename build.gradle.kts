@@ -16,22 +16,22 @@ allprojects {
     }
 }
 
-val repoUrl = "https://github.com/rahulbsw/agentweave"
+val repoUrl = "https://github.com/rahulbsw/protoweft"
 
 // Modules that are libraries but must not be published yet (see their SPEC.md).
-val unpublished = setOf("agentweave-argi-neutral")
+val unpublished = setOf("protoweft-argi-neutral")
 
-// Published library modules: every agentweave-* module except the BOM (published as a platform).
+// Published library modules: every protoweft-* module except the BOM (published as a platform).
 val libraryProjects = subprojects.filter {
-    it.name.startsWith("agentweave-") && it.name != "agentweave-bom" && it.name !in unpublished &&
+    it.name.startsWith("protoweft-") && it.name != "protoweft-bom" && it.name !in unpublished &&
         it.buildFile.exists()
 }
 
 // One Javadoc site for all library modules, published with the documentation under /api/.
 tasks.register<Javadoc>("aggregateJavadoc") {
-    description = "Generates combined Javadoc for all AgentWeave library modules."
+    description = "Generates combined Javadoc for all Protoweft library modules."
     group = "documentation"
-    title = "AgentWeave ${project.property("version")} API"
+    title = "Protoweft ${project.property("version")} API"
     setDestinationDir(layout.buildDirectory.dir("docs/javadoc").get().asFile)
     (options as StandardJavadocDocletOptions).apply {
         encoding = "UTF-8"
@@ -60,7 +60,7 @@ fun Project.publishToCentral(kind: com.vanniktech.maven.publish.Platform) {
         configure(kind)
         pom {
             name.set(project.name)
-            description.set(project.description ?: "AgentWeave: interoperable agent and tool protocols for Java")
+            description.set(project.description ?: "Protoweft: interoperable agent and tool protocols for Java")
             url.set(repoUrl)
             inceptionYear.set("2026")
             licenses {
@@ -79,8 +79,8 @@ fun Project.publishToCentral(kind: com.vanniktech.maven.publish.Platform) {
             }
             scm {
                 url.set(repoUrl)
-                connection.set("scm:git:git://github.com/rahulbsw/agentweave.git")
-                developerConnection.set("scm:git:ssh://git@github.com/rahulbsw/agentweave.git")
+                connection.set("scm:git:git://github.com/rahulbsw/protoweft.git")
+                developerConnection.set("scm:git:ssh://git@github.com/rahulbsw/protoweft.git")
             }
         }
     }
@@ -88,7 +88,7 @@ fun Project.publishToCentral(kind: com.vanniktech.maven.publish.Platform) {
 
 // Every Java module (directories with a build file); container directories like `examples/`
 // and the java-platform BOM are skipped.
-configure(subprojects.filter { it.buildFile.exists() && it.name != "agentweave-bom" }) {
+configure(subprojects.filter { it.buildFile.exists() && it.name != "protoweft-bom" }) {
     apply(plugin = "java-library")
 
     group = rootProject.property("group") as String
@@ -119,12 +119,12 @@ configure(subprojects.filter { it.buildFile.exists() && it.name != "agentweave-b
         (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
     }
 
-    // A stable JPMS name for classpath and module-path users: io.agentweave.<module>.
+    // A stable JPMS name for classpath and module-path users: io.github.rahulbsw.protoweft.<module>.
     tasks.named<Jar>("jar") {
         manifest {
             attributes(
-                "Automatic-Module-Name" to "io.agentweave." +
-                    project.name.removePrefix("agentweave-").replace('-', '.'),
+                "Automatic-Module-Name" to "io.github.rahulbsw.protoweft." +
+                    project.name.removePrefix("protoweft-").replace('-', '.'),
                 "Implementation-Title" to project.name,
                 "Implementation-Version" to project.version.toString(),
             )
@@ -145,9 +145,9 @@ allprojects {
     }
 }
 
-project(":agentweave-bom") {
+project(":protoweft-bom") {
     group = rootProject.property("group") as String
     version = rootProject.property("version") as String
-    description = "AgentWeave bill of materials: aligns the versions of every AgentWeave module"
+    description = "Protoweft bill of materials: aligns the versions of every Protoweft module"
     pluginManager.withPlugin("java-platform") { publishToCentral(JavaPlatform()) }
 }

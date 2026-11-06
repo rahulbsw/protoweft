@@ -1,4 +1,4 @@
-# Expected failures of AgentWeave's A2A server (conformance/a2a-sut, A2aAgentServer) in the
+# Expected failures of Protoweft's A2A server (conformance/a2a-sut, A2aAgentServer) in the
 # official A2A TCK, a2aproject/a2a-tck tag 1.0.0.alpha3, run with --level must.
 #
 # The TCK has no baseline option, so scripts/conformance/a2a-tck.sh compares the failed and

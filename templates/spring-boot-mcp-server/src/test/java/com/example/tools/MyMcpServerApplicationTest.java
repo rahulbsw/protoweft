@@ -1,7 +1,7 @@
 package com.example.tools;
 
-import io.agentweave.core.tool.ToolInvocation;
-import io.agentweave.mcp.McpClientConnector;
+import io.github.rahulbsw.protoweft.core.tool.ToolInvocation;
+import io.github.rahulbsw.protoweft.mcp.McpClientConnector;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;

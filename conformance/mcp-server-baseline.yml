@@ -1,8 +1,8 @@
-# Expected failures of AgentWeave's MCP server (conformance/mcp-server) in the official MCP
+# Expected failures of Protoweft's MCP server (conformance/mcp-server) in the official MCP
 # conformance suite, @modelcontextprotocol/conformance@0.2.0-alpha.12:
 #   conformance server --suite active --spec-version 2025-11-25 --expected-failures <this file>
 #
-# Every entry names the AgentWeave feature it waits for: an id that McpFeatures (agentweave-mcp)
+# Every entry names the Protoweft feature it waits for: an id that McpFeatures (protoweft-mcp)
 # reports as unsupported, or a precise library gap. Entries are per check
 # (<scenario>:<check-id>), so the other checks of each scenario (wire-schema-valid) stay enforced.
 # The suite exits 1 on any failure not listed here, and on any entry here that now passes.

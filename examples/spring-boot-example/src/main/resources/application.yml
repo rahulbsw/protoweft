@@ -9,7 +9,7 @@ server:
 example:
   api-token: demo-token
 
-agentweave:
+protoweft:
   server:
     mcp:
       enabled: true                      # Streamable HTTP at /mcp

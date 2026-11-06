@@ -1,10 +1,10 @@
-site_name: AgentWeave
+site_name: Protoweft
 site_description: The protocol backbone for Java agents. MCP, A2A and UTCP behind one protocol-neutral API.
-copyright: Copyright &copy; 2026 The AgentWeave Authors. MIT License.
+copyright: Copyright &copy; 2026 The Protoweft Authors. MIT License.
 
-site_url: https://rahulbsw.github.io/agentweave/
-repo_url: https://github.com/rahulbsw/agentweave
-repo_name: rahulbsw/agentweave
+site_url: https://rahulbsw.github.io/github/rahulbsw/protoweft/
+repo_url: https://github.com/rahulbsw/protoweft
+repo_name: rahulbsw/protoweft
 edit_uri: edit/main/docs/
 
 docs_dir: docs

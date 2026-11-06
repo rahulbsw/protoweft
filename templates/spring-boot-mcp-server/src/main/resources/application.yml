@@ -2,7 +2,7 @@ spring:
   application:
     name: my-mcp-server
 
-agentweave:
+protoweft:
   server:
     mcp:
       enabled: true     # MCP over Streamable HTTP at http://localhost:8080/mcp
@@ -12,4 +12,4 @@ agentweave:
     #   enabled: true   # needs an AgentHandler bean; card at /.well-known/agent-card.json
 
 # Before exposing this beyond localhost, protect /mcp: define an InboundAuthenticator bean, or
-# use Spring Security. See https://rahulbsw.github.io/agentweave/concepts/security/
+# use Spring Security. See https://rahulbsw.github.io/github/rahulbsw/protoweft/concepts/security/

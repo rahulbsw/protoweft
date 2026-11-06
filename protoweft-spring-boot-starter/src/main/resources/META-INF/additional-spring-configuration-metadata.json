@@ -1,0 +1,22 @@
+{
+  "properties": [
+    {
+      "name": "protoweft.observations.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether Protoweft operations are recorded as Micrometer observations when an ObservationRegistry bean exists.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.health.protoweft.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether to enable the Protoweft connectors health check.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.info.protoweft.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether to enable the Protoweft compliance info (defaults to management.info.defaults.enabled).",
+      "defaultValue": true
+    }
+  ]
+}

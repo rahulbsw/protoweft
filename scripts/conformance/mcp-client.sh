@@ -6,7 +6,7 @@
 #
 # Default scenarios: every client scenario required for 2025-11-25 (`conformance list --client
 # --requirements 2025-11-25`): the 4 non-auth ones and the 14 auth/* ones (the suite's `auth` suite),
-# which run McpClientConnector with agentweave-oauth's OAuthClient as authorizer.
+# which run McpClientConnector with protoweft-oauth's OAuthClient as authorizer.
 # Env: MCP_CONFORMANCE_VERSION (default 0.2.0-alpha.12), MCP_SPEC_VERSION (default 2025-11-25).
 # Results: build/conformance/mcp-client/. Exits non-zero if any scenario's suite run fails.
 set -euo pipefail

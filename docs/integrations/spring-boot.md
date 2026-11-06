@@ -1,6 +1,6 @@
 # Spring Boot
 
-`agentweave-spring-boot-starter` makes AgentWeave idiomatic in a **Spring Boot 4** application
+`protoweft-spring-boot-starter` makes Protoweft idiomatic in a **Spring Boot 4** application
 (built and tested on 4.1.2):
 
 - `@AgentTool` methods of your beans are collected into one `LocalTools` bean.
@@ -23,33 +23,33 @@ plugins {
 }
 
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
-    implementation("io.agentweave:agentweave-spring-boot-starter")
-    implementation("io.agentweave:agentweave-mcp")     // only the protocols you use
-    implementation("io.agentweave:agentweave-utcp")
-    implementation("io.agentweave:agentweave-a2a")
+    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation("io.github.rahulbsw:protoweft-spring-boot-starter")
+    implementation("io.github.rahulbsw:protoweft-mcp")     // only the protocols you use
+    implementation("io.github.rahulbsw:protoweft-utcp")
+    implementation("io.github.rahulbsw:protoweft-a2a")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")     // for the servers
     implementation("org.springframework.boot:spring-boot-starter-actuator")   // optional
 }
 ```
 
 If a protocol is configured but its module is missing, startup fails and names the artifact to
-add. See [Getting started](../getting-started.md#build-agentweave-from-source) for building
-AgentWeave into your local Maven repository.
+add. See [Getting started](../getting-started.md#build-protoweft-from-source) for building
+Protoweft into your local Maven repository.
 
 ## What gets configured
 
 | Bean | Created when | Replace or disable |
 |---|---|---|
-| `LocalTools` | `agentweave.local-tools.enabled` (default) | defining your own `LocalTools` bean |
-| `ToolRegistry` | always; holds the local tools under `agentweave.local-tools.name`, then every connector once started | defining your own `ToolRegistry` bean |
-| `AgentWeaveConnectors` | always; the declared client connectors and their lifecycle | — |
-| `McpToolServer.Http` | `agentweave.server.mcp.enabled=true`, servlet web app, `agentweave-mcp` present | defining your own bean |
-| `UtcpManualProvider` | `agentweave.server.utcp.enabled=true`, servlet web app, `agentweave-utcp` present | defining your own bean |
-| `A2aAgentServer` | `agentweave.server.a2a.enabled=true`, servlet web app, `agentweave-a2a` present, and an `AgentHandler` bean | defining your own bean |
+| `LocalTools` | `protoweft.local-tools.enabled` (default) | defining your own `LocalTools` bean |
+| `ToolRegistry` | always; holds the local tools under `protoweft.local-tools.name`, then every connector once started | defining your own `ToolRegistry` bean |
+| `ProtoweftConnectors` | always; the declared client connectors and their lifecycle | — |
+| `McpToolServer.Http` | `protoweft.server.mcp.enabled=true`, servlet web app, `protoweft-mcp` present | defining your own bean |
+| `UtcpManualProvider` | `protoweft.server.utcp.enabled=true`, servlet web app, `protoweft-utcp` present | defining your own bean |
+| `A2aAgentServer` | `protoweft.server.a2a.enabled=true`, servlet web app, `protoweft-a2a` present, and an `AgentHandler` bean | defining your own bean |
 | `InboundAuthenticator` | Spring Security present and no bean of your own: `SpringSecurityInboundAuthenticator` | defining your own bean |
-| `MicrometerObservationHandler` | an `ObservationRegistry` bean exists and `agentweave.observations.enabled` (default) | defining your own bean |
-| Health indicator `agentweave`, info contributor `agentweave` | Actuator present | beans named `agentweaveHealthIndicator` / `agentweaveInfoContributor`, or `management.health.agentweave.enabled` / `management.info.agentweave.enabled` |
+| `MicrometerObservationHandler` | an `ObservationRegistry` bean exists and `protoweft.observations.enabled` (default) | defining your own bean |
+| Health indicator `protoweft`, info contributor `protoweft` | Actuator present | beans named `protoweftHealthIndicator` / `protoweftInfoContributor`, or `management.health.protoweft.enabled` / `management.info.protoweft.enabled` |
 
 Beans of yours that the starter uses: `@AgentTool` beans and `LocalTools.LocalTool` beans,
 `InboundAuthenticator`, `CredentialProvider`, any number of `ObservationHandler`s, and an
@@ -103,7 +103,7 @@ Declare connectors under their registry names; tools appear as `<name>.<tool>`, 
 `<name>.ask`.
 
 ```yaml
-agentweave:
+protoweft:
   mcp:
     clients:
       files:                                   # stdio: command + args + env
@@ -143,7 +143,7 @@ CredentialProvider credentials() {
 
 ### Lifecycle
 
-- Connectors are **built** when the `AgentWeaveConnectors` bean is created, so bad URLs fail early.
+- Connectors are **built** when the `ProtoweftConnectors` bean is created, so bad URLs fail early.
 - They are **started after the web server**, so an application can consume its own endpoints, and
   each is added to the `ToolRegistry` once it has started.
 - They are **closed** after the web server has drained during graceful shutdown.
@@ -155,9 +155,9 @@ Remote tools are therefore not in the registry until the context has refreshed. 
 @Component
 public class Startup {
     private final ToolRegistry registry;
-    private final AgentWeaveConnectors connectors;
+    private final ProtoweftConnectors connectors;
 
-    public Startup(ToolRegistry registry, AgentWeaveConnectors connectors) {
+    public Startup(ToolRegistry registry, ProtoweftConnectors connectors) {
         this.registry = registry;
         this.connectors = connectors;
     }
@@ -172,14 +172,14 @@ public class Startup {
 }
 ```
 
-`AgentWeaveConnectors` also offers `connector(name)`, `status()` (each connector's `PENDING`, `UP`,
+`ProtoweftConnectors` also offers `connector(name)`, `status()` (each connector's `PENDING`, `UP`,
 `FAILED` or `CLOSED` state) and `compliance()`.
 
 ### Failure policy
 
 - By default, a connector that fails to start **fails application startup**:
-  `IllegalStateException: AgentWeave <protocol> connector '<name>' failed to start: …`.
-- With `agentweave.fail-fast=false`, the failure is logged at WARN, the connector is closed and
+  `IllegalStateException: Protoweft <protocol> connector '<name>' failed to start: …`.
+- With `protoweft.fail-fast=false`, the failure is logged at WARN, the connector is closed and
   left out of the registry (so it can't break listing), and health reports it `FAILED` (DOWN).
 - There are no retries, and connectors are never restarted.
 
@@ -192,7 +192,7 @@ spring:
   application:
     name: weather-agent
 
-agentweave:
+protoweft:
   server:
     mcp:
       enabled: true                 # Streamable HTTP at /mcp
@@ -214,7 +214,7 @@ agentweave:
 ```
 
 The A2A server needs an `AgentHandler` bean. The card's name, description, version and skills come
-from `agentweave.server.a2a.*` (the name defaults to `spring.application.name`), unless you define
+from `protoweft.server.a2a.*` (the name defaults to `spring.application.name`), unless you define
 an `AgentDescriptor` bean.
 
 ### What a tool server publishes
@@ -244,7 +244,7 @@ have started it answers **503** with `Retry-After: 1`, and then it is built over
 
 Each endpoint becomes a `ServletRegistrationBean` with an `InboundAuthFilter` registered on the
 same URL patterns (REQUEST dispatch), async where the endpoint needs it. Their order is
-`agentweave.server.auth-filter-order` (default `0`), which puts them after Spring Security's filter
+`protoweft.server.auth-filter-order` (default `0`), which puts them after Spring Security's filter
 chain (`spring.security.filter.order`, `-100`).
 
 ## Security
@@ -252,7 +252,7 @@ chain (`spring.security.filter.order`, `-100`).
 Without Spring Security and without an `InboundAuthenticator` bean, the endpoints admit everyone
 (`InboundAuthenticator.ALLOW_ALL`). Choose one of:
 
-**An `InboundAuthenticator` bean.** It protects every AgentWeave endpoint and names the caller.
+**An `InboundAuthenticator` bean.** It protects every Protoweft endpoint and names the caller.
 The [Spring Boot example](../examples.md#spring-boot) uses a bearer-token authenticator that leaves
 the A2A card public.
 
@@ -287,26 +287,26 @@ names the caller after Spring Security's `Authentication`, with the sorted autho
 
 ## Micrometer
 
-When an `ObservationRegistry` bean exists (for example with Actuator), each AgentWeave operation
+When an `ObservationRegistry` bean exists (for example with Actuator), each Protoweft operation
 becomes a Micrometer observation:
 
 | | |
 |---|---|
-| Name | `agentweave.operation` |
+| Name | `protoweft.operation` |
 | Contextual name | `<protocol> <operation>`, for example `mcp tools/call` |
-| Low-cardinality keys | `agentweave.protocol` (`mcp`, `a2a`, `utcp`), `agentweave.operation` (`tools/call`, `SendMessage`, …) |
-| High-cardinality key | `agentweave.target` (tool name, URL or task id) |
+| Low-cardinality keys | `protoweft.protocol` (`mcp`, `a2a`, `utcp`), `protoweft.operation` (`tools/call`, `SendMessage`, …) |
+| High-cardinality key | `protoweft.target` (tool name, URL or task id) |
 
 The bridge covers the client connectors built from properties and the MCP and A2A servers. Every
 `ObservationHandler` bean receives every event, and one that fails doesn't affect the others. Turn
-the bridge off with `agentweave.observations.enabled=false`.
+the bridge off with `protoweft.observations.enabled=false`.
 
 ## Actuator
 
-- **Health** `agentweave` reports connector lifecycle state; it doesn't probe peers on each check.
+- **Health** `protoweft` reports connector lifecycle state; it doesn't probe peers on each check.
   It is DOWN if any connector failed, OUT_OF_SERVICE while any is pending, and UP otherwise. Each
   connector's protocol, state and error appear as details.
-- **Info** `agentweave.connectors.<name>` carries each client connector's `ComplianceReport`
+- **Info** `protoweft.connectors.<name>` carries each client connector's `ComplianceReport`
   (`protocol`, `sdkName`, `sdkVersion`, `wireRevisions`, `negotiatedRevision`, `supported`,
   `unsupported`). Server reports aren't included.
 
@@ -320,14 +320,14 @@ key. Durations use Spring's format (`30s`, `2m`).
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentweave.fail-fast` | boolean | `true` | Whether a connector that fails to start fails application startup. |
-| `agentweave.local-tools.enabled` | boolean | `true` | Collect `@AgentTool` methods of beans into one `LocalTools` bean. |
-| `agentweave.local-tools.name` | string | `local` | Registry name of the local tools (`<name>.<tool>`). |
-| `agentweave.observations.enabled` | boolean | `true` | Record operations as Micrometer observations when an `ObservationRegistry` exists. |
-| `management.health.agentweave.enabled` | boolean | `true` | The connectors health check. |
-| `management.info.agentweave.enabled` | boolean | `management.info.defaults.enabled` | The compliance info contributor. |
+| `protoweft.fail-fast` | boolean | `true` | Whether a connector that fails to start fails application startup. |
+| `protoweft.local-tools.enabled` | boolean | `true` | Collect `@AgentTool` methods of beans into one `LocalTools` bean. |
+| `protoweft.local-tools.name` | string | `local` | Registry name of the local tools (`<name>.<tool>`). |
+| `protoweft.observations.enabled` | boolean | `true` | Record operations as Micrometer observations when an `ObservationRegistry` exists. |
+| `management.health.protoweft.enabled` | boolean | `true` | The connectors health check. |
+| `management.info.protoweft.enabled` | boolean | `management.info.defaults.enabled` | The compliance info contributor. |
 
-### MCP clients: `agentweave.mcp.clients.<name>.*`
+### MCP clients: `protoweft.mcp.clients.<name>.*`
 
 Set exactly one of `command` (stdio) and `url` (Streamable HTTP), and only the options of that kind.
 
@@ -341,7 +341,7 @@ Set exactly one of `command` (stdio) and `url` (Streamable HTTP), and only the o
 | `headers` | map | `{}` | Static headers sent with every HTTP request. |
 | `request-timeout` | duration | 20 s (connector default) | Timeout for initialization and each request. |
 
-### UTCP manuals: `agentweave.utcp.manuals.<name>.*`
+### UTCP manuals: `protoweft.utcp.manuals.<name>.*`
 
 Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 
@@ -354,7 +354,7 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `discovery-timeout` | duration | 10 s (connector default) | Manual discovery timeout. |
 | `call-timeout` | duration | 30 s (connector default) | Tool call timeout. |
 
-### A2A agents: `agentweave.a2a.agents.<name>.*`
+### A2A agents: `protoweft.a2a.agents.<name>.*`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -362,58 +362,58 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `timeout` | duration | 60 s (connector default) | Connect timeout and the longest a call waits for the task. |
 | `streaming` | boolean | `true` | Whether calls may stream when the agent supports it. |
 
-### Servers: `agentweave.server.*`
+### Servers: `protoweft.server.*`
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentweave.server.auth-filter-order` | int | `0` | Order of the inbound-authentication filters; the default runs them after Spring Security (`-100`). |
-| `agentweave.server.mcp.enabled` | boolean | `false` | Serve tools over MCP (Streamable HTTP). |
-| `agentweave.server.mcp.path` | string | `/mcp` | Servlet path of the MCP endpoint. |
-| `agentweave.server.mcp.expose` | `local` \| `registry` | `local` | Which tools to serve. |
-| `agentweave.server.mcp.server-name` | string | `agentweave` | `serverInfo` name. |
-| `agentweave.server.mcp.server-version` | string | `0.1.0` | `serverInfo` version. |
-| `agentweave.server.mcp.allowed-origins` | list | `[]` | Browser origins allowed to call the endpoint; other origins get 403. |
-| `agentweave.server.mcp.request-timeout` | duration | 60 s (server default) | Longest a `tools/call` may run. |
-| `agentweave.server.utcp.enabled` | boolean | `false` | Publish tools as a UTCP manual. |
-| `agentweave.server.utcp.base-url` | string | from each request | Public base URL used in tool URLs. |
-| `agentweave.server.utcp.expose` | `local` \| `registry` | `local` | Which tools to publish. |
-| `agentweave.server.utcp.manual-version` | string | `1.0.0` | `manual_version` of the manual. |
-| `agentweave.server.utcp.api-key-header` | string | — | Header clients must send on tool calls, published as `api_key` auth. Requires `api-key-variable`. |
-| `agentweave.server.utcp.api-key-variable` | string | — | Client-side UTCP variable holding that header's value. |
-| `agentweave.server.a2a.enabled` | boolean | `false` | Serve the `AgentHandler` bean over A2A. |
-| `agentweave.server.a2a.public-url` | string | `http://localhost:<port><context-path>` | Externally reachable base URL advertised in the card. |
-| `agentweave.server.a2a.path` | string | `/a2a` | Servlet path of the JSON-RPC endpoint. |
-| `agentweave.server.a2a.name` | string | `spring.application.name` | Agent name in the card. Ignored with an `AgentDescriptor` bean. |
-| `agentweave.server.a2a.description` | string | `""` | Agent description. |
-| `agentweave.server.a2a.version` | string | `1.0.0` | Agent version. |
-| `agentweave.server.a2a.skills[]` | list | `[]` | Skills: `id`, `name` (default: the id), `description`, `tags`, `examples`. |
-| `agentweave.server.a2a.streaming` | boolean | `true` | Offer `SendStreamingMessage` and `SubscribeToTask`. |
-| `agentweave.server.a2a.push-notifications` | boolean | `true` | Offer push notifications. |
-| `agentweave.server.a2a.agent-timeout` | duration | 30 s (server default) | How long a blocking `SendMessage` waits for the handler. |
-| `agentweave.server.a2a.from-chat-client` | boolean | `false` | With `agentweave-spring-ai` and no `AgentHandler` bean, serve the application's Spring AI `ChatClient` as the agent. See [Spring AI](spring-ai.md#spring-boot). |
+| `protoweft.server.auth-filter-order` | int | `0` | Order of the inbound-authentication filters; the default runs them after Spring Security (`-100`). |
+| `protoweft.server.mcp.enabled` | boolean | `false` | Serve tools over MCP (Streamable HTTP). |
+| `protoweft.server.mcp.path` | string | `/mcp` | Servlet path of the MCP endpoint. |
+| `protoweft.server.mcp.expose` | `local` \| `registry` | `local` | Which tools to serve. |
+| `protoweft.server.mcp.server-name` | string | `protoweft` | `serverInfo` name. |
+| `protoweft.server.mcp.server-version` | string | `0.1.0` | `serverInfo` version. |
+| `protoweft.server.mcp.allowed-origins` | list | `[]` | Browser origins allowed to call the endpoint; other origins get 403. |
+| `protoweft.server.mcp.request-timeout` | duration | 60 s (server default) | Longest a `tools/call` may run. |
+| `protoweft.server.utcp.enabled` | boolean | `false` | Publish tools as a UTCP manual. |
+| `protoweft.server.utcp.base-url` | string | from each request | Public base URL used in tool URLs. |
+| `protoweft.server.utcp.expose` | `local` \| `registry` | `local` | Which tools to publish. |
+| `protoweft.server.utcp.manual-version` | string | `1.0.0` | `manual_version` of the manual. |
+| `protoweft.server.utcp.api-key-header` | string | — | Header clients must send on tool calls, published as `api_key` auth. Requires `api-key-variable`. |
+| `protoweft.server.utcp.api-key-variable` | string | — | Client-side UTCP variable holding that header's value. |
+| `protoweft.server.a2a.enabled` | boolean | `false` | Serve the `AgentHandler` bean over A2A. |
+| `protoweft.server.a2a.public-url` | string | `http://localhost:<port><context-path>` | Externally reachable base URL advertised in the card. |
+| `protoweft.server.a2a.path` | string | `/a2a` | Servlet path of the JSON-RPC endpoint. |
+| `protoweft.server.a2a.name` | string | `spring.application.name` | Agent name in the card. Ignored with an `AgentDescriptor` bean. |
+| `protoweft.server.a2a.description` | string | `""` | Agent description. |
+| `protoweft.server.a2a.version` | string | `1.0.0` | Agent version. |
+| `protoweft.server.a2a.skills[]` | list | `[]` | Skills: `id`, `name` (default: the id), `description`, `tags`, `examples`. |
+| `protoweft.server.a2a.streaming` | boolean | `true` | Offer `SendStreamingMessage` and `SubscribeToTask`. |
+| `protoweft.server.a2a.push-notifications` | boolean | `true` | Offer push notifications. |
+| `protoweft.server.a2a.agent-timeout` | duration | 30 s (server default) | How long a blocking `SendMessage` waits for the handler. |
+| `protoweft.server.a2a.from-chat-client` | boolean | `false` | With `protoweft-spring-ai` and no `AgentHandler` bean, serve the application's Spring AI `ChatClient` as the agent. See [Spring AI](spring-ai.md#spring-boot). |
 
-### Tool discovery: `agentweave.discovery.*`
+### Tool discovery: `protoweft.discovery.*`
 
-Needs `agentweave-discovery` on the classpath. See [Tool discovery: Spring Boot](../discovery/index.md#spring-boot).
+Needs `protoweft-discovery` on the classpath. See [Tool discovery: Spring Boot](../discovery/index.md#spring-boot).
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentweave.discovery.enabled` | boolean | `false` | Build a `CapabilityCatalog` bean over the tool registry. |
-| `agentweave.discovery.fallback` | `progressive` \| `all-schemas` \| `none` | `progressive` | What a low-confidence search does. |
-| `agentweave.discovery.sources.<name>.required-scopes` | list | `[]` | Scopes a caller needs to see the source's tools (matched against the caller's `scopes`). |
-| `agentweave.discovery.expose-mcp` | boolean | `false` | Serve the discovery meta-tools over MCP. |
-| `agentweave.discovery.mcp-path` | string | `/mcp-discovery` | Path of that MCP endpoint. |
+| `protoweft.discovery.enabled` | boolean | `false` | Build a `CapabilityCatalog` bean over the tool registry. |
+| `protoweft.discovery.fallback` | `progressive` \| `all-schemas` \| `none` | `progressive` | What a low-confidence search does. |
+| `protoweft.discovery.sources.<name>.required-scopes` | list | `[]` | Scopes a caller needs to see the source's tools (matched against the caller's `scopes`). |
+| `protoweft.discovery.expose-mcp` | boolean | `false` | Serve the discovery meta-tools over MCP. |
+| `protoweft.discovery.mcp-path` | string | `/mcp-discovery` | Path of that MCP endpoint. |
 
-### Spring AI: `agentweave.spring-ai.*`
+### Spring AI: `protoweft.spring-ai.*`
 
-Needs `agentweave-spring-ai` on the classpath; everything is off by default. See
+Needs `protoweft-spring-ai` on the classpath; everything is off by default. See
 [Spring AI: Spring Boot](spring-ai.md#spring-boot) for why.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentweave.spring-ai.tool-callbacks.enabled` | boolean | `false` | Register an `AgentWeaveToolCallbacks` bean and add it to the auto-configured `ChatClient.Builder`. |
-| `agentweave.spring-ai.tool-callbacks.expose` | `local` \| `registry` | `local` | Expose only the `@AgentTool` methods, or every registry tool. |
-| `agentweave.spring-ai.tool-search.enabled` | boolean | `false` | Add Spring AI's tool-search advisor backed by the capability catalog instead (needs `agentweave.discovery.enabled`). |
+| `protoweft.spring-ai.tool-callbacks.enabled` | boolean | `false` | Register an `ProtoweftToolCallbacks` bean and add it to the auto-configured `ChatClient.Builder`. |
+| `protoweft.spring-ai.tool-callbacks.expose` | `local` \| `registry` | `local` | Expose only the `@AgentTool` methods, or every registry tool. |
+| `protoweft.spring-ai.tool-search.enabled` | boolean | `false` | Add Spring AI's tool-search advisor backed by the capability catalog instead (needs `protoweft.discovery.enabled`). |
 
 ### Validation rules
 

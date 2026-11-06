@@ -1,6 +1,6 @@
 # OAuth 2.1
 
-`agentweave-oauth` implements OAuth 2.1 for AgentWeave's HTTP connectors and server endpoints,
+`protoweft-oauth` implements OAuth 2.1 for Protoweft's HTTP connectors and server endpoints,
 following the [MCP authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
 (revision `2025-11-25`). It has two halves:
 
@@ -14,15 +14,15 @@ following the [MCP authorization specification](https://modelcontextprotocol.io/
 
 ```kotlin
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
-    implementation("io.agentweave:agentweave-oauth")
+    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation("io.github.rahulbsw:protoweft-oauth")
 }
 ```
 
 It is built on Nimbus `oauth2-oidc-sdk` 11.39 and `nimbus-jose-jwt` 10.10 as internal
 (`implementation`) dependencies: no Nimbus type appears in its API. Message building and parsing,
 PKCE and JWT/JWKS processing come from Nimbus; `WWW-Authenticate` parsing, protected resource
-metadata and the MCP rules are AgentWeave's own.
+metadata and the MCP rules are Protoweft's own.
 
 !!! note "Where it plugs in"
     On the client side, only the MCP Streamable HTTP connector takes an `HttpAuthorizer` today
@@ -94,7 +94,7 @@ order:
    host the document yourself; it must list the redirect URI in use and carry `client_id` equal to
    the URL.
 3. **Dynamic Client Registration** (RFC 7591), when the server has a `registration_endpoint` and
-   `dynamicRegistration(true)` (the default). `clientName(...)` (default `AgentWeave`),
+   `dynamicRegistration(true)` (the default). `clientName(...)` (default `Protoweft`),
    `dynamicRegistrationAuthMethod(...)` and `clientMetadata(name, value)` shape the request.
    Registrations are cached in memory per issuer, grant and redirect URI.
 
@@ -172,13 +172,13 @@ user for client details. `ClientRegistration.dynamic()` is DCR only, and the bui
 - `OAuthClient.canonicalResource(uri)`: the canonical form sent as `resource` and expected as
   audience (lowercase scheme and host, no fragment, no default port, no trailing slash).
 
-Other failures are `AgentWeaveException`s: `AUTHENTICATION` for discovery, registration, grant and
+Other failures are `ProtoweftException`s: `AUTHENTICATION` for discovery, registration, grant and
 policy refusals, `CONFIGURATION` for bad builder input, `CONNECTION` for I/O and `PROTOCOL` for
 malformed JSON.
 
 ## Resource server
 
-Protect any AgentWeave host by publishing protected resource metadata and validating tokens. This
+Protect any Protoweft host by publishing protected resource metadata and validating tokens. This
 is the composition the MCP end-to-end test uses:
 
 ```java
@@ -197,7 +197,7 @@ BearerTokenAuthenticator auth = BearerTokenAuthenticator.builder(metadata,
         .requiredScopes("mcp:tools")
         .build();
 
-try (AgentWeaveServer server = AgentWeaveServer.builder().port(8080)
+try (ProtoweftServer server = ProtoweftServer.builder().port(8080)
         .endpoints(new ProtectedResourceMetadataEndpoint(metadata), McpToolServer.http(tools))
         .authenticator(auth)
         .start()) {
@@ -245,7 +245,7 @@ claims (`BearerTokenAuthenticator.CLAIMS`).
 
 !!! note "Spring Boot"
     The starter has no OAuth properties. A `BearerTokenAuthenticator` bean becomes the
-    `InboundAuthenticator` of every AgentWeave endpoint, but the starter doesn't mount
+    `InboundAuthenticator` of every Protoweft endpoint, but the starter doesn't mount
     `ProtectedResourceMetadataEndpoint`; register its servlet on Boot's container yourself, or use
     Spring Security's OAuth2 resource server, whose `SCOPE_x` authorities the starter maps to the
     caller's `scopes` (see [Spring Boot and Spring Security](../concepts/security.md#spring-boot-and-spring-security)).

@@ -33,7 +33,7 @@ jobs:
         run: |
           for t in templates/*/; do
             ./gradlew -p "$t" build --init-script "$PWD/templates/verify-with-maven-local.init.gradle.kts" \
-              -PagentweaveVersion=0.0.0-ci --console=plain
+              -PprotoweftVersion=0.0.0-ci --console=plain
           done
       - name: Upload test reports
         if: failure()
@@ -57,9 +57,9 @@ jobs:
         with:
           path: |
             ~/.m2/repository/io/github/agentic-ai-java
-            ~/.cache/agentweave/argi-src
+            ~/.cache/protoweft/argi-src
           key: argi-${{ hashFiles('scripts/install-argi-snapshot.sh') }}
       - name: Install pinned ARGI (Spring-free modules) to mavenLocal
         run: scripts/install-argi-snapshot.sh
-      - name: Build agentweave-argi-neutral
-        run: ./gradlew -PargiSnapshot :agentweave-argi-neutral:build --console=plain
+      - name: Build protoweft-argi-neutral
+        run: ./gradlew -PargiSnapshot :protoweft-argi-neutral:build --console=plain

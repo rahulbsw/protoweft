@@ -1,11 +1,11 @@
 # Conformance testing
 
-AgentWeave runs two official conformance suites against small apps built only on its public API:
+Protoweft runs two official conformance suites against small apps built only on its public API:
 
 | Suite | Version | Tests | App under test |
 |---|---|---|---|
-| [MCP conformance suite](https://github.com/modelcontextprotocol/conformance) | `@modelcontextprotocol/conformance@0.2.0-alpha.12` (the version the MCP Java SDK pins), spec `2025-11-25` | server scenarios (`--suite active`) and the 18 client scenarios required for 2025-11-25 (4 non-auth, 14 `auth/*`) | `conformance/mcp-server` (`McpToolServer.http` on `AgentWeaveServer`), `conformance/mcp-client` (`McpClientConnector`, with agentweave-oauth's `OAuthClient` for `auth/*`) |
-| [A2A TCK](https://github.com/a2aproject/a2a-tck) | tag `1.0.0.alpha3` (A2A spec 1.0, as pinned by a2a-java 1.5.0.Final), `--level must` | the TCK's MUST requirements for the transports the card declares | `conformance/a2a-sut` (`A2aAgentServer` on `AgentWeaveServer`) |
+| [MCP conformance suite](https://github.com/modelcontextprotocol/conformance) | `@modelcontextprotocol/conformance@0.2.0-alpha.12` (the version the MCP Java SDK pins), spec `2025-11-25` | server scenarios (`--suite active`) and the 18 client scenarios required for 2025-11-25 (4 non-auth, 14 `auth/*`) | `conformance/mcp-server` (`McpToolServer.http` on `ProtoweftServer`), `conformance/mcp-client` (`McpClientConnector`, with protoweft-oauth's `OAuthClient` for `auth/*`) |
+| [A2A TCK](https://github.com/a2aproject/a2a-tck) | tag `1.0.0.alpha3` (A2A spec 1.0, as pinned by a2a-java 1.5.0.Final), `--level must` | the TCK's MUST requirements for the transports the card declares | `conformance/a2a-sut` (`A2aAgentServer` on `ProtoweftServer`) |
 
 The apps in `conformance/` are never published. Every failure that remains is listed in a
 baseline with its reason, and a run fails on any failure that isn't listed and on any listed
@@ -16,7 +16,7 @@ entry that now passes.
 - The MCP client `auth/*` scenarios outside the 2025-11-25 requirement set: the back-compat
   (`2025-03-26`), extension (client credentials, DPoP, enterprise-managed, workload identity) and
   draft (`2026-07-28`) scenarios.
-- The A2A gRPC and HTTP+JSON bindings. AgentWeave serves only JSON-RPC, and the card declares
+- The A2A gRPC and HTTP+JSON bindings. Protoweft serves only JSON-RPC, and the card declares
   only that, so the TCK skips those transports.
 - The TCK's SHOULD and MAY levels.
 
@@ -70,7 +70,7 @@ run on JDK 21.0.10, with Node 26.3.1, Python 3.12.0 and uv 0.5.1. All three scri
 
 ### MCP server: 31 scenarios, 65 checks
 
-61 checks passed. 4 failed, all in the baseline (sampling and elicitation, which AgentWeave does
+61 checks passed. 4 failed, all in the baseline (sampling and elicitation, which Protoweft does
 not support), each in a different scenario. 27 scenarios passed completely.
 
 | Scenarios | Result |
@@ -108,7 +108,7 @@ check (227 of 227); the only failures are the baselined elicitation and SSE-retr
 Before `0961934`, the OAuth client refused the suite's authorization server: plain `http` was
 allowed only for the literal addresses `127.0.0.0/8` and `::1`, not the name `localhost`, so every
 `auth/*` flow stopped after fetching the protected resource metadata. It now also accepts the exact
-name `localhost` (see `agentweave-oauth`); the redirect receiver still binds `127.0.0.1`.
+name `localhost` (see `protoweft-oauth`); the redirect receiver still binds `127.0.0.1`.
 
 ### A2A TCK, MUST level: 235 test cases
 
@@ -171,7 +171,7 @@ report with this list, using the same rules as the MCP suite.
 - `conformance/mcp-server` publishes the suite's fixture names and texts exactly. It binds
   `localhost` and allows only `http://localhost:*`, `http://127.0.0.1:*` and `http://[::1]:*` as
   browser origins; any other `Origin` gets 403, which is what `dns-rebinding-protection` checks.
-  Tools AgentWeave can't implement (sampling, elicitation) aren't faked.
+  Tools Protoweft can't implement (sampling, elicitation) aren't faked.
   The embedded-resource tools return `Content.Resource`.
 - `conformance/a2a-sut` follows the TCK's Gherkin scenarios (`scenarios/*.feature`), selecting a
   behavior by `messageId` prefix. Its JSON-RPC endpoint is at `/`, as in a2a-java's SUT. The

@@ -2,22 +2,22 @@
 
 ## Outcomes versus exceptions
 
-AgentWeave distinguishes two kinds of failure:
+Protoweft distinguishes two kinds of failure:
 
 - **The tool ran and failed.** You get a `ToolOutcome` with `error() == true`; the details are in
   its content. Examples: an MCP `CallToolResult` with `isError`, a UTCP tool answering HTTP 500,
   an A2A task that ended `failed`.
-- **The call couldn't be made.** An `AgentWeaveException` is thrown. Examples: an unknown tool,
+- **The call couldn't be made.** An `ProtoweftException` is thrown. Examples: an unknown tool,
   rejected arguments, a connection failure, a timeout, a missing UTCP variable.
 
 Builders reject invalid arguments (a blank name, a relative URL, a non-positive timeout)
 immediately with `IllegalArgumentException` or `IllegalStateException`. Configuration problems
 detected later, such as an A2A server built without a public URL or a missing UTCP variable, are
-`AgentWeaveException`s with `CONFIGURATION`.
+`ProtoweftException`s with `CONFIGURATION`.
 
 ## One exception, neutral categories
 
-`AgentWeaveException` is unchecked. It carries:
+`ProtoweftException` is unchecked. It carries:
 
 - `category()`: a protocol-neutral `ErrorCategory`.
 - `protocol()`: the `ProtocolId` the error came from, if any.
@@ -43,7 +43,7 @@ try {
     if (out.error()) {
         System.err.println("the tool reported a failure: " + out.text());
     }
-} catch (AgentWeaveException e) {
+} catch (ProtoweftException e) {
     switch (e.category()) {
         case TIMEOUT, CONNECTION -> retryLater();
         case INVALID_ARGUMENTS -> System.err.println("bad call (" + e.protocolCode().orElse("-") + "): " + e.getMessage());

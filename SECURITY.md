@@ -11,11 +11,11 @@ We aim to acknowledge reports within five working days.
 
 ## Supported versions
 
-AgentWeave is pre-1.0. Only the latest released version receives security fixes.
+Protoweft is pre-1.0. Only the latest released version receives security fixes.
 
 ## Security model in brief
 
-- **Inbound requests.** No AgentWeave server endpoint (MCP over HTTP, A2A, UTCP manual and tool
+- **Inbound requests.** No Protoweft server endpoint (MCP over HTTP, A2A, UTCP manual and tool
   routes) is protected unless you configure an `InboundAuthenticator`, or put Spring Security in
   front of it in Spring Boot. The Spring Boot starter exposes no endpoint until you enable it per
   protocol.

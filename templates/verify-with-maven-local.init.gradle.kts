@@ -2,11 +2,11 @@
 // exists on Maven Central:
 //   ./gradlew publishToMavenLocal -Pversion=0.0.0-templates
 //   ./gradlew -p templates/<name> build --init-script templates/verify-with-maven-local.init.gradle.kts \
-//       -PagentweaveVersion=0.0.0-templates
+//       -PprotoweftVersion=0.0.0-templates
 allprojects {
     repositories {
         mavenLocal {
-            content { includeGroup("io.agentweave") }
+            content { includeGroup("io.github.rahulbsw") }
         }
     }
 }

@@ -1,11 +1,11 @@
 package com.example.client;
 
-import io.agentweave.a2a.A2aAgentConnector;
-import io.agentweave.core.tool.ToolInvocation;
-import io.agentweave.core.tool.ToolRegistry;
-import io.agentweave.core.tool.ToolSpec;
-import io.agentweave.mcp.McpClientConnector;
-import io.agentweave.utcp.UtcpClientConnector;
+import io.github.rahulbsw.protoweft.a2a.A2aAgentConnector;
+import io.github.rahulbsw.protoweft.core.tool.ToolInvocation;
+import io.github.rahulbsw.protoweft.core.tool.ToolRegistry;
+import io.github.rahulbsw.protoweft.core.tool.ToolSpec;
+import io.github.rahulbsw.protoweft.mcp.McpClientConnector;
+import io.github.rahulbsw.protoweft.utcp.UtcpClientConnector;
 
 import java.util.Map;
 
@@ -49,7 +49,7 @@ public final class Main {
         }
     }
 
-    private static <T extends io.agentweave.core.ProtocolConnector> T started(T connector) {
+    private static <T extends io.github.rahulbsw.protoweft.core.ProtocolConnector> T started(T connector) {
         connector.start();
         return connector;
     }

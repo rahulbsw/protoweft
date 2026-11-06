@@ -1,9 +1,9 @@
 # Spring AI
 
-`agentweave-spring-ai` connects AgentWeave to [Spring AI](https://spring.io/projects/spring-ai)
+`protoweft-spring-ai` connects Protoweft to [Spring AI](https://spring.io/projects/spring-ai)
 **2.0.2** in four directions, without depending on any protocol module:
 
-1. **Tools in:** any AgentWeave `ToolSource` (MCP, UTCP, A2A, local tools, a `ToolRegistry`) is
+1. **Tools in:** any Protoweft `ToolSource` (MCP, UTCP, A2A, local tools, a `ToolRegistry`) is
    offered to a `ChatClient` as a `ToolCallbackProvider`.
 2. **Tool search:** a [`CapabilityCatalog`](../discovery/index.md) becomes Spring AI's `ToolIndex`
    for `ToolSearchToolCallingAdvisor`. The model starts with only `toolSearchTool` and receives full
@@ -15,13 +15,13 @@
 
 ```kotlin
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
-    implementation("io.agentweave:agentweave-spring-ai")    // brings spring-ai-model
-    implementation("io.agentweave:agentweave-mcp")          // and whichever protocols you use
+    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation("io.github.rahulbsw:protoweft-spring-ai")    // brings spring-ai-model
+    implementation("io.github.rahulbsw:protoweft-mcp")          // and whichever protocols you use
 
     // Only for the classes that need them (see below):
     implementation("org.springframework.ai:spring-ai-client-chat:2.0.2")          // SpringAiAgents
-    implementation("io.agentweave:agentweave-discovery")                          // CatalogToolIndex
+    implementation("io.github.rahulbsw:protoweft-discovery")                          // CatalogToolIndex
     implementation("org.springframework.ai:spring-ai-tool-search-tool:2.0.2")     // CatalogToolIndex
     implementation("org.springframework.ai:spring-ai-tool-search-advisor:2.0.2")  // the advisor
 }
@@ -29,9 +29,9 @@ dependencies {
 
 `ToolCallback`, `ToolCallbackProvider`, `ToolDefinition` and `ToolContext` appear in the public API,
 so the module exposes `spring-ai-model` as an `api` dependency. Everything else is `compileOnly`:
-`AgentWeaveToolCallbacks` and `SpringAiTools` need only `spring-ai-model`; `SpringAiAgents` needs
+`ProtoweftToolCallbacks` and `SpringAiTools` need only `spring-ai-model`; `SpringAiAgents` needs
 `spring-ai-client-chat` (which a Spring AI model starter already brings); `CatalogToolIndex` needs
-`agentweave-discovery` and `spring-ai-tool-search-tool`. Add your model provider yourself.
+`protoweft-discovery` and `spring-ai-tool-search-tool`. Add your model provider yourself.
 
 ## Tools in
 
@@ -42,24 +42,24 @@ ToolRegistry registry = new ToolRegistry()
 
 String answer = chatClient.prompt()
         .user("What's the weather in Paris?")
-        .tools(AgentWeaveToolCallbacks.from(registry))
-        .toolContext(Map.of(AgentWeaveToolCallbacks.CALLER_KEY, caller))
+        .tools(ProtoweftToolCallbacks.from(registry))
+        .toolContext(Map.of(ProtoweftToolCallbacks.CALLER_KEY, caller))
         .call().content();
 ```
 
-`.defaultTools(AgentWeaveToolCallbacks.from(registry))` on `ChatClient.builder(...)` registers the
-tools for every request instead. `AgentWeaveToolCallbacks.builder(source)` offers more control:
+`.defaultTools(ProtoweftToolCallbacks.from(registry))` on `ChatClient.builder(...)` registers the
+tools for every request instead. `ProtoweftToolCallbacks.builder(source)` offers more control:
 
 | Method | Default | Meaning |
 |---|---|---|
 | `dynamic(boolean)` | `true` | `true`: list the source on every `getToolCallbacks()`, which Spring AI calls once per `ChatClient` request. `false`: list once and keep the snapshot until `refresh()`. |
-| `filter(predicate)` | all tools | Offer only matching tools, tested against the AgentWeave `ToolSpec`. |
-| `toolNames(mapper)` | `ToolNames::sanitize` | How AgentWeave names become model-facing names; the result must be unique and accepted by your provider. |
+| `filter(predicate)` | all tools | Offer only matching tools, tested against the Protoweft `ToolSpec`. |
+| `toolNames(mapper)` | `ToolNames::sanitize` | How Protoweft names become model-facing names; the result must be unique and accepted by your provider. |
 | `callerIdentity(supplier)` | — | A fixed caller for every call, ignoring the tool context. |
-| `callerIdentityFrom(function)` | the `agentweave.caller` lookup | Derive the caller from Spring AI's `ToolContext` (which may be `null`). |
+| `callerIdentityFrom(function)` | the `protoweft.caller` lookup | Derive the caller from Spring AI's `ToolContext` (which may be `null`). |
 
 Caching, if you want it, belongs in the source. `originalName("weather__forecast")` returns the
-AgentWeave name behind a provider name, as of the latest listing.
+Protoweft name behind a provider name, as of the latest listing.
 
 ### Tool names
 
@@ -67,7 +67,7 @@ AgentWeave name behind a provider name, as of the latest listing.
 LangChain4j adapter: `.` becomes `__`, other characters outside `[a-zA-Z0-9_-]` become `_`, and
 names over 64 characters are cut to 55 characters plus `_` and 8 hex digits of a SHA-256 hash. So
 `weather.forecast` is offered as `weather__forecast`, and a catalog capability has the same name
-here as in AgentWeave's own provider payloads.
+here as in Protoweft's own provider payloads.
 
 Names are never parsed back: each callback is bound to its original name. Two tools that map to the
 same name fail the listing with `IllegalStateException`.
@@ -84,11 +84,11 @@ The adapter overrides `ToolCallback.call(input, ToolContext)`, because Spring AI
 the tool context. The `CallerIdentity` passed to `ToolSource.invoke` is:
 
 1. the result of `callerIdentity(...)` or `callerIdentityFrom(...)` if you configured one; otherwise
-2. the `CallerIdentity` under `agentweave.caller` (`AgentWeaveToolCallbacks.CALLER_KEY`) in the
+2. the `CallerIdentity` under `protoweft.caller` (`ProtoweftToolCallbacks.CALLER_KEY`) in the
    tool context; otherwise
 3. `CallerIdentity.ANONYMOUS`.
 
-A [`ToolProgress`](../concepts/tools.md#progress-and-log-messages) under `agentweave.progress`
+A [`ToolProgress`](../concepts/tools.md#progress-and-log-messages) under `protoweft.progress`
 (`PROGRESS_KEY`) is forwarded too, for example to an MCP server's progress notifications.
 
 ### Results and errors
@@ -101,19 +101,19 @@ Failures are thrown as Spring AI's `ToolExecutionException(definition, cause)`, 
 Spring AI's tool-calling manager turns into a message for the model; any other exception ends the
 call. Its configured `ToolExecutionExceptionProcessor` then decides:
 
-| AgentWeave result | Cause of the `ToolExecutionException` |
+| Protoweft result | Cause of the `ToolExecutionException` |
 |---|---|
 | `ToolOutcome.error() == true` | `ToolOutcomeException`, carrying the outcome (`outcome()`) |
-| `AgentWeaveException` | the `AgentWeaveException` itself |
-| Arguments that aren't a JSON object | an `AgentWeaveException` with `INVALID_ARGUMENTS` |
+| `ProtoweftException` | the `ProtoweftException` itself |
+| Arguments that aren't a JSON object | an `ProtoweftException` with `INVALID_ARGUMENTS` |
 
 The default `DefaultToolExecutionExceptionProcessor` sends the message to the model so it can
 recover. To end the call instead, configure one with `alwaysThrow(true)` or, for infrastructure
-failures only, `rethrowExceptions(List.of(AgentWeaveException.class))`.
+failures only, `rethrowExceptions(List.of(ProtoweftException.class))`.
 
 !!! warning "Not a bean by default"
     Spring AI's MCP server auto-configuration re-serves every `ToolCallbackProvider` bean. An
-    `AgentWeaveToolCallbacks` bean over a registry of remote connectors would republish those tools,
+    `ProtoweftToolCallbacks` bean over a registry of remote connectors would republish those tools,
     and spend their credentials, on your MCP endpoint. Create it where you build the `ChatClient`
     instead, as the [example](#example) does, or opt in through the
     [Spring Boot properties](#spring-boot).
@@ -121,7 +121,7 @@ failures only, `rethrowExceptions(List.of(AgentWeaveException.class))`.
 ## Tool search with the catalog
 
 Spring AI's `ToolSearchToolCallingAdvisor` gives the model a `toolSearchTool` and loads tool
-definitions on demand. `CatalogToolIndex` makes an AgentWeave
+definitions on demand. `CatalogToolIndex` makes an Protoweft
 [`CapabilityCatalog`](../discovery/index.md) its index, so the catalog's ranking, permission
 filter, availability filter and fallback decide what the model can load.
 
@@ -157,7 +157,7 @@ String answer = chat.prompt().user(question)
   definition of every name it gets back, and there's no text-only channel.
 - **Permissions.** Capabilities the caller may not see are never named. `index.toolCallbacks()`
   covers every capability, but calls go through `CapabilityCatalog.invoke`, which re-checks
-  permission and availability. The caller for a call is `agentweave.caller` from the tool context
+  permission and availability. The caller for a call is `protoweft.caller` from the tool context
   if present, else the same session-id function, so the search and the call see the same caller.
 - **What the model doesn't see.** Spring AI's `SearchMetadata` has fields only for the search type
   (`CatalogToolIndex.SEARCH_TYPE`), the query and the time. Confidence, fallback stage and hidden
@@ -185,7 +185,7 @@ Limitations:
 ```java
 ChatClient chat = ChatClient.builder(chatModel)
         .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-        .defaultTools(AgentWeaveToolCallbacks.from(registry))
+        .defaultTools(ProtoweftToolCallbacks.from(registry))
         .build();
 
 AgentHandler handler = SpringAiAgents.streamingHandler(chat);   // or SpringAiAgents.handler(chat)
@@ -197,8 +197,8 @@ A2aAgentServer server = A2aAgentServer.builder(handler, card).publicUrl("https:/
 
 - **One request per message.** The message text is the user message. The request's `contextId`
   (falling back to its `taskId`, then a random id) is passed as advisor parameter
-  `ChatMemory.CONVERSATION_ID`, and the caller as tool-context entry `agentweave.caller`, so
-  AgentWeave tools are called on the A2A caller's behalf.
+  `ChatMemory.CONVERSATION_ID`, and the caller as tool-context entry `protoweft.caller`, so
+  Protoweft tools are called on the A2A caller's behalf.
 - **Memory** takes effect only if the client has a memory advisor, as above. The A2A history isn't
   replayed, because the memory owns the conversation.
 - **Results.** The answer becomes one text artifact named `response`
@@ -244,13 +244,13 @@ McpToolServer.http(tools);   // or UtcpManualProvider.builder(tools).build()
 `SpringAiTools.from(...)` accepts `ToolCallbackProvider`s or `ToolCallback`s.
 
 - **Calls.** Each callback is called with the arguments as JSON and a `ToolContext` holding the
-  AgentWeave caller (`agentweave.caller`) and progress reporter (`agentweave.progress`). A `@Tool`
+  Protoweft caller (`protoweft.caller`) and progress reporter (`protoweft.progress`). A `@Tool`
   method reads them by declaring a `ToolContext` parameter.
 - **Results.** A JSON string result is unquoted (Spring AI's default converter JSON-encodes
   strings). A JSON object or array is the text and also the structured payload. Anything else is
   text.
 - **Errors.** A `ToolExecutionException` becomes a failure outcome with its message, unless its
-  cause is an `AgentWeaveException`, which propagates. Other exceptions become failure outcomes,
+  cause is an `ProtoweftException`, which propagates. Other exceptions become failure outcomes,
   as for every local tool.
 - **Names** must match `[A-Za-z0-9_-]{1,64}` (set `@Tool(name = ...)` otherwise), and duplicates
   are rejected with `IllegalArgumentException`. `returnDirect` is kept as metadata
@@ -258,17 +258,17 @@ McpToolServer.http(tools);   // or UtcpManualProvider.builder(tools).build()
 
 ## Spring Boot
 
-With the [Spring Boot starter](spring-boot.md) and `agentweave-spring-ai` on the classpath, three
+With the [Spring Boot starter](spring-boot.md) and `protoweft-spring-ai` on the classpath, three
 opt-in properties wire the pieces above into Spring AI's auto-configured `ChatClient.Builder`:
 
 ```yaml
-agentweave:
+protoweft:
   spring-ai:
     tool-callbacks:
-      enabled: true          # AgentWeave tools on the auto-configured ChatClient.Builder
+      enabled: true          # Protoweft tools on the auto-configured ChatClient.Builder
       expose: local          # local (@AgentTool methods only) | registry (every registry tool)
     tool-search:
-      enabled: false         # catalog-backed tool search instead; needs agentweave.discovery.enabled
+      enabled: false         # catalog-backed tool search instead; needs protoweft.discovery.enabled
   server:
     a2a:
       enabled: true
@@ -277,23 +277,23 @@ agentweave:
 
 | Property | Default | Effect |
 |---|---|---|
-| `agentweave.spring-ai.tool-callbacks.enabled` | `false` | Registers an `AgentWeaveToolCallbacks` bean (unless you define one) and adds it to the auto-configured `ChatClient.Builder`. |
-| `agentweave.spring-ai.tool-callbacks.expose` | `local` | `local`: only the application's `@AgentTool` methods (the `LocalTools` bean). `registry`: every tool in the `ToolRegistry` bean, including remote MCP, UTCP and A2A tools. |
-| `agentweave.spring-ai.tool-search.enabled` | `false` | Adds `ToolSearchToolCallingAdvisor` backed by a `CatalogToolIndex` bean, plus the catalog's callbacks, to the `ChatClient.Builder`. Requires [`agentweave.discovery.enabled=true`](../discovery/index.md#spring-boot) and the tool-search jars. |
-| `agentweave.server.a2a.from-chat-client` | `false` | When there's no `AgentHandler` bean, serves the application's `ChatClient` (the unique bean, else one built from `ChatClient.Builder`) as the A2A agent. Streams when `agentweave.server.a2a.streaming` is true (the default). Still needs `agentweave.server.a2a.enabled=true`. |
+| `protoweft.spring-ai.tool-callbacks.enabled` | `false` | Registers an `ProtoweftToolCallbacks` bean (unless you define one) and adds it to the auto-configured `ChatClient.Builder`. |
+| `protoweft.spring-ai.tool-callbacks.expose` | `local` | `local`: only the application's `@AgentTool` methods (the `LocalTools` bean). `registry`: every tool in the `ToolRegistry` bean, including remote MCP, UTCP and A2A tools. |
+| `protoweft.spring-ai.tool-search.enabled` | `false` | Adds `ToolSearchToolCallingAdvisor` backed by a `CatalogToolIndex` bean, plus the catalog's callbacks, to the `ChatClient.Builder`. Requires [`protoweft.discovery.enabled=true`](../discovery/index.md#spring-boot) and the tool-search jars. |
+| `protoweft.server.a2a.from-chat-client` | `false` | When there's no `AgentHandler` bean, serves the application's `ChatClient` (the unique bean, else one built from `ChatClient.Builder`) as the A2A agent. Streams when `protoweft.server.a2a.streaming` is true (the default). Still needs `protoweft.server.a2a.enabled=true`. |
 
 - **Why everything is opt-in.** Spring AI's MCP server re-serves every `ToolCallbackProvider` bean.
   Registering one automatically would silently republish your registry's remote tools, and spend
   their credentials, on any Spring AI MCP endpoint in the application.
 - **Tool search replaces plain callbacks.** With both enabled, only the tool-search customizer is
   applied to the `ChatClient.Builder`: registering both would offer the same tool names twice,
-  which Spring AI rejects. The `AgentWeaveToolCallbacks` bean itself is still registered.
+  which Spring AI rejects. The `ProtoweftToolCallbacks` bean itself is still registered.
 - An `AgentHandler` bean of your own always wins over `from-chat-client`.
 
 ## Example
 
 [`examples/spring-ai-example`](../examples.md#spring-ai) is a Spring Boot application whose
-`ChatClient` uses the starter's `ToolRegistry` through `AgentWeaveToolCallbacks`, remembers each A2A
+`ChatClient` uses the starter's `ToolRegistry` through `ProtoweftToolCallbacks`, remembers each A2A
 context, and is served over A2A with `SpringAiAgents.streamingHandler`. Its test drives it with a
 scripted `ChatModel`, so it needs no API key.
 

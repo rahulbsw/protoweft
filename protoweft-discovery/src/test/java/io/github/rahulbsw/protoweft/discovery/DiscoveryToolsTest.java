@@ -1,0 +1,128 @@
+package io.github.rahulbsw.protoweft.discovery;
+
+import io.github.rahulbsw.protoweft.core.ProtoweftException;
+import io.github.rahulbsw.protoweft.core.ErrorCategory;
+import io.github.rahulbsw.protoweft.core.server.CallerIdentity;
+import io.github.rahulbsw.protoweft.core.tool.ToolInvocation;
+import io.github.rahulbsw.protoweft.core.tool.ToolOutcome;
+import io.github.rahulbsw.protoweft.core.tool.ToolRegistry;
+import io.github.rahulbsw.protoweft.core.tool.ToolSpec;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class DiscoveryToolsTest {
+
+    private final CapabilityCatalog catalog = CapabilityCatalog.builder()
+            .registry(new ToolRegistry().register("files", Fixtures.files()).register("weather", Fixtures.weather()))
+            .build();
+
+    @Test
+    void exposesExactlyThreeMetaTools() {
+        assertThat(DiscoveryTools.of(catalog).listTools()).extracting(ToolSpec::name)
+                .containsExactly("search_capabilities", "describe_capabilities", "call_capability");
+    }
+
+    @Test
+    void searchDescribeCallEndToEnd() {
+        DiscoverySession session = new DiscoverySession(catalog);
+        DiscoveryTools tools = DiscoveryTools.forSession(session);
+
+        ToolOutcome search = tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "weather forecast")));
+        assertThat(search.text()).contains("weather.forecast").contains("confidence:");
+        assertThat(Fixtures.map(search.structuredContent().orElseThrow())).containsKey("capabilities");
+        assertThat(search.text()).doesNotContain("\"properties\"").as("cards only, no schema");
+
+        ToolOutcome describe = tools.invoke(ToolInvocation.of("describe_capabilities",
+                Map.of("names", List.of("weather.forecast", "weather.nope"))));
+        assertThat(describe.text()).contains("input_schema").contains("Not found: weather.nope");
+        assertThat(session.loaded()).containsExactly("weather.forecast");
+
+        ToolOutcome call = tools.invoke(ToolInvocation.of("call_capability",
+                Map.of("name", "weather.forecast", "arguments", Map.of("city", "Oslo"))));
+        assertThat(call.text()).isEqualTo("sunny in Oslo");
+    }
+
+    @Test
+    void permissionHidingDoesNotLeakNames() {
+        CapabilityCatalog guarded = CapabilityCatalog.builder()
+                .source("files", Fixtures.files(), SourcePolicy.builder().requiredScopes("files:read").build()).build();
+        DiscoveryTools tools = DiscoveryTools.of(guarded);
+
+        ToolOutcome search = tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "read a file")),
+                CallerIdentity.ANONYMOUS);
+        assertThat(search.text()).doesNotContain("files.");
+        ToolOutcome describe = tools.invoke(ToolInvocation.of("describe_capabilities",
+                Map.of("names", List.of("files.readFile"))), CallerIdentity.ANONYMOUS);
+        assertThat(describe.text()).isEqualTo("Not found: files.readFile");
+        assertThatThrownBy(() -> tools.invoke(ToolInvocation.of("call_capability",
+                Map.of("name", "files.readFile", "arguments", Map.of("path", "x"))), CallerIdentity.ANONYMOUS))
+                .isInstanceOfSatisfying(ProtoweftException.class,
+                        e -> assertThat(e.category()).isEqualTo(ErrorCategory.TOOL_NOT_FOUND));
+
+        CallerIdentity reader = new CallerIdentity("r", Map.of("scopes", List.of("files:read")));
+        assertThat(tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "read a file")), reader)
+                .text()).contains("files.readFile");
+    }
+
+    @Test
+    void searchOffersOnlyQueryAndLimitAndIgnoresOtherFilters() {
+        DiscoveryTools tools = DiscoveryTools.of(catalog);
+        assertThat(tools.listTools().get(0).inputSchema().get("properties"))
+                .isEqualTo(Map.of("query", Map.of("type", "string", "description", "What you need to do, in plain words"),
+                        "limit", Map.of("type", "integer", "description", "How many results to return (at least 10, at most 50)")));
+
+        // Filters a model invents (seen from GPT-5.4 in the evaluation) must not empty the search.
+        ToolOutcome r = tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file",
+                "read_only", true, "sources", List.of("all"), "protocols", List.of("mcp"), "limit", 10)));
+        assertThat(r.text()).contains("files.readFile").contains("files.deleteFile");
+    }
+
+    @Test
+    void defaultLimitAppliesWhenTheModelSetsNone() {
+        assertThat(DiscoveryTools.of(catalog).defaultLimit()).isEqualTo(10);
+        DiscoveryTools tools = DiscoveryTools.of(catalog).withDefaultLimit(1);
+        assertThat(tools.listTools().get(0).inputSchema().toString()).contains("at least 1");
+        assertThat(cards(tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file"))))).hasSize(1);
+        assertThat(cards(tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file", "limit", 10)))))
+                .hasSizeGreaterThan(1);
+        // A model asking for fewer than the minimum still gets the minimum.
+        DiscoveryTools two = DiscoveryTools.of(catalog).withDefaultLimit(2);
+        assertThat(cards(two.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file", "limit", 1)))))
+                .hasSize(2);
+        assertThat(DiscoveryTools.query(Map.of("query", "file", "limit", 1), CallerIdentity.ANONYMOUS).limit()).isEqualTo(1);
+        assertThatThrownBy(() -> DiscoveryTools.of(catalog).withDefaultLimit(0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static List<?> cards(ToolOutcome outcome) {
+        return (List<?>) ((Map<?, ?>) outcome.structured()).get("capabilities");
+    }
+
+    @Test
+    void invalidArgumentsAreRejected() {
+        DiscoveryTools tools = DiscoveryTools.of(catalog);
+        assertThatThrownBy(() -> tools.invoke(ToolInvocation.of("search_capabilities", Map.of())))
+                .isInstanceOfSatisfying(ProtoweftException.class,
+                        e -> assertThat(e.category()).isEqualTo(ErrorCategory.INVALID_ARGUMENTS));
+        assertThatThrownBy(() -> tools.invoke(ToolInvocation.of("call_capability",
+                Map.of("name", "weather.forecast", "arguments", "Oslo"))))
+                .isInstanceOf(ProtoweftException.class);
+    }
+
+    @Test
+    void sessionEvictsLeastRecentlySelected() {
+        DiscoverySession session = new DiscoverySession(catalog, CallerIdentity.ANONYMOUS, 2);
+        session.select(List.of("files.readFile"));
+        session.select(List.of("weather.forecast"));
+        session.select(List.of("files.readFile"));
+        session.select(List.of("files.listDirectory"));
+        assertThat(session.loaded()).containsExactly("files.readFile", "files.listDirectory");
+        assertThat(session.loadedSchemas()).extracting(ToolSpec::name)
+                .containsExactly("files.readFile", "files.listDirectory");
+    }
+}

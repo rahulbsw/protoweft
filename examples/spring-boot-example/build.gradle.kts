@@ -6,11 +6,11 @@ plugins {
 
 dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:${project.property("springBootVersion")}"))
-    implementation(project(":agentweave-spring-boot-starter"))
+    implementation(project(":protoweft-spring-boot-starter"))
     // The protocols this application serves; the starter auto-configures only those present.
-    implementation(project(":agentweave-mcp"))
-    implementation(project(":agentweave-utcp"))
-    implementation(project(":agentweave-a2a"))
+    implementation(project(":protoweft-mcp"))
+    implementation(project(":protoweft-utcp"))
+    implementation(project(":protoweft-a2a"))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 

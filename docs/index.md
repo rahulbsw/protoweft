@@ -1,6 +1,6 @@
-# AgentWeave
+# Protoweft
 
-**The protocol backbone for Java agents.** AgentWeave connects Java applications to the agent and
+**The protocol backbone for Java agents.** Protoweft connects Java applications to the agent and
 tool interoperability protocols —
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io),
 [Agent2Agent (A2A)](https://a2a-protocol.org) and the
@@ -21,7 +21,7 @@ public class Weather {
 LocalTools tools = LocalTools.builder().scan(new Weather()).build();
 
 // Serve the tool over MCP and UTCP from one embedded server...
-AgentWeaveServer server = AgentWeaveServer.builder().port(8080)
+ProtoweftServer server = ProtoweftServer.builder().port(8080)
         .endpoints(McpToolServer.http(tools), UtcpManualProvider.builder(tools).build())
         .start();
 
@@ -32,7 +32,7 @@ ToolOutcome out = mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "Os
 System.out.println(out.text());   // 21.5
 ```
 
-## Why AgentWeave
+## Why Protoweft
 
 <div class="grid cards" markdown>
 
@@ -92,25 +92,25 @@ Each protocol guide lists exactly what is and isn't covered: [MCP](protocols/mcp
 [A2A](protocols/a2a.md), [UTCP](protocols/utcp.md). The full version matrix is in
 [Versions and compliance](concepts/compliance.md).
 
-## What AgentWeave is not
+## What Protoweft is not
 
-- **Not an LLM framework.** AgentWeave has no model clients, prompt templates, chains, memory or
+- **Not an LLM framework.** Protoweft has no model clients, prompt templates, chains, memory or
   RAG. Use [LangChain4j](https://docs.langchain4j.dev) or [Spring AI](https://spring.io/projects/spring-ai)
-  for those; AgentWeave gives them a protocol layer.
+  for those; Protoweft gives them a protocol layer.
 - **Not an agent runtime or orchestrator.** It doesn't plan, schedule or persist work. A2A task
   state is kept in memory.
-- **Not a re-implementation of the protocol SDKs.** Where an official Java SDK exists, AgentWeave
+- **Not a re-implementation of the protocol SDKs.** Where an official Java SDK exists, Protoweft
   wraps it.
 - **Not a lowest-common-denominator façade.** Tools (MCP, UTCP) and agents (A2A) stay separate
   concepts in the core API.
 
 !!! note "Pre-release"
-    AgentWeave is at `0.1.0-SNAPSHOT` and isn't published to Maven Central yet.
+    Protoweft is at `0.1.0-SNAPSHOT` and isn't published to Maven Central yet.
     [Getting started](getting-started.md) shows how to build it from source.
 
 ## Next steps
 
-- [Getting started](getting-started.md): add AgentWeave and make your first calls.
+- [Getting started](getting-started.md): add Protoweft and make your first calls.
 - [Architecture](concepts/architecture.md): the modules and how they fit together.
 - [Examples](examples.md): runnable applications and starter templates.
 - [API reference](api/index.html): the aggregated Javadoc.

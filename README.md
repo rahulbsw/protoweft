@@ -1,6 +1,6 @@
-# AgentWeave
+# Protoweft
 
-**The protocol backbone for Java agents.** AgentWeave puts the agent and tool interoperability
+**The protocol backbone for Java agents.** Protoweft puts the agent and tool interoperability
 protocols — [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org) and
 [UTCP](https://www.utcp.io) — behind one protocol-neutral Java 17 API, in both the client and the
 server role, with optional LangChain4j, Spring AI, ARGI and Spring Boot 4 integrations.
@@ -14,7 +14,7 @@ public class Weather {
 LocalTools tools = LocalTools.builder().scan(new Weather()).build();
 
 // Serve the tool over MCP and UTCP from one embedded server...
-AgentWeaveServer server = AgentWeaveServer.builder().port(8080)
+ProtoweftServer server = ProtoweftServer.builder().port(8080)
         .endpoints(McpToolServer.http(tools), UtcpManualProvider.builder(tools).build())
         .start();
 
@@ -54,7 +54,7 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
 
 Coverage and limitations are documented per protocol in the [user guide](docs/index.md).
 
-AgentWeave is not an LLM framework: it has no model clients, chains, memory or RAG. Use it with
+Protoweft is not an LLM framework: it has no model clients, chains, memory or RAG. Use it with
 [LangChain4j](https://docs.langchain4j.dev), [Spring AI](https://spring.io/projects/spring-ai) or
 [ARGI](https://github.com/agentic-ai-java/argi).
 
@@ -62,29 +62,29 @@ AgentWeave is not an LLM framework: it has no model clients, chains, memory or R
 
 | Artifact | What it is |
 |---|---|
-| `agentweave-core` | Protocol-neutral API. No dependencies. |
-| `agentweave-mcp` | MCP client and tool server (stdio, Streamable HTTP). |
-| `agentweave-a2a` | A2A client and agent server (JSON-RPC). |
-| `agentweave-utcp` | UTCP client and manual provider. |
-| `agentweave-server`, `agentweave-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
-| `agentweave-oauth` | OAuth 2.1 for MCP authorization: client and resource-server pieces (Nimbus). |
-| `agentweave-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
-| `agentweave-discovery-embeddings` | Offline bge-small embedder on ONNX Runtime alone (model in `agentweave-model-bge-small-en-v15`). |
-| `agentweave-discovery-anthropic` / `-openai` | Typed native tool-search adapters on the official SDKs. |
-| `agentweave-langchain4j` | LangChain4j adapter: tools in, agents and `@Tool`s out, and catalog tool search. |
-| `agentweave-spring-ai` | Spring AI adapter: tools as `ToolCallback`s, catalog tool search, `ChatClient` as an A2A agent. |
-| `agentweave-argi` | ARGI adapter: tools in, catalog tool selection, agents with human-in-the-loop over A2A. |
-| `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration with opt-in servers, Spring AI wiring, Micrometer and Actuator. |
-| `agentweave-bom` | Version alignment. |
+| `protoweft-core` | Protocol-neutral API. No dependencies. |
+| `protoweft-mcp` | MCP client and tool server (stdio, Streamable HTTP). |
+| `protoweft-a2a` | A2A client and agent server (JSON-RPC). |
+| `protoweft-utcp` | UTCP client and manual provider. |
+| `protoweft-server`, `protoweft-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
+| `protoweft-oauth` | OAuth 2.1 for MCP authorization: client and resource-server pieces (Nimbus). |
+| `protoweft-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
+| `protoweft-discovery-embeddings` | Offline bge-small embedder on ONNX Runtime alone (model in `protoweft-model-bge-small-en-v15`). |
+| `protoweft-discovery-anthropic` / `-openai` | Typed native tool-search adapters on the official SDKs. |
+| `protoweft-langchain4j` | LangChain4j adapter: tools in, agents and `@Tool`s out, and catalog tool search. |
+| `protoweft-spring-ai` | Spring AI adapter: tools as `ToolCallback`s, catalog tool search, `ChatClient` as an A2A agent. |
+| `protoweft-argi` | ARGI adapter: tools in, catalog tool selection, agents with human-in-the-loop over A2A. |
+| `protoweft-spring-boot-starter` | Spring Boot 4 auto-configuration with opt-in servers, Spring AI wiring, Micrometer and Actuator. |
+| `protoweft-bom` | Version alignment. |
 
 ## Getting started
 
-Requirements: Java 17 or newer. AgentWeave `0.1.0-SNAPSHOT` isn't on Maven Central yet; build it
+Requirements: Java 17 or newer. Protoweft `0.1.0-SNAPSHOT` isn't on Maven Central yet; build it
 and install it into your local Maven repository:
 
 ```bash
 ./gradlew build                 # compile and test everything
-./gradlew publishToMavenLocal   # io.agentweave:*:0.1.0-SNAPSHOT into ~/.m2
+./gradlew publishToMavenLocal   # io.github.rahulbsw:*:0.1.0-SNAPSHOT into ~/.m2
 ```
 
 Then, in your project:
@@ -93,9 +93,9 @@ Then, in your project:
 repositories { mavenLocal(); mavenCentral() }
 
 dependencies {
-    implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
-    implementation("io.agentweave:agentweave-mcp")
-    implementation("io.agentweave:agentweave-server-jetty")
+    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation("io.github.rahulbsw:protoweft-mcp")
+    implementation("io.github.rahulbsw:protoweft-server-jetty")
 }
 ```
 

@@ -1,15 +1,15 @@
 # A2A
 
-`agentweave-a2a` speaks [Agent2Agent](https://a2a-protocol.org) specification **1.0** over the
+`protoweft-a2a` speaks [Agent2Agent](https://a2a-protocol.org) specification **1.0** over the
 **JSON-RPC binding**, in both roles, on the official a2a-java SDK (`org.a2aproject.sdk`
 `1.5.0.Final`):
 
 - **Client:** `A2aAgentConnector` talks to one remote agent through the core `AgentConnector` API,
   and also exposes it as a `ToolConnector` with one `ask` tool.
-- **Server:** `A2aAgentServer` publishes an AgentWeave `AgentHandler` as an A2A agent with the full
+- **Server:** `A2aAgentServer` publishes an Protoweft `AgentHandler` as an A2A agent with the full
   task lifecycle.
 
-SDK types never appear in AgentWeave's public API. The server is wired from the SDK's
+SDK types never appear in Protoweft's public API. The server is wired from the SDK's
 framework-neutral modules; no CDI container, Quarkus or Vert.x is involved.
 
 ## Client
@@ -93,7 +93,7 @@ AgentDescriptor descriptor = new AgentDescriptor("Travel agent", "Books flights"
 try (A2aAgentServer agent = A2aAgentServer.builder(handler, descriptor)
              .publicUrl("https://agents.example.com")      // required: advertised in the card
              .build();
-     AgentWeaveServer server = AgentWeaveServer.builder().port(8080)
+     ProtoweftServer server = ProtoweftServer.builder().port(8080)
              .authenticator(authenticator)
              .endpoints(agent)
              .start()) {
@@ -173,7 +173,7 @@ the specification requires authentication for it.
 
 Both directions:
 
-| A2A part | AgentWeave content |
+| A2A part | Protoweft content |
 |---|---|
 | `TextPart` | `Content.Text` |
 | `FilePart` with bytes | `Content.Data` (base64 as on the wire, file name kept; a missing media type becomes `application/octet-stream`) |

@@ -1,7 +1,7 @@
 # Versions and compliance
 
 Every connector and server states exactly what it implements in a machine-readable
-`ComplianceReport`, and the module tests assert those reports. AgentWeave never claims a feature it
+`ComplianceReport`, and the module tests assert those reports. Protoweft never claims a feature it
 hasn't implemented: a protocol feature that isn't implemented is listed as unsupported, not
 silently ignored.
 
@@ -37,7 +37,7 @@ Where to read reports:
 | `McpClientConnector`, `A2aAgentConnector`, `UtcpClientConnector` | `compliance()`, with the negotiated revision after `start()` |
 | `McpToolServer.Http`, `McpToolServer.Stdio`, `A2aAgentServer` | `compliance()`, no negotiated revision |
 | `UtcpManualProvider` | none; it declares `utcp_version` `1.1.0` in the manual it serves |
-| Spring Boot | Actuator `info` under `agentweave.connectors.<name>`, for client connectors |
+| Spring Boot | Actuator `info` under `protoweft.connectors.<name>`, for client connectors |
 
 ## SDK version is not the wire revision
 
@@ -49,8 +49,8 @@ completely separate axes:
 - **Java SDK version:** SemVer, such as `2.1.0`. SDK `2.1.0` speaks wire revisions `2024-11-05`
   through `2025-11-25`.
 
-AgentWeave keeps them in separate fields and never collapses them into one "version". When this
-project says "MCP v1/v2", it means **SDK major versions** 1.x and 2.x; AgentWeave builds on SDK
+Protoweft keeps them in separate fields and never collapses them into one "version". When this
+project says "MCP v1/v2", it means **SDK major versions** 1.x and 2.x; Protoweft builds on SDK
 2.x.
 
 ## Compatibility matrix
@@ -64,7 +64,7 @@ project says "MCP v1/v2", it means **SDK major versions** 1.x and 2.x; AgentWeav
 | Wire revisions, Streamable HTTP | `2025-03-26`, `2025-06-18`, `2025-11-25` | same |
 | Negotiated revision | the one in the server's `initialize` result (the SDK offers `2025-11-25`) | per session, not reported |
 | Features | tools, structured output, all content types, resources (with templates and subscriptions), prompts, completion, logging, progress, list-change notifications | the same, except list-change notifications (lists are snapshots) |
-| Authorization (`2025-11-25`) | supported when an `HttpAuthorizer` such as `agentweave-oauth`'s `OAuthClient` is configured | reported unsupported; compose `agentweave-oauth`'s resource-server pieces in the host |
+| Authorization (`2025-11-25`) | supported when an `HttpAuthorizer` such as `protoweft-oauth`'s `OAuthClient` is configured | reported unsupported; compose `protoweft-oauth`'s resource-server pieces in the host |
 | Not supported | SSE transport; cancellation; sampling, roots and elicitation; revision `2026-07-28` (SDK `2.2.x` milestones are not used) | same |
 
 Streamable HTTP didn't exist in `2024-11-05`, so it isn't listed for HTTP. The revisions are read
@@ -85,7 +85,7 @@ lists every feature id per role.
 | | Client (`UtcpClientConnector`) | Provider (`UtcpManualProvider`) |
 |---|---|---|
 | SDK | `none`: no official Java SDK exists; implemented from the specification | same |
-| `sdkVersion` | the `agentweave-utcp` module version (`0.1.0-SNAPSHOT`) | no report |
+| `sdkVersion` | the `protoweft-utcp` module version (`0.1.0-SNAPSHOT`) | no report |
 | Wire revisions | `1.0`, `1.1` (the manual format didn't change; 1.1 client rules apply to both) | serves `utcp_version` `1.1.0` |
 | Negotiated revision | the manual's declared `utcp_version`, as declared and not validated, like the Python reference | — |
 | Reference checked against | python-utcp core `1.2.0`, `utcp-http` `1.1.15` | same |
@@ -98,13 +98,13 @@ lists every feature id per role.
 | Spring Boot (starter) | 4.x, built and tested on `4.1.2`; 3.x isn't supported |
 | LangChain4j (adapter) | `1.23.0` |
 | Spring AI (adapter) | `2.0.2` |
-| ARGI (`agentweave-argi`) | `2.1.0-RC1` (Spring AI based; ARGI itself is built on Spring AI `2.0.1`, aligned to `2.0.2`) |
-| ARGI (`agentweave-argi-neutral`, unpublished) | `2.1.0-RC2-SNAPSHOT` at commit `a869538fcee17230bc8f20f6ed76c0d15926220e`, built from source |
+| ARGI (`protoweft-argi`) | `2.1.0-RC1` (Spring AI based; ARGI itself is built on Spring AI `2.0.1`, aligned to `2.0.2`) |
+| ARGI (`protoweft-argi-neutral`, unpublished) | `2.1.0-RC2-SNAPSHOT` at commit `a869538fcee17230bc8f20f6ed76c0d15926220e`, built from source |
 | Nimbus (OAuth module, internal) | `oauth2-oidc-sdk` `11.39`, `nimbus-jose-jwt` `10.10` |
 | Jetty (embedded host) | `12.1.14` (Jakarta EE 11, Servlet 6.1) |
 | Servlet API (any host) | compiled against Jakarta Servlet `6.1.0` |
 | Jackson (UTCP module, internal) | `3.1.4` |
 
 These versions are pinned in the build's `gradle.properties` (the ARGI snapshot commit in
-`scripts/install-argi-snapshot.sh`). The BOM aligns the published AgentWeave modules; the protocol
+`scripts/install-argi-snapshot.sh`). The BOM aligns the published Protoweft modules; the protocol
 SDKs arrive transitively at the versions above.

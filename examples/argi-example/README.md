@@ -1,14 +1,14 @@
 # ARGI example
 
 A Spring Boot 4 application where an [ARGI](https://github.com/agentic-ai-java/argi) 2.1.0-RC1
-`ReactAgent` calls AgentWeave tools, chosen per request by the capability catalog, and is served as
+`ReactAgent` calls Protoweft tools, chosen per request by the capability catalog, and is served as
 an **A2A** agent. Transfers wait for the caller's approval, which A2A carries as `input-required`.
-It uses `agentweave-argi`.
+It uses `protoweft-argi`.
 
-- `BankTools` holds plain `@AgentTool` bean methods. The AgentWeave starter registers them in its
+- `BankTools` holds plain `@AgentTool` bean methods. The Protoweft starter registers them in its
   `ToolRegistry` bean as source `local`, so the model sees `local__balance`, `local__rate` and
   `local__transfer`.
-- `agentweave.discovery.enabled: true` makes the starter build a `CapabilityCatalog` bean over the
+- `protoweft.discovery.enabled: true` makes the starter build a `CapabilityCatalog` bean over the
   registry.
 - `AgentConfiguration` wires the agent with explicit beans:
   - `CatalogToolSelectionInterceptor` registers every catalog capability on the agent and, on each
@@ -17,7 +17,7 @@ It uses `agentweave-argi`.
   - `HumanInTheLoopHook.approvalOn("local__transfer", ...)` pauses the run before a transfer. The
     `MemorySaver` keeps the paused run.
   - The `AgentHandler` bean is `ArgiAgents.handler(agent)`. The starter serves it over A2A
-    (`agentweave.server.a2a.enabled: true`).
+    (`protoweft.server.a2a.enabled: true`).
 - The model is Spring AI's OpenAI chat model, configured from the environment.
 
 | Endpoint | Protocol |
@@ -70,7 +70,7 @@ is decided. The answer is the task's `response` artifact.
 ```
 
 `ArgiExampleTest` runs the application with a scripted `ChatModel` bean marked `@Primary`
-instead of OpenAI, so it needs no network. It talks to the application through AgentWeave's A2A
+instead of OpenAI, so it needs no network. It talks to the application through Protoweft's A2A
 client and checks three things:
 
 - a balance question offers `local__balance` but not `local__transfer`, and the answer uses it;

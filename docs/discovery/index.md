@@ -16,12 +16,12 @@ model selects.
 
 | Module | Use it for |
 |---|---|
-| `agentweave-discovery` | The catalog, hybrid search, filters, fallback, sessions, the generic meta-tools, and raw-JSON provider payloads. Depends only on the core. |
-| `agentweave-discovery-embeddings` | Semantic ranking with an offline in-process model (bge-small-en-v1.5, quantized) on ONNX Runtime alone; the model comes in `agentweave-model-bge-small-en-v15`. For any LangChain4j `EmbeddingModel`, use `LangChain4jEmbedder` from `agentweave-langchain4j`. |
-| `agentweave-discovery-anthropic` | Typed Anthropic Messages API request parts (native tool search) on `com.anthropic:anthropic-java`. |
-| `agentweave-discovery-openai` | Typed OpenAI Responses API request parts (native tool search) on `com.openai:openai-java`. |
+| `protoweft-discovery` | The catalog, hybrid search, filters, fallback, sessions, the generic meta-tools, and raw-JSON provider payloads. Depends only on the core. |
+| `protoweft-discovery-embeddings` | Semantic ranking with an offline in-process model (bge-small-en-v1.5, quantized) on ONNX Runtime alone; the model comes in `protoweft-model-bge-small-en-v15`. For any LangChain4j `EmbeddingModel`, use `LangChain4jEmbedder` from `protoweft-langchain4j`. |
+| `protoweft-discovery-anthropic` | Typed Anthropic Messages API request parts (native tool search) on `com.anthropic:anthropic-java`. |
+| `protoweft-discovery-openai` | Typed OpenAI Responses API request parts (native tool search) on `com.openai:openai-java`. |
 
-AgentWeave never calls a model. The adapters build request parts and process responses; your
+Protoweft never calls a model. The adapters build request parts and process responses; your
 application, or LangChain4j, sends the requests.
 
 ## Build a catalog
@@ -189,21 +189,21 @@ through chat memory. Names-only candidates are listed in the text but not loaded
 
 ### Spring AI
 
-`CatalogToolIndex` (in `agentweave-spring-ai`) makes the catalog the index of Spring AI's own
+`CatalogToolIndex` (in `protoweft-spring-ai`) makes the catalog the index of Spring AI's own
 `ToolSearchToolCallingAdvisor`: the model starts with `toolSearchTool` and loads definitions only
 for what the catalog finds for the caller. Names-only candidates aren't loaded. See
 [Spring AI: tool search](../integrations/spring-ai.md#tool-search-with-the-catalog).
 
 ### ARGI
 
-`CatalogToolSelectionInterceptor` (in `agentweave-argi`) narrows the tools of an ARGI agent on each
+`CatalogToolSelectionInterceptor` (in `protoweft-argi`) narrows the tools of an ARGI agent on each
 model call to the catalog's hits, instead of ARGI's LLM-based tool selector. See
 [ARGI: catalog tool selection](../integrations/argi.md#catalog-tool-selection).
 
 ### Spring Boot
 
 ```yaml
-agentweave:
+protoweft:
   discovery:
     enabled: true
     fallback: progressive          # progressive | all-schemas | none

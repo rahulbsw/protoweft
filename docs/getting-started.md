@@ -1,47 +1,47 @@
 # Getting started
 
-This page adds AgentWeave to a project, calls a tool on an MCP server, and publishes a tool of your
+This page adds Protoweft to a project, calls a tool on an MCP server, and publishes a tool of your
 own over MCP and UTCP.
 
 ## Requirements
 
-- **Java 17 or newer.** AgentWeave is compiled for Java 17.
+- **Java 17 or newer.** Protoweft is compiled for Java 17.
 - **Gradle or Maven.** The examples use Gradle's Kotlin DSL; Maven coordinates are the same.
 - **An SLF4J binding** if you want to see the protocol SDKs' logs, for example
   `org.slf4j:slf4j-simple`, which logs to stderr.
 - **Node.js**, only to run the reference MCP servers used in some examples (`npx …`).
 
-## Build AgentWeave from source
+## Build Protoweft from source
 
 !!! warning "Not yet on Maven Central"
-    AgentWeave `0.1.0-SNAPSHOT` isn't published to Maven Central. Build it from source and install
+    Protoweft `0.1.0-SNAPSHOT` isn't published to Maven Central. Build it from source and install
     it into your local Maven repository (`~/.m2/repository`):
 
 ```bash
 ./gradlew publishToMavenLocal
 ```
 
-Run this from a clone of the AgentWeave repository. It publishes every library module and the BOM
-with group `io.agentweave` and version `0.1.0-SNAPSHOT`. The examples and `agentweave-argi-neutral`
+Run this from a clone of the Protoweft repository. It publishes every library module and the BOM
+with group `io.github.rahulbsw` and version `0.1.0-SNAPSHOT`. The examples and `protoweft-argi-neutral`
 aren't published.
 
 ## Add the dependencies
 
-Import the BOM so every AgentWeave module has the same version, then add only the modules you use.
+Import the BOM so every Protoweft module has the same version, then add only the modules you use.
 
 === "Gradle (Kotlin DSL)"
 
     ```kotlin
     repositories {
-        mavenLocal()      // AgentWeave, until it is published
+        mavenLocal()      // Protoweft, until it is published
         mavenCentral()    // the protocol SDKs and everything else
     }
 
     dependencies {
-        implementation(platform("io.agentweave:agentweave-bom:0.1.0-SNAPSHOT"))
-        implementation("io.agentweave:agentweave-mcp")
-        implementation("io.agentweave:agentweave-utcp")
-        implementation("io.agentweave:agentweave-server-jetty")   // to host servers in plain Java
+        implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+        implementation("io.github.rahulbsw:protoweft-mcp")
+        implementation("io.github.rahulbsw:protoweft-utcp")
+        implementation("io.github.rahulbsw:protoweft-server-jetty")   // to host servers in plain Java
         runtimeOnly("org.slf4j:slf4j-simple:2.0.17")
     }
 
@@ -62,8 +62,8 @@ Import the BOM so every AgentWeave module has the same version, then add only th
     <dependencyManagement>
       <dependencies>
         <dependency>
-          <groupId>io.agentweave</groupId>
-          <artifactId>agentweave-bom</artifactId>
+          <groupId>io.github.rahulbsw</groupId>
+          <artifactId>protoweft-bom</artifactId>
           <version>0.1.0-SNAPSHOT</version>
           <type>pom</type>
           <scope>import</scope>
@@ -73,16 +73,16 @@ Import the BOM so every AgentWeave module has the same version, then add only th
 
     <dependencies>
       <dependency>
-        <groupId>io.agentweave</groupId>
-        <artifactId>agentweave-mcp</artifactId>
+        <groupId>io.github.rahulbsw</groupId>
+        <artifactId>protoweft-mcp</artifactId>
       </dependency>
       <dependency>
-        <groupId>io.agentweave</groupId>
-        <artifactId>agentweave-utcp</artifactId>
+        <groupId>io.github.rahulbsw</groupId>
+        <artifactId>protoweft-utcp</artifactId>
       </dependency>
       <dependency>
-        <groupId>io.agentweave</groupId>
-        <artifactId>agentweave-server-jetty</artifactId>
+        <groupId>io.github.rahulbsw</groupId>
+        <artifactId>protoweft-server-jetty</artifactId>
       </dependency>
     </dependencies>
     ```
@@ -93,24 +93,24 @@ Import the BOM so every AgentWeave module has the same version, then add only th
 
 | Artifact | Use it for |
 |---|---|
-| `agentweave-core` | The protocol-neutral API. Every other module depends on it; you rarely add it yourself. |
-| `agentweave-mcp` | MCP client and tool server (stdio, Streamable HTTP). |
-| `agentweave-a2a` | A2A client and agent server (JSON-RPC binding). |
-| `agentweave-utcp` | UTCP client and manual provider. |
-| `agentweave-server` | The servlet hosting contract the protocol servers use. Comes with each protocol module. |
-| `agentweave-server-jetty` | An embedded Jetty 12 host for servers in plain Java. |
-| `agentweave-oauth` | [OAuth 2.1](integrations/oauth.md) for MCP authorization: a token-obtaining client for the MCP connector, and a bearer-token resource server for any endpoint. |
-| `agentweave-discovery` | [Tool discovery](discovery/index.md): a searchable capability catalog, for when there are too many tools for one prompt. |
-| `agentweave-discovery-embeddings` | Semantic ranking for discovery with an offline model (ONNX Runtime; the model comes in `agentweave-model-bge-small-en-v15`). |
-| `agentweave-discovery-anthropic`, `agentweave-discovery-openai` | Native tool-search request parts for the Anthropic and OpenAI Java SDKs. |
-| `agentweave-langchain4j` | [LangChain4j](integrations/langchain4j.md) adapter: AgentWeave tools in, agents and `@Tool`s out. |
-| `agentweave-spring-ai` | [Spring AI](integrations/spring-ai.md) adapter: tools in, catalog tool search, `ChatClient` agents and `@Tool`s out. |
-| `agentweave-argi` | [ARGI](integrations/argi.md) `2.1.0-RC1` adapter: tools in, catalog tool selection, agents over A2A with approvals. |
-| `agentweave-spring-boot-starter` | Spring Boot 4 auto-configuration. Add the protocol modules you use next to it. |
-| `agentweave-bom` | Version alignment. |
+| `protoweft-core` | The protocol-neutral API. Every other module depends on it; you rarely add it yourself. |
+| `protoweft-mcp` | MCP client and tool server (stdio, Streamable HTTP). |
+| `protoweft-a2a` | A2A client and agent server (JSON-RPC binding). |
+| `protoweft-utcp` | UTCP client and manual provider. |
+| `protoweft-server` | The servlet hosting contract the protocol servers use. Comes with each protocol module. |
+| `protoweft-server-jetty` | An embedded Jetty 12 host for servers in plain Java. |
+| `protoweft-oauth` | [OAuth 2.1](integrations/oauth.md) for MCP authorization: a token-obtaining client for the MCP connector, and a bearer-token resource server for any endpoint. |
+| `protoweft-discovery` | [Tool discovery](discovery/index.md): a searchable capability catalog, for when there are too many tools for one prompt. |
+| `protoweft-discovery-embeddings` | Semantic ranking for discovery with an offline model (ONNX Runtime; the model comes in `protoweft-model-bge-small-en-v15`). |
+| `protoweft-discovery-anthropic`, `protoweft-discovery-openai` | Native tool-search request parts for the Anthropic and OpenAI Java SDKs. |
+| `protoweft-langchain4j` | [LangChain4j](integrations/langchain4j.md) adapter: Protoweft tools in, agents and `@Tool`s out. |
+| `protoweft-spring-ai` | [Spring AI](integrations/spring-ai.md) adapter: tools in, catalog tool search, `ChatClient` agents and `@Tool`s out. |
+| `protoweft-argi` | [ARGI](integrations/argi.md) `2.1.0-RC1` adapter: tools in, catalog tool selection, agents over A2A with approvals. |
+| `protoweft-spring-boot-starter` | Spring Boot 4 auto-configuration. Add the protocol modules you use next to it. |
+| `protoweft-bom` | Version alignment. |
 
-`agentweave-argi-neutral`, the adapter for ARGI's Spring-free API, is in the repository but isn't
-published: it builds only against a pinned ARGI snapshot (see [ARGI](integrations/argi.md#agentweave-argi-neutral-unpublished)).
+`protoweft-argi-neutral`, the adapter for ARGI's Spring-free API, is in the repository but isn't
+published: it builds only against a pinned ARGI snapshot (see [ARGI](integrations/argi.md#protoweft-argi-neutral-unpublished)).
 
 ## Call a tool on an MCP server
 
@@ -119,8 +119,8 @@ stdin/stdout. Only the builder names the protocol; the rest of the code uses the
 `ToolConnector` API.
 
 ```java
-import io.agentweave.core.tool.*;
-import io.agentweave.mcp.McpClientConnector;
+import io.github.rahulbsw.protoweft.core.tool.*;
+import io.github.rahulbsw.protoweft.mcp.McpClientConnector;
 
 import java.time.Duration;
 import java.util.Map;
@@ -146,7 +146,7 @@ public class FirstClient {
 Things to know:
 
 - `start()` is explicit. Calls made before it fail with `ErrorCategory.CONFIGURATION`.
-- A tool that runs and fails returns `out.error() == true`. An `AgentWeaveException` means the
+- A tool that runs and fails returns `out.error() == true`. An `ProtoweftException` means the
   call couldn't be made. See [Errors and observability](concepts/errors-and-observability.md).
 - `close()` (here, the end of the `try` block) shuts the session down and stops the subprocess.
 - For a remote server, use `McpClientConnector.http("https://tools.example.com")`; the endpoint
@@ -158,15 +158,15 @@ instead.
 ## Publish your first tools
 
 Annotate a method with `@AgentTool`, collect it with `LocalTools`, and hand it to the protocol
-servers. `AgentWeaveServer` hosts them in embedded Jetty.
+servers. `ProtoweftServer` hosts them in embedded Jetty.
 
 ```java
-import io.agentweave.core.tool.AgentTool;
-import io.agentweave.core.tool.LocalTools;
-import io.agentweave.core.tool.ToolParam;
-import io.agentweave.mcp.McpToolServer;
-import io.agentweave.server.jetty.AgentWeaveServer;
-import io.agentweave.utcp.UtcpManualProvider;
+import io.github.rahulbsw.protoweft.core.tool.AgentTool;
+import io.github.rahulbsw.protoweft.core.tool.LocalTools;
+import io.github.rahulbsw.protoweft.core.tool.ToolParam;
+import io.github.rahulbsw.protoweft.mcp.McpToolServer;
+import io.github.rahulbsw.protoweft.server.jetty.ProtoweftServer;
+import io.github.rahulbsw.protoweft.utcp.UtcpManualProvider;
 
 public class FirstServer {
 
@@ -180,7 +180,7 @@ public class FirstServer {
     public static void main(String[] args) throws InterruptedException {
         LocalTools tools = LocalTools.builder().scan(new Greeter()).build();
 
-        try (AgentWeaveServer server = AgentWeaveServer.builder()
+        try (ProtoweftServer server = ProtoweftServer.builder()
                 .port(8080)                                       // binds localhost by default
                 .endpoints(McpToolServer.http(tools).serverInfo("greeter", "1.0.0"),
                            UtcpManualProvider.builder(tools).build())
@@ -207,7 +207,7 @@ curl -s -X POST -H 'Content-Type: application/json' -d '{"name":"Ada"}' localhos
 ```
 
 !!! warning "No authentication by default"
-    `AgentWeaveServer` admits every request until you set `.authenticator(...)`. It binds
+    `ProtoweftServer` admits every request until you set `.authenticator(...)`. It binds
     `localhost` by default; set an authenticator before binding another interface. See
     [Security and credentials](concepts/security.md).
 
@@ -218,5 +218,5 @@ curl -s -X POST -H 'Content-Type: application/json' -d '{"name":"Ada"}' localhos
 - [Agents](concepts/agents.md): serve and call A2A agents.
 - [Spring Boot](integrations/spring-boot.md): the same with auto-configuration.
 - [Spring AI](integrations/spring-ai.md), [LangChain4j](integrations/langchain4j.md) and
-  [ARGI](integrations/argi.md): AgentWeave tools in your agent framework, and its agents over A2A.
+  [ARGI](integrations/argi.md): Protoweft tools in your agent framework, and its agents over A2A.
 - [Examples](examples.md): complete runnable programs.

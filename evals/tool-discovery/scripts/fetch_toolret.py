@@ -12,7 +12,7 @@ Two download methods:
            main revision (the manifest records which sha that was)
 `--method auto` (default) uses parquet when pyarrow is importable, else rows.
 
-Output (read by io.agentweave.evals.discovery.data.ToolRetLoader):
+Output (read by io.github.rahulbsw.protoweft.evals.discovery.data.ToolRetLoader):
   <out>/tools/<category>.jsonl    {"id", "category", "documentation": "<tool JSON string>"}
   <out>/queries/<subset>.jsonl    {"id", "subset", "category", "query", "instruction",
                                    "labels": [{"id", "relevance"}]}
@@ -50,7 +50,7 @@ PAGE = 100
 
 
 def http_get(url, retries=6):
-    headers = {"User-Agent": "agentweave-evals/0.1"}
+    headers = {"User-Agent": "protoweft-evals/0.1"}
     token = os.environ.get("HF_TOKEN")
     if token:
         headers["Authorization"] = "Bearer " + token

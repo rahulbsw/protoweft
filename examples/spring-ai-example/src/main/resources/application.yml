@@ -13,14 +13,14 @@ spring:
 server:
   port: 8080
 
-agentweave:
+protoweft:
   server:
     a2a:
       enabled: true                      # card at /.well-known/agent-card.json, JSON-RPC at /a2a
       # public-url: https://assistant.example.com
 
   # More tools for the ChatClient: each client becomes a source in the ToolRegistry, and its tools
-  # reach the model as <name>__<tool>. Or pass --agentweave.mcp.clients.remote.url=<url> at startup.
+  # reach the model as <name>__<tool>. Or pass --protoweft.mcp.clients.remote.url=<url> at startup.
   # mcp:
   #   clients:
   #     remote: { url: "http://localhost:3001" }   # Streamable HTTP; endpoint defaults to /mcp

@@ -1,0 +1,6 @@
+io.github.rahulbsw.protoweft.spring.boot.ProtoweftAutoConfiguration
+io.github.rahulbsw.protoweft.spring.boot.ProtoweftServerAutoConfiguration
+io.github.rahulbsw.protoweft.spring.boot.ProtoweftMicrometerAutoConfiguration
+io.github.rahulbsw.protoweft.spring.boot.ProtoweftActuatorAutoConfiguration
+io.github.rahulbsw.protoweft.spring.boot.ProtoweftDiscoveryAutoConfiguration
+io.github.rahulbsw.protoweft.spring.boot.ProtoweftSpringAiAutoConfiguration

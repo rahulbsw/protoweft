@@ -301,7 +301,7 @@ and hashes, the settings, and the interval method.
 The model-in-the-loop run (needs keys; about $30 at list price):
 
 ```bash
-source ~/.agentweave-eval.env   # ANTHROPIC_/OPENAI_ API keys and, for a proxy, *_BASE_URL
+source ~/.protoweft-eval.env   # ANTHROPIC_/OPENAI_ API keys and, for a proxy, *_BASE_URL
 cd evals/tool-discovery && cp prices.example.json prices.json   # fill in list prices
 ../../gradlew installDist
 JAVA_OPTS=-Xmx8g build/install/tool-discovery-eval/bin/tool-discovery-eval run-llm \
