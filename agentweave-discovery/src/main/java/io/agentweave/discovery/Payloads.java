@@ -37,10 +37,19 @@ final class Payloads {
     }
 
     static Map<String, Object> searchSchema(int defaultLimit) {
+        return searchSchema("Maximum results (default " + defaultLimit + ")");
+    }
+
+    /** The meta-tool's schema: its result count never drops below {@code minimum}. */
+    static Map<String, Object> searchSchemaAtLeast(int minimum, int maximum) {
+        return searchSchema("How many results to return (at least " + minimum + ", at most " + maximum + ")");
+    }
+
+    private static Map<String, Object> searchSchema(String limitDescription) {
         return Map.of("type", "object",
                 "properties", Map.of(
                         "query", Map.of("type", "string", "description", "What you need to do, in plain words"),
-                        "limit", Map.of("type", "integer", "description", "Maximum results (default " + defaultLimit + ")")),
+                        "limit", Map.of("type", "integer", "description", limitDescription)),
                 "required", List.of("query"));
     }
 }

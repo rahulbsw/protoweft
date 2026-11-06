@@ -31,7 +31,7 @@ public final class DiscoveryArmFactory implements ArmFactory {
                     Integer.parseInt(options.getOrDefault("inlineSchemas", "0")),
                     Boolean.parseBoolean(options.getOrDefault("load", "false")),
                     Integer.parseInt(options.getOrDefault("limit",
-                            String.valueOf(io.agentweave.discovery.DiscoveryQuery.DEFAULT_LIMIT))),
+                            String.valueOf(io.agentweave.discovery.DiscoveryTools.DEFAULT_LIMIT))),
                     maxOut, maxTurns, estimator);
             case NATIVE_ANTHROPIC -> new NativeAnthropicArm(DiscoveryArmSupport.retriever(options), maxOut, maxTurns,
                     estimator);

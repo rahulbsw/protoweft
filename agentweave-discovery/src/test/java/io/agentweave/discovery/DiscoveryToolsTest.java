@@ -74,7 +74,7 @@ class DiscoveryToolsTest {
         DiscoveryTools tools = DiscoveryTools.of(catalog);
         assertThat(tools.listTools().get(0).inputSchema().get("properties"))
                 .isEqualTo(Map.of("query", Map.of("type", "string", "description", "What you need to do, in plain words"),
-                        "limit", Map.of("type", "integer", "description", "Maximum results (default 5)")));
+                        "limit", Map.of("type", "integer", "description", "How many results to return (at least 10, at most 50)")));
 
         // Filters a model invents (seen from GPT-5.4 in the evaluation) must not empty the search.
         ToolOutcome r = tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file",
@@ -84,11 +84,17 @@ class DiscoveryToolsTest {
 
     @Test
     void defaultLimitAppliesWhenTheModelSetsNone() {
+        assertThat(DiscoveryTools.of(catalog).defaultLimit()).isEqualTo(10);
         DiscoveryTools tools = DiscoveryTools.of(catalog).withDefaultLimit(1);
-        assertThat(tools.listTools().get(0).inputSchema().toString()).contains("default 1");
+        assertThat(tools.listTools().get(0).inputSchema().toString()).contains("at least 1");
         assertThat(cards(tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file"))))).hasSize(1);
         assertThat(cards(tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file", "limit", 10)))))
                 .hasSizeGreaterThan(1);
+        // A model asking for fewer than the minimum still gets the minimum.
+        DiscoveryTools two = DiscoveryTools.of(catalog).withDefaultLimit(2);
+        assertThat(cards(two.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file", "limit", 1)))))
+                .hasSize(2);
+        assertThat(DiscoveryTools.query(Map.of("query", "file", "limit", 1), CallerIdentity.ANONYMOUS).limit()).isEqualTo(1);
         assertThatThrownBy(() -> DiscoveryTools.of(catalog).withDefaultLimit(0))
                 .isInstanceOf(IllegalArgumentException.class);
     }

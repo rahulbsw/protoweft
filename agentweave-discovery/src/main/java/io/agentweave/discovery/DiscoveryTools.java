@@ -49,24 +49,27 @@ public final class DiscoveryTools implements ToolSource {
     /** The most results one search returns, whatever the model asks for. */
     public static final int MAX_LIMIT = 50;
 
-    /** These meta-tools, returning {@code limit} cards when the model sets no limit. */
+    /** Cards per search unless the application sets otherwise; a model may ask for more, never fewer. */
+    public static final int DEFAULT_LIMIT = 10;
+
+    /** These meta-tools, returning at least {@code limit} cards per search (the model may ask for more). */
     public DiscoveryTools withDefaultLimit(int limit) {
         return new DiscoveryTools(catalog, session, limit);
     }
 
-    /** Cards returned when the model sets no limit. */
+    /** The minimum (and default) cards per search. */
     public int defaultLimit() {
         return defaultLimit;
     }
 
     /** Meta-tools without a session: selections aren't remembered across calls. */
     public static DiscoveryTools of(CapabilityCatalog catalog) {
-        return new DiscoveryTools(catalog, null, DiscoveryQuery.DEFAULT_LIMIT);
+        return new DiscoveryTools(catalog, null, DEFAULT_LIMIT);
     }
 
     /** Meta-tools that record selections in {@code session}. */
     public static DiscoveryTools forSession(DiscoverySession session) {
-        return new DiscoveryTools(session.catalog(), session, DiscoveryQuery.DEFAULT_LIMIT);
+        return new DiscoveryTools(session.catalog(), session, DEFAULT_LIMIT);
     }
 
     @Override
@@ -75,7 +78,7 @@ public final class DiscoveryTools implements ToolSource {
                 new ToolSpec(SEARCH, "Search the available capabilities (tools and agents) by what you need to do. "
                         + "Always search before calling. Returns short cards, not schemas. If confidence is LOW, "
                         + "rephrase or broaden the query.",
-                        Payloads.searchSchema(defaultLimit)),
+                        Payloads.searchSchemaAtLeast(defaultLimit, MAX_LIMIT)),
                 new ToolSpec(DESCRIBE, "Get the full input schemas of capabilities found by " + SEARCH
                         + ". Call this before " + CALL + ".",
                         schema(Map.of("names", Map.of("type", "array", "items", Map.of("type", "string"),
@@ -115,11 +118,19 @@ public final class DiscoveryTools implements ToolSource {
      * application's to set on a {@link DiscoveryQuery}.
      */
     public static DiscoveryQuery query(Map<String, Object> args, CallerIdentity caller) {
-        return query(args, caller, DiscoveryQuery.DEFAULT_LIMIT);
+        return query(args, caller, DiscoveryQuery.DEFAULT_LIMIT, false);
     }
 
-    /** As {@link #query(Map, CallerIdentity)}, with {@code defaultLimit} when the model sets none. */
-    public static DiscoveryQuery query(Map<String, Object> args, CallerIdentity caller, int defaultLimit) {
+    /**
+     * As {@link #query(Map, CallerIdentity)}, returning at least {@code minimumLimit} results: a
+     * model's {@code limit} may raise the count (up to {@link #MAX_LIMIT}) but not lower it.
+     */
+    public static DiscoveryQuery query(Map<String, Object> args, CallerIdentity caller, int minimumLimit) {
+        return query(args, caller, minimumLimit, true);
+    }
+
+    private static DiscoveryQuery query(Map<String, Object> args, CallerIdentity caller, int defaultLimit,
+                                        boolean floor) {
         Object text = args.get("query");
         if (!(text instanceof String s) || s.isBlank()) {
             throw new AgentWeaveException(ErrorCategory.INVALID_ARGUMENTS, CapabilityCatalog.DISCOVERY,
@@ -127,7 +138,8 @@ public final class DiscoveryTools implements ToolSource {
         }
         DiscoveryQuery.Builder q = DiscoveryQuery.builder(s).caller(caller).limit(defaultLimit);
         if (args.get("limit") instanceof Number n) {
-            q.limit(Math.max(1, Math.min(MAX_LIMIT, n.intValue())));
+            int asked = Math.max(1, Math.min(MAX_LIMIT, n.intValue()));
+            q.limit(floor ? Math.max(defaultLimit, asked) : asked);
         }
         return q.build();
     }

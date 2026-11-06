@@ -34,8 +34,8 @@ import java.util.Objects;
  * ({@code progressive}|{@code all_schemas}|{@code none}, default {@code progressive}),
  * {@code inlineSchemas} (append the full schemas of the top n hits to each search result, default
  * 0), {@code load} ({@code true}: described schemas also become directly callable tools, named
- * with {@link ProviderToolNames}; default {@code false}), {@code limit} (cards per search when the
- * model sets none; default the product's).
+ * with {@link ProviderToolNames}; default {@code false}), {@code limit} (the minimum cards per search;
+ * default the product's).
  */
 public final class GenericSearchArm implements Arm {
 
@@ -53,7 +53,7 @@ public final class GenericSearchArm implements Arm {
 
     public GenericSearchArm(CatalogRetriever retriever, int inlineSchemas, boolean load, int maxOutputTokens,
                             int maxTurns, TokenEstimator estimator) {
-        this(retriever, inlineSchemas, load, io.agentweave.discovery.DiscoveryQuery.DEFAULT_LIMIT, maxOutputTokens,
+        this(retriever, inlineSchemas, load, io.agentweave.discovery.DiscoveryTools.DEFAULT_LIMIT, maxOutputTokens,
                 maxTurns, estimator);
     }
 
@@ -75,7 +75,7 @@ public final class GenericSearchArm implements Arm {
     public String name() {
         return "generic-search(" + retriever.name() + ",inline=" + inlineSchemas + ",fallback="
                 + DiscoveryArmSupport.fallbackName(retriever) + (load ? ",load" : "")
-                + (defaultLimit == io.agentweave.discovery.DiscoveryQuery.DEFAULT_LIMIT ? "" : ",limit=" + defaultLimit) + ")";
+                + (defaultLimit == io.agentweave.discovery.DiscoveryTools.DEFAULT_LIMIT ? "" : ",limit=" + defaultLimit) + ")";
     }
 
     @Override
