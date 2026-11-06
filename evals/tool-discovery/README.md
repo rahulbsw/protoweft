@@ -148,6 +148,7 @@ ranks with `catalog.search`, so ranking, the vector floor and `Confidence` are t
 | `catalog-bm25` | Keyword-only catalog (field-weighted BM25, no embedder) |
 | `catalog-dense` | Cosine only, with `bge-small-en-v1.5` (quantized, offline). A small `CapabilityIndex` wrapper (`VectorOnlyIndex`) lets a `HybridIndex` with the embedder index the documents, then re-ranks its hits by cosine and drops hits below the vector floor |
 | `catalog-hybrid` | The default hybrid catalog (BM25 + cosine, convex fusion α = 0.8) with `bge-small-en-v1.5`; variants such as `catalog-hybrid:fusion=rrf:rrf-k=60` select other fusions |
+| `catalog-hybrid:rerank=l6\|l2[:…]` | Experimental: the hybrid catalog's top hits re-scored by an MS MARCO MiniLM cross-encoder (`RerankingIndex`, see [Reranking experiment](#reranking-experiment)) |
 
 - **Catalog construction** (`CatalogBridge`): one fixed `ToolSource` per MCP server (MCPToolBench++
   tools carry their server) or, for tools without a server, per dataset (`toolret-web`,
@@ -159,11 +160,47 @@ ranks with `catalog.search`, so ranking, the vector floor and `Confidence` are t
   `--retriever-opt instruction=true`.
 - **Options** (`--retriever-opt key=value`, or in an arm spec): `fallback=none|progressive|all_schemas`,
   `min-cosine=<x>` (vector floor, default 0.30), `instruction=true`,
-  `embedding-cache=<dir>|none`.
+  `embedding-cache=<dir>|none`. Without `fusion=`, `catalog-hybrid` uses the product default
+  (convex, α = 0.8); before this was fixed the harness silently defaulted to RRF k = 60.
 - **Embedding cache**: document and query vectors are cached on disk under
   `build/embedding-cache/<model>.vec`, keyed by SHA-256 of model + kind + text. Repeated runs over
   the 44k ToolRet tools re-embed nothing; a truncated tail from an interrupted run is cut off.
   Delete the directory to start over.
+
+### Reranking experiment
+
+An offline cross-encoder reranker on top of hybrid search, measured but **not part of the product**
+(`CrossEncoderReranker` in `agentweave-discovery-embeddings`, `RerankingIndex` here).
+
+```bash
+python3 scripts/fetch_reranker.py        # build/models/ms-marco-minilm-{l6,l2}-v2: model.onnx, vocab.txt, manifest.json
+```
+
+The script is standard-library only, pins each file to a Hugging Face revision and SHA-256, checks
+that the vocabulary is bge-small's (30,522 entries, same file), and refuses to overwrite a file
+that differs (`--force` replaces it). Default source: `Xenova/ms-marco-MiniLM-L-{6,2}-v2`
+`onnx/model_quantized.onnx` (portable int8); `--source arm64|avx2` takes
+`cross-encoder/…/onnx/model_qint8_arm64.onnx` / `model_quint8_avx2.onnx` instead.
+
+Variant keys (with `catalog-hybrid`): `rerank=l6|l2`, `reranker-dir=<dir>` (default
+`build/models/ms-marco-minilm-<l6|l2>-v2`), `rerank-depth=<n>` (hybrid hits re-scored, default 50;
+the rest follow in hybrid order), `rerank-text=card|description` (passage: spelled-out name, title,
+summary, tags, parameters; or the full description instead of the summary), `rerank-mix=<w>`
+(final score `w·z(logit) + (1−w)·z(hybrid score)`, z = min-max within the window; default pure
+reranking), `rerank-threads=<n>` (ONNX Runtime intra-op threads per pair, default its own). Ties
+keep hybrid order; hits keep their keyword/vector signals for `Confidence` (no preset is calibrated
+for reranked scores). Every `run-retrieval` row now records `retrieveMs` (the whole search) and,
+for reranking retrievers, `rerankMs`/`rerankPairs`; the report adds a latency table.
+`scripts/paired_bootstrap.py <calls.jsonl> --baseline catalog-hybrid` prints macro averages over
+datasets, latency, and paired stratified-bootstrap deltas (2,000 resamples).
+
+Result (dev split to choose, one pre-registered variant on test; MCPToolBench++ and five ToolRet
+subsets, N = 1,000 and 10,000; Apple M4 Pro, CPU): pure reranking (L6 or L2, depth 20 or 50, card
+or description text) **lost** to convex hybrid on dev (L6 depth 50: −2.7 / −3.8 pts macro R@5;
+ToolBench at 10,000 −13 pts). The chosen blend `rerank=l6:rerank-depth=50:rerank-mix=0.3` gained on
+test: R@5 +1.1 pts [+0.2, +2.1] at 1,000 and +1.0 [−0.2, +2.3] at 10,000; nDCG@10 +1.3 [+0.7, +2.0]
+and +0.9 [+0.5, +1.4]. Reranking 50 hits costs about 60 ms per query (p95 ~100 ms) against 1–13 ms
+for the hybrid search itself.
 
 ### Confidence calibration
 

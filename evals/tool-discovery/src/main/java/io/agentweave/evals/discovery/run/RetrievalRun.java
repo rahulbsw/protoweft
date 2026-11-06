@@ -108,7 +108,12 @@ public final class RetrievalRun {
                             if (!config.scores(t)) {
                                 continue;
                             }
-                            Map<String, Object> row = score(t, r.retrieve(t, catalog, depth), spec, r.name(), catalog);
+                            long start = System.nanoTime();
+                            List<String> ranked = r.retrieve(t, catalog, depth);
+                            double millis = (System.nanoTime() - start) / 1e6;
+                            Map<String, Object> row = score(t, ranked, spec, r.name(), catalog);
+                            row.put("retrieveMs", millis);
+                            row.putAll(r.rowExtras());
                             rows.add(row);
                             out.row(row);
                         }
@@ -121,6 +126,7 @@ public final class RetrievalRun {
             Map<String, Object> cellSummaries = new LinkedHashMap<>();
             StringBuilder md = new StringBuilder(Markdown.header("Tool retrieval evaluation (offline)", info));
             md.append(table(cells, cellSummaries));
+            md.append(latency(cells, cellSummaries));
             if (!notes.isEmpty()) {
                 md.append("## Notes\n\n");
                 notes.forEach(n -> md.append("- ").append(n).append('\n'));
@@ -184,6 +190,45 @@ public final class RetrievalRun {
         }
         return "## Results\n\nR = Recall, C = Completeness (all gold tools in top k), N = catalog size. "
                 + "Precision@k is in summary.json.\n\n" + Markdown.table(headers, rows);
+    }
+
+    /**
+     * Median and p95 per-query latency of each cell ({@code retrieveMs}: the whole search, warm;
+     * {@code rerankMs}: the reranking step, when a retriever reports it). Machine-dependent.
+     */
+    private static String latency(Map<String, List<Map<String, Object>>> cells, Map<String, Object> summaries) {
+        List<List<String>> rows = new ArrayList<>();
+        for (Map.Entry<String, List<Map<String, Object>>> cell : cells.entrySet()) {
+            String[] key = cell.getKey().split("\\|");
+            List<String> line = new ArrayList<>(List.of(key[0], key[1], key[2]));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> s = (Map<String, Object>) summaries.get(cell.getKey());
+            for (String field : List.of("retrieveMs", "rerankMs")) {
+                double[] v = cell.getValue().stream().map(row -> row.get(field)).filter(Number.class::isInstance)
+                        .mapToDouble(x -> ((Number) x).doubleValue()).sorted().toArray();
+                if (v.length == 0) {
+                    line.addAll(List.of("", ""));
+                    continue;
+                }
+                double median = percentile(v, 0.5);
+                double p95 = percentile(v, 0.95);
+                if (s != null) {
+                    s.put(field, Map.of("median", median, "p95", p95, "n", v.length));
+                }
+                line.addAll(List.of(String.format(java.util.Locale.ROOT, "%.1f", median),
+                        String.format(java.util.Locale.ROOT, "%.1f", p95)));
+            }
+            rows.add(line);
+        }
+        return "\n## Latency (ms per query, this machine)\n\n"
+                + Markdown.table(List.of("dataset", "retriever", "N", "search median", "search p95", "rerank median",
+                "rerank p95"), rows);
+    }
+
+    /** Nearest-rank percentile of sorted values. */
+    static double percentile(double[] sorted, double q) {
+        int rank = (int) Math.ceil(q * sorted.length);
+        return sorted[Math.max(0, Math.min(sorted.length - 1, rank - 1))];
     }
 
     private Map<String, Object> configMap() {

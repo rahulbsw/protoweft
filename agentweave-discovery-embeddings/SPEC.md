@@ -156,6 +156,26 @@ module never encapsulates it):
   the only model the evals calibrate. `Confidence.Policy.ALL_MINILM_L6_V2` in
   `agentweave-discovery` is removed separately.
 
+## Reranker experiment
+
+`CrossEncoderReranker` (public, **experimental**, no model shipped) scores (query, passage) pairs
+with a BERT cross-encoder: `fromDirectory(dir[, intraOpThreads])` / `fromClasspath(loader, prefix)`
+over `model.onnx` + `vocab.txt`; `score(query, passage)` and `score(query, passages) -> float[]`
+(raw logit). Pairs are `encodePair` at 512 positions (longest-first), `token_type_ids` 0/1; the
+first output must be `logits [batch, 1]`. As for embeddings, one unpadded pair per run (padded
+batches change the quantized scores: 8.72 vs 8.69 for the model card's Berlin pair), pairs spread
+over the common fork-join pool; lazy, once-only, retried load. `OnnxModel` gained
+`firstOutputName`/`firstOutputShape` and an intra-op thread count.
+
+Measured with `Xenova/ms-marco-MiniLM-L-6-v2` `onnx/model_quantized.onnx` (int8 export of
+Apache-2.0 `cross-encoder/ms-marco-MiniLM-L6-v2`, vocabulary byte-identical to bge's), fetched by
+`evals/tool-discovery/scripts/fetch_reranker.py`: logits equal Python onnxruntime 1.23.2 on the same
+file within 1e-3 and the fp32 export within 0.3 (`CrossEncoderRerankerTest`, skipped without the
+model). In the discovery eval (`catalog-hybrid:rerank=…`, see `evals/tool-discovery/README.md`) pure reranking
+lost to convex hybrid on dev; a 0.3/0.7 min-max blend of reranker and hybrid scores over the top 50
+gained about +1 pt R@5 and +0.9–1.3 pts nDCG@10 on the held-out split, at ~60 ms per query on an
+M4 Pro. Shipping is undecided; nothing in `agentweave-discovery` uses it.
+
 ## Licenses and sizes
 
 Runtime dependencies of this module (third-party and model):

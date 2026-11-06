@@ -40,13 +40,50 @@ final class OnnxModel implements AutoCloseable {
 
     /** Creates a session from the bytes of an {@code .onnx} file. */
     static OnnxModel load(byte[] model) throws OrtException {
+        return load(model, 0);
+    }
+
+    /**
+     * Creates a session from the bytes of an {@code .onnx} file.
+     *
+     * @param intraOpThreads ONNX Runtime's intra-op thread count, or 0 for its default (one per
+     *                       physical core)
+     */
+    static OnnxModel load(byte[] model, int intraOpThreads) throws OrtException {
         OrtEnvironment environment = OrtEnvironment.getEnvironment();
-        OrtSession session = environment.createSession(model, new OrtSession.SessionOptions());
+        OrtSession session;
+        try (OrtSession.SessionOptions options = new OrtSession.SessionOptions()) {
+            if (intraOpThreads > 0) {
+                options.setIntraOpNumThreads(intraOpThreads);
+            }
+            session = environment.createSession(model, options);
+        }
         try {
             return new OnnxModel(environment, session);
         } catch (RuntimeException e) {
             session.close();
             throw e;
+        }
+    }
+
+    /** The name of the first output (for example {@code last_hidden_state} or {@code logits}). */
+    String firstOutputName() {
+        try {
+            return session.getOutputNames().iterator().next();
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("Model has no outputs", e);
+        }
+    }
+
+    /** The declared shape of the first output; symbolic dimensions are -1. */
+    long[] firstOutputShape() {
+        try {
+            if (session.getOutputInfo().get(firstOutputName()).getInfo() instanceof TensorInfo info) {
+                return info.getShape();
+            }
+            throw new IllegalStateException("First model output is not a tensor");
+        } catch (OrtException e) {
+            throw new IllegalStateException("ONNX Runtime failed: " + e.getMessage(), e);
         }
     }
 
