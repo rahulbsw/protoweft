@@ -179,13 +179,16 @@ hooks build on this module and never re-implement search.
 - Re-checking availability calls the source's probe on every search. Keep probes cheap.
 - **What is measured.** Results, bound to commits, are in `docs/discovery/evaluation.md` and
   owned by `evals-tool-discovery`.
-  - Retrieval: hybrid R@5 is 0.863 on MCPToolBench++'s 87 tools, falling to 0.521 with about 44k
-    distractors.
-  - Model in the loop (commit `021a2f3`; Claude Sonnet 5.5 and GPT-5.4 through a LiteLLM proxy;
+  - Retrieval (commit `7d1a614`, convex default): hybrid R@5 is 0.865 on MCPToolBench++'s 87
+    tools, falling to 0.720 (1,000), 0.604 (10,000) and 0.523 (about 44k distractors).
+  - Model in the loop (built at `7d1a614`; Claude Sonnet 5.5 and GPT-5.4 through a LiteLLM proxy;
     50 tasks, 1 trial, N = 50/200/1,000): top-k and generic search cut input tokens per task by
-    up to ~180k (N = 1,000), and no selection difference against all-tools was detected — but
-    intervals are wide (up to −20 points for Sonnet at N = 1,000 can't be excluded), so no claim
-    of unchanged accuracy is made. Losses at large N come mostly from retrieval misses.
+    up to ~182k at N = 1,000 (Sonnet: $0.37 → $0.004–$0.011 per task), and no selection
+    difference against all-tools was detected — Sonnet's generic search matched all-tools at
+    N = 1,000 (80.0% each, interval −6 to +6) — but intervals are wide, so no claim of unchanged
+    accuracy is made. Tuning lifted Sonnet's generic search at N = 1,000 by +8 points [+2, +16].
+    Exact-argument correctness through the meta-tools trails all-tools for Sonnet at N = 1,000
+    (−8 points [−16, −2]).
   - Not measured: the provider-native adapters (the proxy dropped deferred loading).
 
 ## Verification

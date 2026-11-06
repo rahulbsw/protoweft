@@ -320,8 +320,9 @@ Each run writes `build/eval-results/<run-id>/`:
 The published offline results are in [`docs/discovery/evaluation.md`](../../docs/discovery/evaluation.md).
 They were measured at clean commits `fdbf3d9` (N = 1,000, 10,000 and all) and `611d295`
 (MCPToolBench++ against its own 87 tools), together with the calibration run that set the hybrid
-confidence presets. Model-in-the-loop results (`run-llm`) were measured at clean commit `021a2f3`
-through a LiteLLM proxy; the same page has them.
+confidence presets. Model-in-the-loop results (`run-llm`) for the tuned defaults were measured with
+the build of clean commit `7d1a614` through a LiteLLM proxy (the earlier run at `021a2f3` is the
+"before tuning" column); the same page has them and the tuning evidence.
 
 ## Caveats
 
