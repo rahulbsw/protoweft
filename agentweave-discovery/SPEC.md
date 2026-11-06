@@ -142,11 +142,16 @@ hooks build on this module and never re-implement search.
 - Card summaries are English-oriented: the tokenizer, stopwords and plural trimming target
   English.
 - Re-checking availability calls the source's probe on every search. Keep probes cheap.
-- **Retrieval quality is measured; model behavior is not yet.** Offline retrieval results, bound
-  to commits, are in `docs/discovery/evaluation.md` and owned by `evals-tool-discovery`. Example:
-  hybrid R@5 is 0.863 on MCPToolBench++'s 87 tools, falling to 0.521 with about 44k distractors.
-  Selection accuracy, wrong-tool rate, call correctness and tokens against the all-tools baseline
-  need the model-in-the-loop arms, which haven't run. No claim of unchanged accuracy is made.
+- **What is measured.** Results, bound to commits, are in `docs/discovery/evaluation.md` and
+  owned by `evals-tool-discovery`.
+  - Retrieval: hybrid R@5 is 0.863 on MCPToolBench++'s 87 tools, falling to 0.521 with about 44k
+    distractors.
+  - Model in the loop (commit `021a2f3`; Claude Sonnet 5.5 and GPT-5.4 through a LiteLLM proxy;
+    50 tasks, 1 trial, N = 50/200/1,000): top-k and generic search cut input tokens per task by
+    up to ~180k (N = 1,000), and no selection difference against all-tools was detected — but
+    intervals are wide (up to −20 points for Sonnet at N = 1,000 can't be excluded), so no claim
+    of unchanged accuracy is made. Losses at large N come mostly from retrieval misses.
+  - Not measured: the provider-native adapters (the proxy dropped deferred loading).
 
 ## Verification
 

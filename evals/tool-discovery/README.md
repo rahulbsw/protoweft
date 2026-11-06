@@ -9,8 +9,10 @@ reach an AgentWeave library.
 Status: the harness, datasets, metrics, cost guard, both model clients, the two baseline arms
 (all-tools, top-k injected), the discovery-backed retrievers (`catalog-bm25`, `catalog-dense`,
 `catalog-hybrid`, `catalog-hybrid-minilm`), confidence calibration (`calibrate`) and the three
-discovery arms (`generic-search`, `native-anthropic`, `native-openai`) are done. The LLM arms have
-only been run against scripted and canned-HTTP clients; no paid run has been made.
+discovery arms (`generic-search`, `native-anthropic`, `native-openai`) are done. The all-tools,
+top-k and generic-search arms have been run on Claude Sonnet 5.5 and GPT-5.4 (results in
+[`docs/discovery/evaluation.md`](../../docs/discovery/evaluation.md)); the native arms have only
+been run against scripted and canned-HTTP clients.
 
 ## What is measured
 
@@ -282,7 +284,8 @@ Each run writes `build/eval-results/<run-id>/`:
 The published offline results are in [`docs/discovery/evaluation.md`](../../docs/discovery/evaluation.md).
 They were measured at clean commits `fdbf3d9` (N = 1,000, 10,000 and all) and `611d295`
 (MCPToolBench++ against its own 87 tools), together with the calibration run that set the hybrid
-confidence presets. Model-in-the-loop results (`run-llm`) haven't been produced yet.
+confidence presets. Model-in-the-loop results (`run-llm`) were measured at clean commit `021a2f3`
+through a LiteLLM proxy; the same page has them.
 
 ## Caveats
 

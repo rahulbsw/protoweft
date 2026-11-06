@@ -4,14 +4,115 @@ This page reports what has been **measured** about tool discovery, and lists wha
 measured yet. Every number below comes from the harness in `evals/tool-discovery`, run on the
 stated commit and dataset revisions. Reproduce it with the commands at the end.
 
-!!! danger "Not yet measured: effects on the model"
-    These results measure **retrieval**: whether the right tool is among the few that discovery
-    would show a model. They don't measure what a model then does. Tool-selection accuracy,
-    wrong-tool rate, call correctness, discovery calls per task, and context tokens against the
-    all-tools baseline need the model-in-the-loop arms (`run-llm`), which need API keys and
-    haven't been run yet. **Nothing here shows that discovery leaves accuracy unchanged.**
+There are two kinds of results: [model in the loop](#model-in-the-loop) (what Claude Sonnet 5.5
+and GPT-5.4 do with discovery against sending every tool) and [retrieval](#retrieval)
+(whether the right tool is among the few discovery would show a model).
 
-## Setup
+!!! warning "What the model-in-the-loop run does and doesn't show"
+    One trial of 50 MCPToolBench++ tasks per cell, two models, through a LiteLLM proxy. On these
+    tasks no difference in selection accuracy between discovery and all-tools was detected at
+    any catalog size, but the intervals are wide: at N = 1,000 a loss of up to 20 points for
+    discovery can't be excluded for Claude. Token and cost savings are large and certain. The
+    provider-native tool-search arms were **not** measured (see below).
+
+## Model in the loop
+
+### Setup
+
+| | |
+|---|---|
+| Commit | `021a2f34f1ba30f314cec9a6973fffa1c3ba3500` (clean), run 2026-11-06 |
+| Models | Claude Sonnet 5.5 (Messages API) and GPT-5.4 (Responses API), provider-default settings, no temperature sent, max 4,096 output tokens, up to 6 turns |
+| Endpoint | A local LiteLLM proxy (`http://localhost:4000`) in front of a corporate model gateway, for both providers. Recorded in the report header |
+| Tasks | The first 50 MCPToolBench++ tasks in the harness's seeded order (seed 42), 1 trial |
+| Catalogs | N = 50, 200 and 1,000 tools: the tasks' gold tools, then MCPToolBench++'s other tools and ToolRet distractors (`--distractors both`), one catalog per N shared by all tasks |
+| Arms | **all-tools** (every tool's full schema in every request); **top-k** (the 5 tools `CapabilityCatalog.search` ranks highest for the task text, hybrid bge-small, injected in full); **generic search** (only the `search_capabilities` / `describe_capabilities` / `call_capability` meta-tools, progressive fallback) |
+| Metrics | Selection = the first real tool call is a gold tool or a dataset-accepted alternative. Call correct = tool and arguments match the dataset label exactly (a proxy for task completion; tools are never executed). Input tokens and cost are per task, from provider usage, at public list prices (Sonnet 5.5 $2 / $10 and GPT-5.4 $2.50 / $15 per million input / output tokens, GPT cached input $0.25). Brackets are 95% intervals (Wilson for proportions, bootstrap otherwise) |
+| Spend | 1,478 calls, $30.23 at list price |
+
+### Results
+
+| Model | Arm | N | Selection | Call correct | Input tokens / task | Cost / task |
+|---|---|---|---|---|---|---|
+| Sonnet 5.5 | all-tools | 50 | 98.0% [89.5, 99.6] | 56.0% | 15,526 | $0.0321 |
+| | top-k | 50 | 96.0% [86.5, 98.9] | 56.0% | 2,659 | $0.0065 |
+| | generic search | 50 | 96.0% [86.5, 98.9] | 50.0% | 3,759 | $0.0101 |
+| | all-tools | 200 | 94.0% [83.8, 97.9] | 52.0% | 41,907 | $0.0849 |
+| | top-k | 200 | 88.0% [76.2, 94.4] | 52.0% | 1,929 | $0.0050 |
+| | generic search | 200 | 94.0% [83.8, 97.9] | 52.0% | 3,905 | $0.0104 |
+| | all-tools | 1,000 | 80.0% [67.0, 88.8] | 52.0% | 186,332 | $0.3737 |
+| | top-k | 1,000 | 72.0% [58.3, 82.5] | 48.0% | 1,604 | $0.0045 |
+| | generic search | 1,000 | 72.0% [58.3, 82.5] | 46.0% | 3,783 | $0.0102 |
+| GPT-5.4 | all-tools | 50 | 96.0% [86.5, 98.9] | 52.0% | 6,895 | $0.0051 |
+| | top-k | 50 | 98.0% [89.5, 99.6] | 54.0% | 1,283 | $0.0030 |
+| | generic search | 50 | 92.0% [81.2, 96.8] | 46.0% | 1,809 | $0.0059 |
+| | all-tools | 200 | 95.3% [84.5, 98.7] of 43 ¹ | 51.2% | 15,809 | $0.0084 |
+| | top-k | 200 | 86.0% [73.8, 93.0] | 50.0% | 792 | $0.0021 |
+| | generic search | 200 | 90.0% [78.6, 95.7] | 50.0% | 1,690 | $0.0055 |
+| | all-tools | 1,000 | 62.2% [47.6, 74.9] of 45 ¹ | 37.8% | 72,577 | $0.0299 |
+| | top-k | 1,000 | 70.0% [56.2, 80.9] | 46.0% | 604 | $0.0020 |
+| | generic search | 1,000 | 66.0% [52.2, 77.6] | 38.0% | 1,580 | $0.0052 |
+
+¹ Some all-tools requests were rejected outright: "Invalid 'tools': array too long. Expected an
+array with maximum length 128" (7 of 50 at N = 200, 5 of 50 at N = 1,000). The rows show the
+tasks that ran; counting the rejections as failures gives 82% at N = 200 and 56% at N = 1,000.
+The proxy evidently routes to backends with different tool limits.
+
+Paired differences against all-tools on the same tasks (Δ selection, then Δ input tokens per task):
+
+| Model | N | top-k | generic search |
+|---|---|---|---|
+| Sonnet 5.5 | 50 | −2.0 pts [−6, 0]; −12,866 | −2.0 pts [−6, 0]; −11,767 |
+| | 200 | −6.0 pts [−16, 4]; −39,977 | 0.0 pts [−6, 6]; −38,002 |
+| | 1,000 | −8.0 pts [−20, 2]; −184,728 | −8.0 pts [−18, 0]; −182,549 |
+| GPT-5.4 | 50 | +2.0 pts [−4, 10]; −5,612 | −4.0 pts [−12, 4]; −5,086 |
+| | 200 | −11.6 pts [−23.3, 2.3]; −15,017 | −7.0 pts [−14, 0]; −14,119 |
+| | 1,000 | +6.7 pts [−8.9, 20]; −71,973 | +2.2 pts [−11.1, 17.8]; −70,997 |
+
+### What the numbers say
+
+- **Tokens and cost fall sharply, and more as the catalog grows.** At N = 1,000, Sonnet 5.5
+  reads 186k input tokens per task with every tool and 1.6k (top-k) or 3.8k (generic search) with
+  discovery: about 37–83 times cheaper per task. GPT-5.4's all-tools cost is lower than its token
+  count suggests, because the provider caches the repeated tool block automatically (about 93%
+  of input tokens cached at N = 1,000), so its saving is smaller: $0.030 against $0.002–$0.005.
+- **No selection difference was detected, but none is ruled out.** Every paired interval
+  contains 0 or touches it. The point estimates lean slightly against discovery for Sonnet 5.5
+  (−8 points at N = 1,000) and are mixed for GPT-5.4. A 50-task, single-trial run can't
+  distinguish a few points either way.
+- **All arms degrade with catalog size, for different reasons.** With every tool, the model
+  picks the wrong one more often (Sonnet 5.5 wrong-tool rate 2% → 20% from N = 50 to 1,000). With
+  discovery, the loss is mostly retrieval: hybrid search put the gold tool in the top 5 for 47,
+  43 and 35 of 50 tasks at N = 50, 200 and 1,000, and the generic search tool, which lets the
+  model rephrase, got it in front of the model for 40 (Sonnet) and 42 (GPT) of 50 at N = 1,000.
+  Better retrieval would lift the discovery arms directly.
+- **Sending every tool stops working on some deployments.** Twelve GPT-5.4 all-tools requests
+  were rejected for exceeding a 128-tool limit; discovery never sends more than a handful.
+- **Discovery costs a round trip.** Generic search averages about 2 discovery calls per task
+  before the real call. Latency isn't compared, because rate-limit retries through the proxy
+  inflated it unevenly.
+
+### Found and fixed along the way
+
+The first smoke run (commit `48b74f8`, 10 tasks, N = 50) showed GPT-5.4 making no tool call on 7
+of 10 generic-search tasks. It had set the meta-tool's optional filters — `sources: ["all"]`,
+`protocols` that left out in-process tools, `read_only` on tools without annotations — and
+every such search came back empty. The meta-tool now offers models only `query` and `limit`
+(commit `eb377cf`); the same 10 tasks then gave 10 of 10.
+
+### Not measured
+
+- **Provider-native tool search** (Anthropic `defer_loading` + `tool_reference`, OpenAI
+  `tool_search`). Through this proxy, 40 tools marked deferred cost as many input tokens as 40
+  loaded tools for both providers, so deferral was not reaching the model and those arms would
+  have measured all-tools under another name. They need direct provider endpoints.
+- More trials, more tasks, smaller models, multi-tool tasks, and an LLM judge for free-text
+  arguments (paraphrases fail the exact call-correct match, which is why that column sits near
+  50% for every arm).
+
+## Retrieval
+
+### Setup
 
 | | |
 |---|---|
@@ -23,7 +124,7 @@ stated commit and dataset revisions. Reproduce it with the commands at the end.
 | Metrics | Recall@k, nDCG@10, MRR, and Completeness@10 (all gold tools in the top 10), as in ToolRet's `pytrec_eval` usage. Brackets are 95% bootstrap intervals over tasks |
 | Run time | About 17 minutes on an Apple M4 Pro, CPU only, with embeddings cached |
 
-## What the numbers say
+### What the numbers say
 
 - **The right tool is usually in the top 5 for small, realistic catalogs, but not always.** On
   MCPToolBench++'s 87 MCP tools, hybrid search puts the gold tool in the top 5 for 86.3% of tasks
@@ -38,7 +139,7 @@ stated commit and dataset revisions. Reproduce it with the commands at the end.
   several tools. Completeness@10 is at most 13.4% at N = 1,000 and in single digits from
   N = 10,000, which matches ToolRet's finding that tool retrieval is hard.
 
-## Confidence and fallback
+### Confidence and fallback
 
 The fallback broadens a search when confidence is LOW. Calibration measured, on a held-out test
 split (3,743 queries over catalogs of 1,000 and all tools), how often each retriever's
@@ -61,7 +162,7 @@ broadens needlessly:
 - Report: `calibrate-20261105-113046-132-fdbf3d927a-dirty-1`, at commit `fdbf3d9`. The working
   tree was dirty only in Markdown files, and no source changes were present.
 
-## Retrieval results
+### Results by dataset
 
 
 #### mcptoolbench
@@ -197,17 +298,15 @@ Reports go to `evals/tool-discovery/build/eval-results/<run-id>/`, as `report.md
 `summary.json` and `calls.jsonl`. Each report header records the commit, the dataset revisions
 and hashes, the settings, and the interval method.
 
-## Still to measure
+The model-in-the-loop run (needs keys; about $30 at list price):
 
-Running the model-in-the-loop arms (`run-llm`) against an all-tools baseline on Claude and GPT
-will measure:
-
-- selection accuracy and wrong-tool rate
-- call correctness (an exact match on tool and arguments, the harness's proxy for task
-  completion)
-- discovery calls per task
-- provider-reported input tokens
-
-The arms are: all tools, top-k injected, the generic search tool (with and without inlined
-schemas), and the native Anthropic and OpenAI adapters. See `evals/tool-discovery/README.md` for
-commands and the cost guard. Results will be added here with their commits.
+```bash
+source ~/.agentweave-eval.env   # ANTHROPIC_/OPENAI_ API keys and, for a proxy, *_BASE_URL
+cd evals/tool-discovery && cp prices.example.json prices.json   # fill in list prices
+../../gradlew installDist
+JAVA_OPTS=-Xmx8g build/install/tool-discovery-eval/bin/tool-discovery-eval run-llm \
+  --budget-usd 100 --run-cap-usd 80 --max-retries 8 --prices prices.json \
+  --arm all-tools --arm top-k:k=5,retriever=catalog-hybrid --arm generic-search \
+  --models anthropic:<model> --models openai:<model> \
+  --tasks 50 --catalog-sizes 50,200,1000 --distractors both
+```
