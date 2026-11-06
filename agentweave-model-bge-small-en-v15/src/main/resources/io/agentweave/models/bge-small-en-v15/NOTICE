@@ -1,0 +1,24 @@
+agentweave-model-bge-small-en-v15
+
+This artifact contains a third-party model and its vocabulary, unmodified, and no code.
+
+Model: BAAI bge-small-en-v1.5
+  https://huggingface.co/BAAI/bge-small-en-v1.5
+  By the Beijing Academy of Artificial Intelligence (BAAI). The model card declares the MIT
+  License and points to the FlagEmbedding license, reproduced in LICENSE:
+  https://github.com/FlagOpen/FlagEmbedding/blob/master/LICENSE
+
+model.onnx
+  The quantized ONNX export by Xenova (Transformers.js):
+  https://huggingface.co/Xenova/bge-small-en-v1.5/blob/main/onnx/model_quantized.onnx
+  SHA-256 6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4, 34,014,426 bytes.
+  Copied from bge-small-en-v1.5-q.onnx in the Maven Central artifact
+  dev.langchain4j:langchain4j-embeddings-bge-small-en-v15-q:1.23.0-beta33, which redistributes
+  the same file.
+
+vocab.txt
+  The model's WordPiece vocabulary, 30,522 entries, one per line, line number = token id.
+  Written from the tokenizer.json in that artifact (byte-identical to tokenizer.json in both
+  BAAI/bge-small-en-v1.5 and Xenova/bge-small-en-v1.5); the result is byte-identical to
+  https://huggingface.co/BAAI/bge-small-en-v1.5/blob/main/vocab.txt
+  SHA-256 07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3.

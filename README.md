@@ -69,7 +69,7 @@ AgentWeave is not an LLM framework: it has no model clients, chains, memory or R
 | `agentweave-server`, `agentweave-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
 | `agentweave-oauth` | OAuth 2.1 for MCP authorization: client and resource-server pieces (Nimbus). |
 | `agentweave-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
-| `agentweave-discovery-embeddings` | Offline (bge-small, MiniLM) and LangChain4j-backed embedders. |
+| `agentweave-discovery-embeddings` | Offline bge-small embedder on ONNX Runtime alone (model in `agentweave-model-bge-small-en-v15`). |
 | `agentweave-discovery-anthropic` / `-openai` | Typed native tool-search adapters on the official SDKs. |
 | `agentweave-langchain4j` | LangChain4j adapter: tools in, agents and `@Tool`s out, and catalog tool search. |
 | `agentweave-spring-ai` | Spring AI adapter: tools as `ToolCallback`s, catalog tool search, `ChatClient` as an A2A agent. |

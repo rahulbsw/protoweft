@@ -10,7 +10,7 @@ parent: agentweave-architecture
 
 ## Responsibility
 
-Shows that AgentWeave plugs into a non-Spring agent framework, in four directions, against
+Shows that AgentWeave plugs into a non-Spring agent framework, in five directions, against
 **LangChain4j 1.23.0**:
 
 1. **Tools in** — any AgentWeave `ToolSource` (MCP, UTCP, A2A, local tools, a `ToolRegistry`) is
@@ -21,6 +21,9 @@ Shows that AgentWeave plugs into a non-Spring agent framework, in four direction
    servers (MCP server, UTCP manual) can serve them.
 4. **Tool search** — an AgentWeave `CapabilityCatalog` answers LangChain4j's tool search, so a
    model starts with one search tool and receives full schemas only for the capabilities found.
+5. **Embeddings** — any LangChain4j `EmbeddingModel` (a hosted one the application already uses,
+   such as OpenAI, Ollama or Vertex AI, or one of LangChain4j's in-process models) becomes a
+   discovery `Embedder`, so a `CapabilityCatalog` ranks semantically with it.
 
 ## Boundary
 
@@ -43,6 +46,17 @@ Shows that AgentWeave plugs into a non-Spring agent framework, in four direction
     as a method reference.
   - `LangChain4jTools.from(Object...)` → `List<LocalTools.LocalTool>`; `CALLER_PARAMETER`.
   - `JsonSchemas.toJsonObjectSchema(Map)` / `toMap(JsonObjectSchema)`; `ToolNames.sanitize`.
+  - `LangChain4jEmbedder implements Embedder` — `of(EmbeddingModel)`, `builder(EmbeddingModel)`
+    with `name`, `queryPrefix`, `documentPrefix`, `batchSize`, `dimension`; accessors `model()`,
+    `queryPrefix()`, `documentPrefix()`. (Moved from `agentweave-discovery-embeddings`, whose
+    offline embedder no longer uses LangChain4j.)
+
+Semantic discovery with a hosted model:
+
+```java
+Embedder hosted = LangChain4jEmbedder.builder(openAiEmbeddingModel).dimension(1536).batchSize(256).build();
+CapabilityCatalog catalog = CapabilityCatalog.builder().source("svc", tools).embedder(hosted).build();
+```
 
 Tool search over a catalog (`ToolSearchStrategy` is `@Experimental` in LangChain4j):
 
@@ -170,6 +184,21 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
     meta-tools was the alternative if the strategy API couldn't carry this. It isn't needed, and
     `DiscoveryTools` can still be offered through `AgentWeaveToolProvider.from(DiscoveryTools.of(catalog))`.
 
+- **Embeddings go through `embedAll`.** In LangChain4j 1.23.0 every `EmbeddingModel` method is
+  `default`; `embedAll` and `doEmbed` have mutually recursive defaults. The in-process models
+  override only `embedAll`; newer hosted providers override `doEmbed`, which the default
+  `embedAll` reaches. `embedAll` is therefore the one entry point that works for both; single
+  texts are a one-element batch. `embedDocuments` splits into `batchSize` chunks (default: one
+  call), returns `List.of()` for an empty list without calling the model (the in-process models
+  reject empty lists), and fails with `IllegalStateException` if the model returns a different
+  number of vectors.
+- **Embedding prefixes and checks.** `embedQuery` prepends the query prefix,
+  `embedDocument`/`embedDocuments` the document prefix; both default to empty (bge wants a query
+  instruction, e5 `"query: "`/`"passage: "`). Null text → `NullPointerException`, blank text →
+  `IllegalArgumentException`, for every model alike. Vectors are copied before return. When the
+  dimension is known (from the builder, or after `dimension()` has asked the model once and
+  cached it), every vector is checked against it.
+
 ## Coverage and limitations
 
 - Not mapped: binary tool content (images) into LangChain4j's multimodal tool results
@@ -196,6 +225,11 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
     descriptions, raw keywords, and root normalization.
   - `@Tool` objects through `LocalTools.invoke`.
   - Agent handlers, blocking and over a real streaming AI Service, with a fake `AgentTaskContext`.
+  - `LangChain4jEmbedderTest` (fake models): query prefix on queries only, document prefix on
+    documents only, single batch by default, ordered `batchSize` chunks, empty list without a
+    model call, dimension asked once and cached, explicit dimension not asking the model and
+    enforced, blank/null rejected, vectors copied, wrong vector count rejected, a
+    `doEmbed`-only model works, default naming.
   - Tool search over a catalog, with a scripted model making a sequence of calls
     (`CatalogToolSearchStrategyTest`, 8 tests):
     - The first request offers only `search_capabilities`. The found tool's full specification
@@ -232,5 +266,7 @@ LangChain4j **1.23.0** (`dev.langchain4j:langchain4j`, `langchain4j-core`) and `
   `ToolSpecification.METADATA_SEARCH_BEHAVIOR`:
   <https://github.com/langchain4j/langchain4j/tree/1.23.0/langchain4j/src/main/java/dev/langchain4j/service/tool/search>,
   <https://github.com/langchain4j/langchain4j/blob/1.23.0/langchain4j-core/src/main/java/dev/langchain4j/agent/tool/SearchBehavior.java>
+- `EmbeddingModel`, `DimensionAwareEmbeddingModel` (`embedAll`/`doEmbed` defaults):
+  <https://github.com/langchain4j/langchain4j/blob/1.23.0/langchain4j-core/src/main/java/dev/langchain4j/model/embedding/EmbeddingModel.java>
 - MCP schema mapping precedent:
   <https://github.com/langchain4j/langchain4j/blob/1.23.0/langchain4j-mcp/src/main/java/dev/langchain4j/mcp/client/ToolSpecificationHelper.java>

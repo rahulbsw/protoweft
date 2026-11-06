@@ -9,9 +9,6 @@ dependencies {
     // The discovery layer under test: catalog retrievers, the generic search arm, native payloads.
     implementation(project(":agentweave-discovery"))
     implementation(project(":agentweave-discovery-embeddings"))
-    // OfflineEmbedders.allMiniLmL6V2() (the catalog-hybrid-minilm retriever) needs its model
-    // artifact at runtime; agentweave-discovery-embeddings only declares it compileOnly.
-    runtimeOnly("dev.langchain4j:langchain4j-embeddings-all-minilm-l6-v2-q:${project.property("langchain4jVersion")}-beta33")
     implementation("tools.jackson.core:jackson-databind:${project.property("jackson3Version")}")
     implementation("com.anthropic:anthropic-java:3.5.0")
     implementation("com.openai:openai-java:4.100.0")

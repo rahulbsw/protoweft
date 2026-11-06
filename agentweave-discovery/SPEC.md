@@ -89,7 +89,8 @@ hooks build on this module and never re-implement search.
   Thresholds are chosen as follows:
   - **An explicit policy is never overridden.**
   - **Hybrid presets:** when none is set, the catalog uses the preset calibrated for the embedder
-    (`BGE_SMALL_EN_V15`, `ALL_MINILM_L6_V2`, matched by `Embedder.name()`).
+    (`BGE_SMALL_EN_V15`, matched by `Embedder.name()`; the all-MiniLM-L6-v2 preset was removed with
+    that model).
   - **Everything else:** keyword-only search and unknown embedders use `DEFAULT`.
 
   Why presets:

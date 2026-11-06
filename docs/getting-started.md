@@ -101,7 +101,7 @@ Import the BOM so every AgentWeave module has the same version, then add only th
 | `agentweave-server-jetty` | An embedded Jetty 12 host for servers in plain Java. |
 | `agentweave-oauth` | [OAuth 2.1](integrations/oauth.md) for MCP authorization: a token-obtaining client for the MCP connector, and a bearer-token resource server for any endpoint. |
 | `agentweave-discovery` | [Tool discovery](discovery/index.md): a searchable capability catalog, for when there are too many tools for one prompt. |
-| `agentweave-discovery-embeddings` | Semantic ranking for discovery (an offline model, or any LangChain4j `EmbeddingModel`). |
+| `agentweave-discovery-embeddings` | Semantic ranking for discovery with an offline model (ONNX Runtime; the model comes in `agentweave-model-bge-small-en-v15`). |
 | `agentweave-discovery-anthropic`, `agentweave-discovery-openai` | Native tool-search request parts for the Anthropic and OpenAI Java SDKs. |
 | `agentweave-langchain4j` | [LangChain4j](integrations/langchain4j.md) adapter: AgentWeave tools in, agents and `@Tool`s out. |
 | `agentweave-spring-ai` | [Spring AI](integrations/spring-ai.md) adapter: tools in, catalog tool search, `ChatClient` agents and `@Tool`s out. |

@@ -1,4 +1,4 @@
-package io.agentweave.discovery.embeddings;
+package io.agentweave.langchain4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

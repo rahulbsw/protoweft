@@ -8,7 +8,7 @@ reach an AgentWeave library.
 
 Status: the harness, datasets, metrics, cost guard, both model clients, the two baseline arms
 (all-tools, top-k injected), the discovery-backed retrievers (`catalog-bm25`, `catalog-dense`,
-`catalog-hybrid`, `catalog-hybrid-minilm`), confidence calibration (`calibrate`) and the three
+`catalog-hybrid`, with tuning variants), confidence calibration (`calibrate`) and the three
 discovery arms (`generic-search`, `native-anthropic`, `native-openai`) are done. The all-tools,
 top-k and generic-search arms have been run on Claude Sonnet 5.5 and GPT-5.4 (results in
 [`docs/discovery/evaluation.md`](../../docs/discovery/evaluation.md)); the native arms have only
@@ -114,12 +114,12 @@ directory.
 ```bash
 # Offline retrieval (no keys, no cost)
 ./gradlew :evals:tool-discovery:run --args="run-retrieval --datasets mcptoolbench,toolret:toolbench,toolret:toollens \
-  --retrievers catalog-bm25,catalog-dense,catalog-hybrid,catalog-hybrid-minilm,random,oracle \
+  --retrievers catalog-bm25,catalog-dense,catalog-hybrid,random,oracle \
   --k 1,3,5,10 --catalog-sizes 1000,10000,all"
 
 # Confidence calibration (offline; writes calibration.json, applies nothing)
 ./gradlew :evals:tool-discovery:run --args="calibrate --datasets mcptoolbench,toolret:toolbench,toolret:toollens \
-  --retrievers catalog-bm25,catalog-dense,catalog-hybrid,catalog-hybrid-minilm --catalog-sizes 1000,all"
+  --retrievers catalog-bm25,catalog-dense,catalog-hybrid --catalog-sizes 1000,all"
 
 # LLM plan without keys or spend: token estimates and worst-case cost per cell
 ./gradlew :evals:tool-discovery:run --args="run-llm --dry-run --arm all-tools --arm top-k:k=5,retriever=catalog-hybrid \
@@ -148,7 +148,6 @@ ranks with `catalog.search`, so ranking, the vector floor and `Confidence` are t
 | `catalog-bm25` | Keyword-only catalog (field-weighted BM25, no embedder) |
 | `catalog-dense` | Cosine only, with `bge-small-en-v1.5` (quantized, offline). A small `CapabilityIndex` wrapper (`VectorOnlyIndex`) lets a `HybridIndex` with the embedder index the documents, then re-ranks its hits by cosine and drops hits below the vector floor |
 | `catalog-hybrid` | The default hybrid catalog (BM25 + cosine, convex fusion α = 0.8) with `bge-small-en-v1.5`; variants such as `catalog-hybrid:fusion=rrf:rrf-k=60` select other fusions |
-| `catalog-hybrid-minilm` | The same with `all-MiniLM-L6-v2` |
 
 - **Catalog construction** (`CatalogBridge`): one fixed `ToolSource` per MCP server (MCPToolBench++
   tools carry their server) or, for tools without a server, per dataset (`toolret-web`,

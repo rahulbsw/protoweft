@@ -105,7 +105,7 @@ public final class EvalMain {
         });
         CalibrateRun.Config config = new CalibrateRun.Config(
                 cli.list("datasets", "mcptoolbench"),
-                cli.list("retrievers", "catalog-bm25,catalog-dense,catalog-hybrid,catalog-hybrid-minilm"),
+                cli.list("retrievers", "catalog-bm25,catalog-dense,catalog-hybrid"),
                 cli.integers("catalog-sizes", "all"),
                 cli.integer("max-queries", 0),
                 seed,
@@ -199,7 +199,7 @@ public final class EvalMain {
                 --k 1,3,5,10   --catalog-sizes all|N,...   --depth 100   --max-queries 0
                 --distractors own|toolret|both   --retriever-opt key=value   --split all|dev|test   --dev-fraction 0.5
                 retriever variants: catalog-hybrid:fusion=rrf|convex:rrf-k=60:kw=1:vw=1:alpha=0.5:describe=true
-                retrievers: random, oracle, catalog-bm25, catalog-dense, catalog-hybrid, catalog-hybrid-minilm
+                retrievers: random, oracle, catalog-bm25, catalog-dense, catalog-hybrid
                 (catalog-* options: fallback=none|progressive|all_schemas, min-cosine=x, instruction=true,
                  embedding-cache=build/embedding-cache|none)
               calibrate       Confidence levels vs top-1/top-5 hits per catalog retriever; suggests

@@ -34,7 +34,8 @@ compatibility matrix. Each module's own decisions live in its `SPEC.md`, linked 
 | | `agentweave-utcp` | UTCP client and manual provider, implemented from spec 1.1 | `agentweave-utcp` |
 | Security | `agentweave-oauth` | Protocol-neutral OAuth 2.1: an `HttpAuthorizer` client and resource-server pieces (Nimbus) | `agentweave-oauth` |
 | Discovery | `agentweave-discovery` | Capability catalog, hybrid search, fallback, sessions, generic meta-tools, raw provider payloads | `agentweave-discovery` |
-| | `agentweave-discovery-embeddings` | Offline and LangChain4j-backed `Embedder`s | `agentweave-discovery-embeddings` |
+| | `agentweave-discovery-embeddings` | Offline bge-small `Embedder` and a pure-Java WordPiece tokenizer on ONNX Runtime alone | `agentweave-discovery-embeddings` |
+| | `agentweave-model-bge-small-en-v15` | Model files only (quantized ONNX, vocab, MIT license), extracted at build time from a checksum-pinned published jar | `agentweave-discovery-embeddings` |
 | | `agentweave-discovery-anthropic` | Typed Anthropic tool-search adapter | `agentweave-discovery-anthropic` |
 | | `agentweave-discovery-openai` | Typed OpenAI Responses tool-search adapter | `agentweave-discovery-openai` |
 | Integrations | `agentweave-langchain4j` | Tools in, agents out, `@Tool` out, catalog tool search | `agentweave-langchain4j` |
@@ -54,7 +55,8 @@ Dependency rules, enforced by module boundaries:
   container.
 - Each protocol module depends on `core`, on `server` (for its endpoints), and on exactly its own
   protocol SDK (or none, for UTCP).
-- `discovery` depends on `core` only. Its embedding and provider modules add one library each.
+- `discovery` depends on `core` only. Its embedding and provider modules add one library each
+  (ONNX Runtime for embeddings, plus the model artifact, which holds only data files).
 - `oauth` depends on `core`, `server` and Nimbus. Protocol modules depend only on core's
   `HttpAuthorizer` and `InboundAuthenticator`, so MCP users who don't use OAuth never get Nimbus.
 - Integrations depend on what they wire. No protocol, discovery or core module depends on an

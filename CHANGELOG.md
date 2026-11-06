@@ -44,9 +44,11 @@ All notable changes to AgentWeave are documented here. The format follows
     filters (protocol, version, permissions, availability), a progressive low-confidence
     fallback, sessions, generic `search`/`describe`/`call` meta-tools, and raw-JSON Anthropic and
     OpenAI tool-search payloads.
-  - `agentweave-discovery-embeddings`: an offline bge-small and MiniLM embedder, plus an adapter
-    for any LangChain4j `EmbeddingModel`. Hybrid search uses calibrated confidence presets for
-    both.
+  - `agentweave-discovery-embeddings`: an offline bge-small embedder on ONNX Runtime alone, with a
+    pure-Java WordPiece tokenizer; the model ships as `agentweave-model-bge-small-en-v15`. Hybrid
+    search uses a calibrated confidence preset for it, and convex score fusion chosen by
+    measurement. Any LangChain4j `EmbeddingModel` plugs in through `LangChain4jEmbedder` in
+    `agentweave-langchain4j`.
   - `agentweave-discovery-anthropic` and `agentweave-discovery-openai`: typed tool-search adapters
     on the official SDKs.
 - **LangChain4j (`agentweave-langchain4j`).** AgentWeave tools in AI services, AI services as A2A

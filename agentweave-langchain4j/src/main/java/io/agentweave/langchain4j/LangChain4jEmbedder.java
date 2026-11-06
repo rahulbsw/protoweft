@@ -1,4 +1,4 @@
-package io.agentweave.discovery.embeddings;
+package io.agentweave.langchain4j;
 
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
@@ -11,8 +11,8 @@ import java.util.Objects;
 
 /**
  * An {@link Embedder} backed by any LangChain4j {@link EmbeddingModel}: a hosted one the
- * application already has (OpenAI, Ollama, Vertex AI, ...) or an in-process ONNX model (see
- * {@link OfflineEmbedders}).
+ * application already has (OpenAI, Ollama, Vertex AI, ...) or one of LangChain4j's in-process
+ * models. For an offline model without LangChain4j, see {@code agentweave-discovery-embeddings}.
  *
  * <p>Every call goes through {@link EmbeddingModel#embedAll(List)}, the one method that works
  * for both implementation styles in LangChain4j 1.23.0 (models that override {@code embedAll}

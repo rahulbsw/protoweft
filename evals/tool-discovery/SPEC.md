@@ -23,8 +23,8 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 - It depends on `agentweave-core`, `com.anthropic:anthropic-java:3.5.0`,
   `com.openai:openai-java:4.100.0`, `com.knuddels:jtokkit:1.1.0` and Jackson 3. The SDKs never reach
   a published module, so the "ships no LLM clients" non-goal holds.
-- It depends on `agentweave-discovery` and `agentweave-discovery-embeddings` (with the
-  all-MiniLM-L6-v2 model artifact at runtime) to evaluate them. Discovery retrievers and arms are
+- It depends on `agentweave-discovery` and `agentweave-discovery-embeddings` (bge-small through
+  `agentweave-model-bge-small-en-v15`) to evaluate them. Discovery retrievers and arms are
   registered through `RetrieverFactory`/`ArmFactory` (ServiceLoader); the CLI has no
   discovery-specific code except the `calibrate` command. The discovery modules make no model
   calls; only this module's own clients do.
@@ -43,8 +43,10 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 - `retrieval`: `Retriever { name(); index(catalog); retrieve(task, catalog, k) }`, plus
   `RandomRetriever`, `OracleRetriever` and the `RetrieverFactory` SPI.
   - Discovery-backed: `CatalogBridge` (eval catalog → `CapabilityCatalog`), `CatalogRetriever`
-    (`catalog-bm25`, `catalog-dense`, `catalog-hybrid`, `catalog-hybrid-minilm`, registered by
-    `DiscoveryRetrieverFactory`), `VectorOnlyIndex` and `CachingEmbedder`.
+    (`catalog-bm25`, `catalog-dense`, `catalog-hybrid`, registered by `DiscoveryRetrieverFactory`;
+    `<name>:key=value:…` names a tuning variant such as `catalog-hybrid:fusion=rrf:rrf-k=60`),
+    `VectorOnlyIndex` and `CachingEmbedder`. `run-retrieval --split dev|test` scores one half of
+    the tasks by the same stable hash as `calibrate`, over catalogs holding every task's gold tools.
 - `calibration`: `Calibration` (signals, levels, metrics, policy grid search); the
   `run.CalibrateRun` command writes `calibration.json`.
 - `llm`:

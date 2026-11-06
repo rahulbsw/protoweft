@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -13,62 +14,101 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
-/** The offline configurations over a fake model: prefixes and lazy, once-only loading. */
+/** The offline configuration over a fake encoder: prefixes, input checks, lazy once-only loading. */
 class OfflineEmbeddersConfigTest {
+
+    /** Records every text and returns a vector derived from it. */
+    static final class RecordingEncoder implements TextEncoder {
+        final List<String> inputs = new CopyOnWriteArrayList<>();
+        final int dimension;
+
+        RecordingEncoder(int dimension) {
+            this.dimension = dimension;
+        }
+
+        @Override
+        public float[] embed(String text) {
+            inputs.add(text);
+            float[] v = new float[dimension];
+            v[0] = text.length();
+            return v;
+        }
+    }
 
     @Test
     void bgePrefixesQueriesButNotDocuments() {
-        RecordingEmbeddingModel model = new RecordingEmbeddingModel(OfflineEmbedders.DIMENSION);
-        LangChain4jEmbedder bge = OfflineEmbedders.bge(() -> model);
+        RecordingEncoder encoder = new RecordingEncoder(OfflineEmbedders.DIMENSION);
+        OfflineEmbedder bge = OfflineEmbedders.bge(() -> encoder);
 
         bge.embedQuery("list files in a directory");
         bge.embedDocument("fs.list_dir: List the contents of a folder");
         bge.embedDocuments(List.of("weather.current: Get the current weather"));
 
-        assertThat(model.allInputs()).containsExactly(
+        assertThat(encoder.inputs).containsExactly(
                 "Represent this sentence for searching relevant passages: list files in a directory",
                 "fs.list_dir: List the contents of a folder",
                 "weather.current: Get the current weather");
-        assertThat(bge.name()).isEqualTo("bge-small-en-v1.5-q");
+        assertThat(bge.name()).isEqualTo("bge-small-en-v1.5-q").isEqualTo(OfflineEmbedders.BGE_SMALL_EN_V15_NAME);
         assertThat(bge.queryPrefix()).isEqualTo(OfflineEmbedders.BGE_QUERY_PREFIX);
     }
 
     @Test
-    void miniLmHasNoPrefixes() {
-        RecordingEmbeddingModel model = new RecordingEmbeddingModel(OfflineEmbedders.DIMENSION);
-        LangChain4jEmbedder miniLm = OfflineEmbedders.miniLm(() -> model);
+    void embedDocumentsKeepsOrderAndRejectsBadInputBeforeEmbedding() {
+        RecordingEncoder encoder = new RecordingEncoder(4);
+        OfflineEmbedder embedder = new OfflineEmbedder("fake", 4, "", () -> encoder);
+        List<String> texts = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            texts.add("t".repeat(i + 1));
+        }
 
-        miniLm.embedQuery("q");
-        miniLm.embedDocument("d");
+        List<float[]> vectors = embedder.embedDocuments(texts);
 
-        assertThat(model.allInputs()).containsExactly("q", "d");
-        assertThat(miniLm.name()).isEqualTo("all-minilm-l6-v2-q");
+        for (int i = 0; i < texts.size(); i++) {
+            assertThat(vectors.get(i)[0]).isEqualTo(i + 1);
+        }
+        encoder.inputs.clear();
+        assertThatThrownBy(() -> embedder.embedDocuments(List.of("ok", " "))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(encoder.inputs).isEmpty();
+        assertThat(embedder.embedDocuments(List.of())).isEmpty();
+    }
+
+    @Test
+    void rejectsBlankAndNullTextAndWrongDimensions() {
+        OfflineEmbedder bge = OfflineEmbedders.bge(() -> new RecordingEncoder(OfflineEmbedders.DIMENSION));
+
+        assertThatThrownBy(() -> bge.embedQuery("  ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> bge.embedDocument("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> bge.embedDocument(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> OfflineEmbedders.bge(() -> new RecordingEncoder(3)).embedDocument("x"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("vector of 3 floats, expected 384");
     }
 
     @Test
     void modelIsNotLoadedByFactoryOrDimension() {
         AtomicInteger loads = new AtomicInteger();
-        LangChain4jEmbedder bge = OfflineEmbedders.bge(() -> {
+        OfflineEmbedder bge = OfflineEmbedders.bge(() -> {
             loads.incrementAndGet();
-            return new RecordingEmbeddingModel(OfflineEmbedders.DIMENSION);
+            return new RecordingEncoder(OfflineEmbedders.DIMENSION);
         });
 
         assertThat(bge.dimension()).isEqualTo(384);
         assertThat(bge.name()).isNotBlank();
         assertThat(loads).hasValue(0);
+        assertThat(bge.isLoaded()).isFalse();
 
         bge.embedQuery("x");
-        bge.embedDocument("y");
+        bge.embedDocuments(List.of("y", "z"));
         assertThat(loads).hasValue(1);
     }
 
     @Test
     void concurrentFirstUseLoadsExactlyOnce() throws Exception {
         AtomicInteger loads = new AtomicInteger();
-        LangChain4jEmbedder bge = OfflineEmbedders.bge(() -> {
+        OfflineEmbedder bge = OfflineEmbedders.bge(() -> {
             loads.incrementAndGet();
             sleep(50); // widen the race window
-            return new RecordingEmbeddingModel(OfflineEmbedders.DIMENSION);
+            return new RecordingEncoder(OfflineEmbedders.DIMENSION);
         });
         int threads = 16;
         CountDownLatch start = new CountDownLatch(1);
@@ -94,11 +134,11 @@ class OfflineEmbeddersConfigTest {
     @Test
     void failedLoadIsReportedAndRetried() {
         AtomicInteger attempts = new AtomicInteger();
-        LangChain4jEmbedder bge = OfflineEmbedders.bge(() -> {
+        OfflineEmbedder bge = OfflineEmbedders.bge(() -> {
             if (attempts.incrementAndGet() == 1) {
                 throw new IllegalStateException("boom");
             }
-            return new RecordingEmbeddingModel(OfflineEmbedders.DIMENSION);
+            return new RecordingEncoder(OfflineEmbedders.DIMENSION);
         });
 
         assertThatThrownBy(() -> bge.embedDocument("x"))
@@ -110,16 +150,16 @@ class OfflineEmbeddersConfigTest {
     }
 
     @Test
-    void factoriesReturnSharedInstances() {
+    void factoryReturnsASharedInstance() {
         assertThat(OfflineEmbedders.bgeSmallEnV15()).isSameAs(OfflineEmbedders.bgeSmallEnV15());
-        assertThat(OfflineEmbedders.allMiniLmL6V2()).isSameAs(OfflineEmbedders.allMiniLmL6V2());
     }
 
     @Test
-    void missingArtifactFailsWithTheCoordinatesToAdd() {
-        assertThatThrownBy(() -> OfflineEmbedders.requireOnClasspath("com.example.NoSuchModel", "com.example:no-such"))
+    void missingResourceFailsWithTheCoordinatesToAdd() {
+        assertThatThrownBy(() -> OfflineEmbedders.requireResource("com/example/none.onnx", "com.example:no-such"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("com.example:no-such:1.23.0-beta33");
+                .hasMessageContaining("add com.example:no-such:")
+                .hasMessageContaining("as a runtime dependency");
     }
 
     private static void sleep(long millis) {

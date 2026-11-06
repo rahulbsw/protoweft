@@ -33,10 +33,14 @@ final class Payloads {
     }
 
     static Map<String, Object> searchSchema() {
+        return searchSchema(DiscoveryQuery.DEFAULT_LIMIT);
+    }
+
+    static Map<String, Object> searchSchema(int defaultLimit) {
         return Map.of("type", "object",
                 "properties", Map.of(
                         "query", Map.of("type", "string", "description", "What you need to do, in plain words"),
-                        "limit", Map.of("type", "integer", "description", "Maximum results (default 5)")),
+                        "limit", Map.of("type", "integer", "description", "Maximum results (default " + defaultLimit + ")")),
                 "required", List.of("query"));
     }
 }

@@ -35,20 +35,38 @@ public final class DiscoveryTools implements ToolSource {
 
     private final CapabilityCatalog catalog;
     private final DiscoverySession session;
+    private final int defaultLimit;
 
-    private DiscoveryTools(CapabilityCatalog catalog, DiscoverySession session) {
+    private DiscoveryTools(CapabilityCatalog catalog, DiscoverySession session, int defaultLimit) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.session = session;
+        if (defaultLimit < 1 || defaultLimit > MAX_LIMIT) {
+            throw new IllegalArgumentException("defaultLimit must be 1.." + MAX_LIMIT + ": " + defaultLimit);
+        }
+        this.defaultLimit = defaultLimit;
+    }
+
+    /** The most results one search returns, whatever the model asks for. */
+    public static final int MAX_LIMIT = 50;
+
+    /** These meta-tools, returning {@code limit} cards when the model sets no limit. */
+    public DiscoveryTools withDefaultLimit(int limit) {
+        return new DiscoveryTools(catalog, session, limit);
+    }
+
+    /** Cards returned when the model sets no limit. */
+    public int defaultLimit() {
+        return defaultLimit;
     }
 
     /** Meta-tools without a session: selections aren't remembered across calls. */
     public static DiscoveryTools of(CapabilityCatalog catalog) {
-        return new DiscoveryTools(catalog, null);
+        return new DiscoveryTools(catalog, null, DiscoveryQuery.DEFAULT_LIMIT);
     }
 
     /** Meta-tools that record selections in {@code session}. */
     public static DiscoveryTools forSession(DiscoverySession session) {
-        return new DiscoveryTools(session.catalog(), session);
+        return new DiscoveryTools(session.catalog(), session, DiscoveryQuery.DEFAULT_LIMIT);
     }
 
     @Override
@@ -57,7 +75,7 @@ public final class DiscoveryTools implements ToolSource {
                 new ToolSpec(SEARCH, "Search the available capabilities (tools and agents) by what you need to do. "
                         + "Always search before calling. Returns short cards, not schemas. If confidence is LOW, "
                         + "rephrase or broaden the query.",
-                        Payloads.searchSchema()),
+                        Payloads.searchSchema(defaultLimit)),
                 new ToolSpec(DESCRIBE, "Get the full input schemas of capabilities found by " + SEARCH
                         + ". Call this before " + CALL + ".",
                         schema(Map.of("names", Map.of("type", "array", "items", Map.of("type", "string"),
@@ -97,20 +115,25 @@ public final class DiscoveryTools implements ToolSource {
      * application's to set on a {@link DiscoveryQuery}.
      */
     public static DiscoveryQuery query(Map<String, Object> args, CallerIdentity caller) {
+        return query(args, caller, DiscoveryQuery.DEFAULT_LIMIT);
+    }
+
+    /** As {@link #query(Map, CallerIdentity)}, with {@code defaultLimit} when the model sets none. */
+    public static DiscoveryQuery query(Map<String, Object> args, CallerIdentity caller, int defaultLimit) {
         Object text = args.get("query");
         if (!(text instanceof String s) || s.isBlank()) {
             throw new AgentWeaveException(ErrorCategory.INVALID_ARGUMENTS, CapabilityCatalog.DISCOVERY,
                     "'query' must be a non-empty string");
         }
-        DiscoveryQuery.Builder q = DiscoveryQuery.builder(s).caller(caller);
+        DiscoveryQuery.Builder q = DiscoveryQuery.builder(s).caller(caller).limit(defaultLimit);
         if (args.get("limit") instanceof Number n) {
-            q.limit(Math.max(1, Math.min(50, n.intValue())));
+            q.limit(Math.max(1, Math.min(MAX_LIMIT, n.intValue())));
         }
         return q.build();
     }
 
     private ToolOutcome search(Map<String, Object> args, CallerIdentity caller) {
-        DiscoveryResult result = catalog.search(query(args, caller));
+        DiscoveryResult result = catalog.search(query(args, caller, defaultLimit));
         return new ToolOutcome(List.of(new Content.Text(render(result))), false, structured(result));
     }
 

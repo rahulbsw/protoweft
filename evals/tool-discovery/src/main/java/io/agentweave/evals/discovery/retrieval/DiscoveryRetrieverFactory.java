@@ -17,8 +17,7 @@ import java.util.function.Supplier;
  * <ul>
  *   <li>{@code catalog-bm25} — keyword-only catalog;</li>
  *   <li>{@code catalog-dense} — vector-only ranking with bge-small-en-v1.5;</li>
- *   <li>{@code catalog-hybrid} — the default hybrid catalog with bge-small-en-v1.5;</li>
- *   <li>{@code catalog-hybrid-minilm} — hybrid with all-MiniLM-L6-v2.</li>
+ *   <li>{@code catalog-hybrid} — the default hybrid catalog with bge-small-en-v1.5.</li>
  * </ul>
  * Options ({@code --retriever-opt}): {@code fallback=none|progressive|all_schemas} (default
  * {@code none}: pure ranking), {@code min-cosine=<x>} (vector floor, default the product's 0.30),
@@ -35,13 +34,12 @@ public final class DiscoveryRetrieverFactory implements RetrieverFactory {
     public static final String BM25 = "catalog-bm25";
     public static final String DENSE = "catalog-dense";
     public static final String HYBRID = "catalog-hybrid";
-    public static final String HYBRID_MINILM = "catalog-hybrid-minilm";
 
     private static final Map<String, Embedder> EMBEDDERS = new ConcurrentHashMap<>();
 
     @Override
     public Set<String> names() {
-        return Set.of(BM25, DENSE, HYBRID, HYBRID_MINILM);
+        return Set.of(BM25, DENSE, HYBRID);
     }
 
     @Override
@@ -74,8 +72,6 @@ public final class DiscoveryRetrieverFactory implements RetrieverFactory {
                     embedder(OfflineEmbedders::bgeSmallEnV15, cache), fallback, instruction, fusion, describe);
             case HYBRID -> new CatalogRetriever(name, CatalogRetriever.Ranking.HYBRID,
                     embedder(OfflineEmbedders::bgeSmallEnV15, cache), fallback, instruction, fusion, describe);
-            case HYBRID_MINILM -> new CatalogRetriever(name, CatalogRetriever.Ranking.HYBRID,
-                    embedder(OfflineEmbedders::allMiniLmL6V2, cache), fallback, instruction);
             default -> throw new IllegalArgumentException("unknown catalog retriever: " + name);
         };
     }

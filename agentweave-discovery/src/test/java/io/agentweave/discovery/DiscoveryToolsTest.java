@@ -83,6 +83,21 @@ class DiscoveryToolsTest {
     }
 
     @Test
+    void defaultLimitAppliesWhenTheModelSetsNone() {
+        DiscoveryTools tools = DiscoveryTools.of(catalog).withDefaultLimit(1);
+        assertThat(tools.listTools().get(0).inputSchema().toString()).contains("default 1");
+        assertThat(cards(tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file"))))).hasSize(1);
+        assertThat(cards(tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file", "limit", 10)))))
+                .hasSizeGreaterThan(1);
+        assertThatThrownBy(() -> DiscoveryTools.of(catalog).withDefaultLimit(0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static List<?> cards(ToolOutcome outcome) {
+        return (List<?>) ((Map<?, ?>) outcome.structured()).get("capabilities");
+    }
+
+    @Test
     void invalidArgumentsAreRejected() {
         DiscoveryTools tools = DiscoveryTools.of(catalog);
         assertThatThrownBy(() -> tools.invoke(ToolInvocation.of("search_capabilities", Map.of())))

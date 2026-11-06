@@ -46,7 +46,7 @@ class CliTest {
     void calibrateRejectsUnknownOptionsAndDocumentsTheNewCommands() {
         assertThatThrownBy(() -> EvalMain.run(new String[] {"calibrate", "--typo", "1", "--data-dir", "/nonexistent"}))
                 .hasMessageContaining("--typo");
-        assertThat(EvalMain.USAGE).contains("calibrate").contains("catalog-hybrid-minilm").contains("generic-search")
+        assertThat(EvalMain.USAGE).contains("calibrate").contains("catalog-hybrid").contains("generic-search")
                 .contains("native-anthropic").contains("native-openai");
     }
 

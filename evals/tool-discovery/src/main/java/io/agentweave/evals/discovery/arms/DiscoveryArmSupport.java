@@ -54,7 +54,12 @@ final class DiscoveryArmSupport {
 
         /** Runs a {@code search_capabilities}-style search; argument errors propagate. */
         DiscoveryResult search(Map<String, Object> args) {
-            DiscoveryResult r = built.catalog().search(DiscoveryTools.query(args, CallerIdentity.ANONYMOUS));
+            return search(args, io.agentweave.discovery.DiscoveryQuery.DEFAULT_LIMIT);
+        }
+
+        /** As {@link #search(Map)}, with {@code defaultLimit} when the model sets none. */
+        DiscoveryResult search(Map<String, Object> args, int defaultLimit) {
+            DiscoveryResult r = built.catalog().search(DiscoveryTools.query(args, CallerIdentity.ANONYMOUS, defaultLimit));
             record(args.get("query"), r);
             Map<String, Object> filters = new LinkedHashMap<>(args);
             filters.remove("query");

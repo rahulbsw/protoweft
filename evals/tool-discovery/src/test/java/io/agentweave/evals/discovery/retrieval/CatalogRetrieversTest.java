@@ -47,9 +47,8 @@ class CatalogRetrieversTest {
 
     @Test
     void registeredThroughTheFactory(@TempDir Path cache) {
-        assertThat(Retrievers.available()).contains("catalog-bm25", "catalog-dense", "catalog-hybrid",
-                "catalog-hybrid-minilm");
-        assertThat(Retrievers.create("catalog-hybrid-minilm", opts(cache))).isInstanceOfSatisfying(
+        assertThat(Retrievers.available()).contains("catalog-bm25", "catalog-dense", "catalog-hybrid");
+        assertThat(Retrievers.create("catalog-hybrid", opts(cache))).isInstanceOfSatisfying(
                 CatalogRetriever.class, r -> assertThat(r.ranking()).isEqualTo(CatalogRetriever.Ranking.HYBRID));
         assertThat(((CatalogRetriever) Retrievers.create("catalog-dense", opts(cache))).ranking())
                 .isEqualTo(CatalogRetriever.Ranking.DENSE);
@@ -74,7 +73,7 @@ class CatalogRetrieversTest {
     void recallSanityOnTheFixtures(@TempDir Path cache) {
         EvalCatalog c = catalog();
         List<EvalTask> tasks = MCP.tasks();
-        for (String name : List.of("catalog-bm25", "catalog-dense", "catalog-hybrid", "catalog-hybrid-minilm")) {
+        for (String name : List.of("catalog-bm25", "catalog-dense", "catalog-hybrid")) {
             Retriever r = Retrievers.create(name, opts(cache));
             assertThat(meanRecall(r, c, tasks, 3)).as(name + " recall@3").isGreaterThanOrEqualTo(0.75);
             assertThat(r.retrieve(tasks.get(0), c, 4)).hasSizeLessThanOrEqualTo(4).allMatch(c::contains)

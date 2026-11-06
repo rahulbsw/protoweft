@@ -57,7 +57,7 @@ and isn't part of the default build.
 | `agentweave-utcp` | `UtcpClientConnector`, `UtcpManualProvider`. | server, Jackson 3 (internal), `java.net.http` |
 | `agentweave-oauth` | [OAuth 2.1](../integrations/oauth.md): `OAuthClient` (an `HttpAuthorizer`), `BearerTokenAuthenticator`, `ProtectedResourceMetadataEndpoint`. | server, Nimbus (internal) |
 | `agentweave-discovery` | [Tool discovery](../discovery/index.md): `CapabilityCatalog`, search, fallback, meta-tools. | core |
-| `agentweave-discovery-embeddings` | Semantic ranking: offline or LangChain4j `EmbeddingModel` embedders. | discovery, LangChain4j core |
+| `agentweave-discovery-embeddings` | Semantic ranking: the offline bge-small embedder and a pure-Java WordPiece tokenizer. | discovery, ONNX Runtime, `agentweave-model-bge-small-en-v15` |
 | `agentweave-discovery-anthropic`, `agentweave-discovery-openai` | Typed native tool-search adapters. | discovery, the provider's Java SDK |
 | `agentweave-langchain4j` | `AgentWeaveToolProvider`, `LangChain4jAgents`, `LangChain4jTools`, `CatalogToolSearchStrategy`. | core, discovery, LangChain4j |
 | `agentweave-spring-ai` | [Spring AI](../integrations/spring-ai.md): `AgentWeaveToolCallbacks`, `CatalogToolIndex`, `SpringAiAgents`, `SpringAiTools`. | core, `spring-ai-model`; Spring AI chat client, tool search and discovery optional |

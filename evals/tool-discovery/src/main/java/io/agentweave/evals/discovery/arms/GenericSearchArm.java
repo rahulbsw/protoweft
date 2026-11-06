@@ -34,7 +34,8 @@ import java.util.Objects;
  * ({@code progressive}|{@code all_schemas}|{@code none}, default {@code progressive}),
  * {@code inlineSchemas} (append the full schemas of the top n hits to each search result, default
  * 0), {@code load} ({@code true}: described schemas also become directly callable tools, named
- * with {@link ProviderToolNames}; default {@code false}).
+ * with {@link ProviderToolNames}; default {@code false}), {@code limit} (cards per search when the
+ * model sets none; default the product's).
  */
 public final class GenericSearchArm implements Arm {
 
@@ -48,9 +49,17 @@ public final class GenericSearchArm implements Arm {
     private final int maxOutputTokens;
     private final int maxTurns;
     private final TokenEstimator estimator;
+    private final int defaultLimit;
 
     public GenericSearchArm(CatalogRetriever retriever, int inlineSchemas, boolean load, int maxOutputTokens,
                             int maxTurns, TokenEstimator estimator) {
+        this(retriever, inlineSchemas, load, io.agentweave.discovery.DiscoveryQuery.DEFAULT_LIMIT, maxOutputTokens,
+                maxTurns, estimator);
+    }
+
+    public GenericSearchArm(CatalogRetriever retriever, int inlineSchemas, boolean load, int defaultLimit,
+                            int maxOutputTokens, int maxTurns, TokenEstimator estimator) {
+        this.defaultLimit = defaultLimit;
         this.retriever = Objects.requireNonNull(retriever, "retriever");
         if (inlineSchemas < 0) {
             throw new IllegalArgumentException("inlineSchemas must be >= 0");
@@ -65,14 +74,15 @@ public final class GenericSearchArm implements Arm {
     @Override
     public String name() {
         return "generic-search(" + retriever.name() + ",inline=" + inlineSchemas + ",fallback="
-                + DiscoveryArmSupport.fallbackName(retriever) + (load ? ",load" : "") + ")";
+                + DiscoveryArmSupport.fallbackName(retriever) + (load ? ",load" : "")
+                + (defaultLimit == io.agentweave.discovery.DiscoveryQuery.DEFAULT_LIMIT ? "" : ",limit=" + defaultLimit) + ")";
     }
 
     @Override
     public ArmResult run(EvalTask task, EvalCatalog catalog, ModelClient client) {
         CatalogBridge.Built built = retriever.bridge(catalog);
         DiscoverySession session = new DiscoverySession(built.catalog());
-        DiscoveryTools tools = DiscoveryTools.forSession(session);
+        DiscoveryTools tools = DiscoveryTools.forSession(session).withDefaultLimit(defaultLimit);
         ProviderToolNames names = new ProviderToolNames();
         DiscoveryArmSupport.SearchLog log = new DiscoveryArmSupport.SearchLog(built, task);
         List<String> described = new ArrayList<>();
@@ -91,7 +101,7 @@ public final class GenericSearchArm implements Arm {
     private ToolLoop.Decision search(ToolCall call, DiscoveryTools tools, DiscoveryArmSupport.SearchLog log,
                                      List<String> described, ProviderToolNames names) {
         try {
-            DiscoveryResult r = log.search(call.arguments());
+            DiscoveryResult r = log.search(call.arguments(), defaultLimit);
             // The product's own model-facing text for the same search (deterministic, same hits).
             String text = tools.invoke(ToolInvocation.of(DiscoveryTools.SEARCH, call.arguments())).text();
             List<String> top = r.names().stream().limit(inlineSchemas).toList();

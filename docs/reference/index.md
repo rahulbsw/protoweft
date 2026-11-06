@@ -41,7 +41,8 @@ Group `io.agentweave`, version `0.1.0-SNAPSHOT`, not yet on Maven Central
 | `agentweave-utcp` | UTCP client and provider |
 | `agentweave-oauth` | OAuth 2.1 client and resource server (MCP authorization) |
 | `agentweave-discovery` | Tool discovery: capability catalog and search |
-| `agentweave-discovery-embeddings` | Embedders for semantic discovery search |
+| `agentweave-discovery-embeddings` | The offline embedder for semantic discovery search (ONNX Runtime) |
+| `agentweave-model-bge-small-en-v15` | The bge-small-en-v1.5 model files (data only, MIT) |
 | `agentweave-discovery-anthropic` | Anthropic native tool-search adapter |
 | `agentweave-discovery-openai` | OpenAI native tool-search adapter |
 | `agentweave-langchain4j` | LangChain4j adapter |

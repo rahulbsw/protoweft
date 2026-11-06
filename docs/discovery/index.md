@@ -17,7 +17,7 @@ model selects.
 | Module | Use it for |
 |---|---|
 | `agentweave-discovery` | The catalog, hybrid search, filters, fallback, sessions, the generic meta-tools, and raw-JSON provider payloads. Depends only on the core. |
-| `agentweave-discovery-embeddings` | Semantic ranking: an offline in-process model (bge-small-en-v1.5, quantized), or any LangChain4j `EmbeddingModel`. |
+| `agentweave-discovery-embeddings` | Semantic ranking with an offline in-process model (bge-small-en-v1.5, quantized) on ONNX Runtime alone; the model comes in `agentweave-model-bge-small-en-v15`. For any LangChain4j `EmbeddingModel`, use `LangChain4jEmbedder` from `agentweave-langchain4j`. |
 | `agentweave-discovery-anthropic` | Typed Anthropic Messages API request parts (native tool search) on `com.anthropic:anthropic-java`. |
 | `agentweave-discovery-openai` | Typed OpenAI Responses API request parts (native tool search) on `com.openai:openai-java`. |
 

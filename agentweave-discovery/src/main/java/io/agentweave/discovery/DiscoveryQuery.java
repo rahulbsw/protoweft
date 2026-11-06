@@ -72,10 +72,13 @@ public record DiscoveryQuery(String text, int limit, Set<String> protocols, Set<
                 && excludeHints.stream().noneMatch(card.hints()::contains);
     }
 
+    /** Results returned when a query sets no limit. */
+    public static final int DEFAULT_LIMIT = 5;
+
     /** Builds a {@link DiscoveryQuery}. */
     public static final class Builder {
         private final String text;
-        private int limit = 5;
+        private int limit = DEFAULT_LIMIT;
         private Set<String> protocols = Set.of();
         private Set<String> versions = Set.of();
         private Set<String> sources = Set.of();

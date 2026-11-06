@@ -29,7 +29,10 @@ public final class DiscoveryArmFactory implements ArmFactory {
         return switch (kind) {
             case GENERIC -> new GenericSearchArm(DiscoveryArmSupport.retriever(options),
                     Integer.parseInt(options.getOrDefault("inlineSchemas", "0")),
-                    Boolean.parseBoolean(options.getOrDefault("load", "false")), maxOut, maxTurns, estimator);
+                    Boolean.parseBoolean(options.getOrDefault("load", "false")),
+                    Integer.parseInt(options.getOrDefault("limit",
+                            String.valueOf(io.agentweave.discovery.DiscoveryQuery.DEFAULT_LIMIT))),
+                    maxOut, maxTurns, estimator);
             case NATIVE_ANTHROPIC -> new NativeAnthropicArm(DiscoveryArmSupport.retriever(options), maxOut, maxTurns,
                     estimator);
             case NATIVE_OPENAI -> new NativeOpenAiArm(DiscoveryArmSupport.retriever(options),

@@ -165,9 +165,6 @@ public final class CalibrateRun {
 
     /** The thresholds the catalog uses by default for this retriever's embedder (keyword-only: DEFAULT). */
     static io.agentweave.discovery.Confidence.Policy productDefault(String retriever) {
-        if (retriever.contains("minilm")) {
-            return io.agentweave.discovery.Confidence.Policy.ALL_MINILM_L6_V2;
-        }
         if (retriever.contains("hybrid") || retriever.contains("dense")) {
             return io.agentweave.discovery.Confidence.Policy.BGE_SMALL_EN_V15;
         }
