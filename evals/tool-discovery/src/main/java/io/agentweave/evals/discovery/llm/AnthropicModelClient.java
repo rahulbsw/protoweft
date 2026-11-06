@@ -63,7 +63,17 @@ public final class AnthropicModelClient implements ModelClient {
 
     /** A client using {@code ANTHROPIC_API_KEY}; fails fast when the variable is unset. */
     public static AnthropicModelClient fromEnv(Options options) {
-        return new AnthropicModelClient(AnthropicOkHttpClient.builder().apiKey(requireKey()).build(), options);
+        return new AnthropicModelClient(sdkFromEnv(), options);
+    }
+
+    /** An SDK client with {@code ANTHROPIC_API_KEY}, at {@code ANTHROPIC_BASE_URL} when set. */
+    static AnthropicClient sdkFromEnv() {
+        AnthropicOkHttpClient.Builder b = AnthropicOkHttpClient.builder().apiKey(requireKey());
+        String base = ModelClients.baseUrl(ModelClients.ANTHROPIC_BASE_URL);
+        if (base != null) {
+            b.baseUrl(base);
+        }
+        return b.build();
     }
 
     static String requireKey() {

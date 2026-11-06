@@ -68,7 +68,12 @@ public final class OpenAiModelClient implements ModelClient {
         if (key == null || key.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY is not set");
         }
-        return new OpenAiModelClient(OpenAIOkHttpClient.builder().apiKey(key).build(), options);
+        OpenAIOkHttpClient.Builder b = OpenAIOkHttpClient.builder().apiKey(key);
+        String base = ModelClients.baseUrl(ModelClients.OPENAI_BASE_URL);
+        if (base != null) {
+            b.baseUrl(base);
+        }
+        return new OpenAiModelClient(b.build(), options);
     }
 
     @Override

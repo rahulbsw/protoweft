@@ -132,5 +132,11 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 
 - Unit tests run offline without keys. SDK wiring is tested against a localhost server.
 - API keys are read from the environment only and never logged, written or echoed.
+- `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` (the SDKs' own variable names) point the clients at
+  another endpoint, such as a LiteLLM proxy. The report header records each endpoint as scheme,
+  host, port and path (never user info or query), because a proxy can change what reaches the
+  model: through a proxy that rewrites requests, provider-native features such as deferred tool
+  loading may be dropped silently, so native arms are only meaningful where deferral is shown to
+  reduce input tokens.
 - Every report header carries the git commit plus a dirty flag, the dataset revisions and hashes,
   the settings and the CI method.

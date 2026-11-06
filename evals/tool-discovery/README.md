@@ -125,6 +125,8 @@ directory.
 
 # Paid run (keys from the environment only; never printed)
 export ANTHROPIC_API_KEY=… OPENAI_API_KEY=…
+# Optional: route through a proxy such as LiteLLM (recorded in the report header)
+export ANTHROPIC_BASE_URL=http://localhost:4000 OPENAI_BASE_URL=http://localhost:4000/v1
 cp prices.example.json prices.json   # fill in from the providers' pricing pages
 ./gradlew :evals:tool-discovery:run --args="run-llm --budget-usd 100 --run-cap-usd 25 --prices prices.json \
   --arm all-tools --arm top-k:k=5,retriever=catalog-hybrid --arm generic-search --arm native-anthropic \

@@ -9,7 +9,34 @@ public final class ModelClients {
     /** Documented default: one mid-tier model per provider (see README for how they were chosen). */
     public static final String DEFAULT_MODELS = "anthropic:claude-sonnet-5-5,openai:gpt-6.1-sol";
 
+    /** Environment variables (the SDKs' own names) that point a provider client at another endpoint, such as a proxy. */
+    public static final String ANTHROPIC_BASE_URL = "ANTHROPIC_BASE_URL";
+    public static final String OPENAI_BASE_URL = "OPENAI_BASE_URL";
+
     private ModelClients() {
+    }
+
+    /** The base URL set in {@code envVar}, or {@code null} for the provider's default endpoint. */
+    static String baseUrl(String envVar) {
+        String v = System.getenv(envVar);
+        return v == null || v.isBlank() ? null : v.trim();
+    }
+
+    /** The endpoint for the report header: scheme, host, port and path only, never user info or query. */
+    static String describeBaseUrl(String envVar) {
+        return describeUrl(baseUrl(envVar));
+    }
+
+    static String describeUrl(String v) {
+        if (v == null) {
+            return "provider default";
+        }
+        try {
+            java.net.URI u = java.net.URI.create(v);
+            return new java.net.URI(u.getScheme(), null, u.getHost(), u.getPort(), u.getPath(), null, null).toString();
+        } catch (IllegalArgumentException | java.net.URISyntaxException e) {
+            return "custom (unparseable)";
+        }
     }
 
     /**
@@ -29,6 +56,8 @@ public final class ModelClients {
             m.put("anthropicCacheTools", anthropicCacheTools);
             m.put("openaiReasoningEffort", openaiReasoningEffort == null ? "default" : openaiReasoningEffort);
             m.put("countTokens", countTokens);
+            m.put("anthropicBaseUrl", describeBaseUrl(ANTHROPIC_BASE_URL));
+            m.put("openaiBaseUrl", describeBaseUrl(OPENAI_BASE_URL));
             return m;
         }
     }

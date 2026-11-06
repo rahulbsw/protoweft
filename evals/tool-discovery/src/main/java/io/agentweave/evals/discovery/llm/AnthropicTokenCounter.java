@@ -1,7 +1,6 @@
 package io.agentweave.evals.discovery.llm;
 
 import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.errors.AnthropicServiceException;
 import com.anthropic.models.messages.MessageCountTokensParams;
 import io.agentweave.core.tool.ToolSpec;
@@ -27,7 +26,7 @@ public final class AnthropicTokenCounter {
 
     public static AnthropicTokenCounter fromEnv(String model) {
         return new AnthropicTokenCounter(
-                AnthropicOkHttpClient.builder().apiKey(AnthropicModelClient.requireKey()).build(), model);
+                AnthropicModelClient.sdkFromEnv(), model);
     }
 
     /** Input tokens of a full request (system, conversation and tools). */
