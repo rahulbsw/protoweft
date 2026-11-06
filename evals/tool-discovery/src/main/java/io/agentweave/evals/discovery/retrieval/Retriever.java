@@ -4,6 +4,7 @@ import io.agentweave.evals.discovery.data.EvalCatalog;
 import io.agentweave.evals.discovery.data.EvalTask;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Ranks catalog tools for a task. Concrete retrievers (BM25, dense, hybrid over the discovery
@@ -27,4 +28,12 @@ public interface Retriever {
      * catalog for this task, best first; at most {@code k}, ids must be catalog members.
      */
     List<String> retrieve(EvalTask task, EvalCatalog catalog, int k);
+
+    /**
+     * Extra per-query fields for the report row of the last {@link #retrieve} on this thread (for
+     * example reranking latency); empty by default.
+     */
+    default Map<String, Object> rowExtras() {
+        return Map.of();
+    }
 }
