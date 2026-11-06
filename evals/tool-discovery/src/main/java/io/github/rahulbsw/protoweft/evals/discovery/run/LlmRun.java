@@ -109,7 +109,8 @@ public final class LlmRun {
         Map<String, ModelClient> guarded = new LinkedHashMap<>();
         clients.forEach((spec, c) -> guarded.put(spec, config.dryRun() ? c : new GuardedModelClient(c, guard, estimator)));
 
-        String runId = RunIds.next(config.dryRun() ? "llm-dryrun" : "llm", config.repoDir());
+        GitInfo git = GitInfo.detect(config.repoDir()); // at start: the code that runs
+        String runId = RunIds.next(config.dryRun() ? "llm-dryrun" : "llm", git);
         String startedAt = Instant.now().toString();
         LlmReport report = new LlmReport(config, prices);
         String stopReason = null;
@@ -161,7 +162,7 @@ public final class LlmRun {
                     }
                 }
             }
-            RunInfo info = new RunInfo(runId, "llm", startedAt, GitInfo.detect(config.repoDir()), data.infos(),
+            RunInfo info = new RunInfo(runId, "llm", startedAt, git, data.infos(),
                     configMap());
             Map<String, Object> spend = new LinkedHashMap<>();
             if (guard != null) {

@@ -18,7 +18,11 @@ final class RunIds {
     }
 
     static String next(String kind, Path repoDir) {
-        GitInfo git = GitInfo.detect(repoDir);
+        return next(kind, GitInfo.detect(repoDir));
+    }
+
+    /** A run id from the git state captured when the run started (the header must use the same one). */
+    static String next(String kind, GitInfo git) {
         String commit = git.commit().length() > 10 ? git.commit().substring(0, 10) : git.commit();
         return kind + "-" + ZonedDateTime.now(ZoneOffset.UTC).format(TS) + "-" + commit + (git.dirty() ? "-dirty" : "")
                 + "-" + COUNTER.incrementAndGet();

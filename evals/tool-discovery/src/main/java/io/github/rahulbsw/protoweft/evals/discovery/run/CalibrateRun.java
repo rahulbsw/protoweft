@@ -74,7 +74,8 @@ public final class CalibrateRun {
 
     public Path run() {
         DataSources data = new DataSources(config.mcpDir(), config.toolretDir(), config.datasets());
-        String runId = RunIds.next("calibrate", config.repoDir());
+        GitInfo git = GitInfo.detect(config.repoDir()); // at start: the code that runs
+        String runId = RunIds.next("calibrate", git);
         Map<String, List<Signals>> dev = new LinkedHashMap<>();
         Map<String, List<Signals>> test = new LinkedHashMap<>();
         Map<String, List<Signals>> perCell = new LinkedHashMap<>();
@@ -126,7 +127,7 @@ public final class CalibrateRun {
                     }
                 }
             }
-            RunInfo info = new RunInfo(runId, "calibrate", Instant.now().toString(), GitInfo.detect(config.repoDir()),
+            RunInfo info = new RunInfo(runId, "calibrate", Instant.now().toString(), git,
                     data.infos(), configMap());
             Map<String, Object> suggestions = new LinkedHashMap<>();
             StringBuilder md = new StringBuilder(Markdown.header("Confidence calibration (offline)", info));

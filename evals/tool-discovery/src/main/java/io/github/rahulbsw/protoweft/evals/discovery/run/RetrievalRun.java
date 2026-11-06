@@ -75,7 +75,8 @@ public final class RetrievalRun {
     /** Runs everything and returns the results directory. */
     public Path run() {
         DataSources data = new DataSources(config.mcpDir(), config.toolretDir(), config.datasets());
-        String runId = RunIds.next("retrieval", config.repoDir());
+        GitInfo git = GitInfo.detect(config.repoDir()); // at start: the code that runs
+        String runId = RunIds.next("retrieval", git);
         int maxK = config.ks().stream().mapToInt(Integer::intValue).max().orElse(10);
         int depth = Math.max(config.depth(), maxK);
         Map<String, List<Map<String, Object>>> cells = new LinkedHashMap<>();
@@ -120,7 +121,7 @@ public final class RetrievalRun {
                     }
                 }
             }
-            RunInfo info = new RunInfo(runId, "retrieval", Instant.now().toString(), GitInfo.detect(config.repoDir()),
+            RunInfo info = new RunInfo(runId, "retrieval", Instant.now().toString(), git,
                     data.infos(), configMap());
             Map<String, Object> summary = new LinkedHashMap<>(info.toMap());
             Map<String, Object> cellSummaries = new LinkedHashMap<>();
