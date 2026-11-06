@@ -45,7 +45,13 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
   - Discovery-backed: `CatalogBridge` (eval catalog → `CapabilityCatalog`), `CatalogRetriever`
     (`catalog-bm25`, `catalog-dense`, `catalog-hybrid`, registered by `DiscoveryRetrieverFactory`;
     `<name>:key=value:…` names a tuning variant such as `catalog-hybrid:fusion=rrf:rrf-k=60`),
-    `VectorOnlyIndex` and `CachingEmbedder`. `run-retrieval --split dev|test` scores one half of
+    `VectorOnlyIndex` and `CachingEmbedder`.
+  - Reranker experiment (not a product feature): `rerank.CrossEncoderReranker` and its own
+    `rerank.OnnxModel` (a copy of the embeddings module's internal session wrapper, so the product
+    gains no API for an unshipped feature), `RerankingIndex`, the `rerank=…` retriever options,
+    `scripts/fetch_reranker.py` (pinned revisions and SHA-256) and `scripts/paired_bootstrap.py`.
+    The plain `catalog-hybrid` uses the product's default fusion (`FusionOptionsTest`): it once
+    fell back to RRF, which invalidated a calibration run and labelled two in-loop runs wrongly. `run-retrieval --split dev|test` scores one half of
     the tasks by the same stable hash as `calibrate`, over catalogs holding every task's gold tools.
 - `calibration`: `Calibration` (signals, levels, metrics, policy grid search); the
   `run.CalibrateRun` command writes `calibration.json`.

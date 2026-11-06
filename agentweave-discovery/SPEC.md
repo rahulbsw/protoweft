@@ -96,9 +96,12 @@ hooks build on this module and never re-implement search.
   Why presets:
   - **Calibration result.** The `calibrate` command (dev/test split over ToolRet and
     MCPToolBench++) showed that the earlier provisional thresholds flagged only 1.4% of bge-hybrid
-    misses as LOW. Re-run for the convex default, the bge preset (0.6, 0.6, 0.90, 0.65, 0.05) flags
-    46.3% of misses with 20.2% false alarms on the held-out split, and is right 83.2% of the time
-    when HIGH (the previous preset on convex fusion: 48.2%, 21.4%, 78.1%).
+    misses as LOW. The bge preset (0.6, 0.6, 0.90, 0.65, 0.05) was suggested by a calibration run
+    that, through an eval-harness bug, still ranked with RRF; it was then checked on the real convex
+    ranking (`calibrate-20261106-092548-390`). On its held-out split it is right 83.2% of the time
+    when HIGH, flags 41.3% of misses and 19.5% of hits as LOW — better on that objective than the
+    previous preset (78.1%, 43.1%, 20.6%) and than the convex run's own suggestion (83.2%, 39.9%,
+    19.4%), so it stays.
   - **Why the keyword default stays:** tuning it would cut miss detection from 58% to 18%, which
     is the wrong trade for a fallback whose job is to avoid silent omission.
   - **Limitation:** the fallback still doesn't flag more than half of hybrid misses. It reduces
@@ -133,7 +136,8 @@ hooks build on this module and never re-implement search.
   with `withDefaultLimit`); a model's `limit` may raise it to 50 but not lower it. The native
   adapters and the LangChain4j strategy keep `DiscoveryQuery.DEFAULT_LIMIT` (5), because every
   hit they return loads a full schema; their larger limits are unmeasured. *Why:* in the loop at
-  N = 1,000 (commits `c24f0ea`, `0dae6b5`; 50 tasks), 10 cards instead of 5 lifted Claude Sonnet
+  N = 1,000 (commits `c24f0ea`, `0dae6b5`; 50 tasks; both runs ranked with RRF because of the same
+  harness bug, shared by every arm, so the comparison holds), 10 cards instead of 5 lifted Claude Sonnet
   5.5's selection by +10 points [+2, +18] (5 wins, 0 losses) for about 540 more input tokens;
   20 cards gained nothing further. GPT-5.4 set `limit: 5` itself on most searches, so a default
   alone didn't reach it; with the floor it saw 10 cards and changed by +2 points [−6, +12] — its
@@ -157,6 +161,15 @@ hooks build on this module and never re-implement search.
 - **Provider tool names.** Both providers accept `^[a-zA-Z0-9_-]{1,64}$`. `ProviderToolNames`
   maps `.` to `__`, replaces other characters with `_`, and hashes over-long names. The mapping
   is reversible and rejects collisions.
+
+- **No reranker ships.** An embedded cross-encoder (ms-marco-MiniLM-L6-v2, int8, on the
+  embeddings module's ONNX Runtime and tokenizer) was measured over the top 50 hybrid hits on the
+  dev/test split. Alone it lost to convex hybrid at every size (dev R@5 −2.7 / −3.8 pts at
+  N = 1,000 / 10,000), matching ToolRet's finding that rerankers give limited or negative gains for
+  tool retrieval. Blended 0.3/0.7 with the hybrid score it gained on the held-out split (R@5 +1.1
+  [+0.2, +2.1] at 1,000, +1.0 [−0.2, +2.3] at 10,000; nDCG@10 +1.3 and +0.9), but added about
+  60 ms median per search (search itself takes 1–13 ms) and would need a 23 MB model artifact.
+  The user chose not to ship it; the experiment stays reproducible in `evals-tool-discovery`.
 
 ## Coverage and limitations
 

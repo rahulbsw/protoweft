@@ -3,7 +3,7 @@ package io.agentweave.evals.discovery.retrieval;
 import io.agentweave.discovery.Embedder;
 import io.agentweave.discovery.FallbackPolicy;
 import io.agentweave.discovery.HybridIndex;
-import io.agentweave.discovery.embeddings.CrossEncoderReranker;
+import io.agentweave.evals.discovery.rerank.CrossEncoderReranker;
 import io.agentweave.discovery.embeddings.OfflineEmbedders;
 
 import java.nio.file.Path;

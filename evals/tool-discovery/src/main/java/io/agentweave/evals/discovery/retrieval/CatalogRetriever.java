@@ -38,7 +38,7 @@ public final class CatalogRetriever implements Retriever {
      *
      * @param mix {@code NaN} for pure reranking, else the reranker weight
      */
-    public record Rerank(io.agentweave.discovery.embeddings.CrossEncoderReranker reranker, int depth,
+    public record Rerank(io.agentweave.evals.discovery.rerank.CrossEncoderReranker reranker, int depth,
                          RerankingIndex.Text text, double mix) {
         public Rerank {
             Objects.requireNonNull(reranker, "reranker");

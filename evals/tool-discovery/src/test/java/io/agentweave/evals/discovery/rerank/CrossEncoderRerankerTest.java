@@ -1,4 +1,5 @@
-package io.agentweave.discovery.embeddings;
+package io.agentweave.evals.discovery.rerank;
+
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

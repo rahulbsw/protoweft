@@ -2,7 +2,7 @@ package io.agentweave.evals.discovery.retrieval;
 
 import io.agentweave.discovery.CapabilityIndex;
 import io.agentweave.discovery.HybridIndex;
-import io.agentweave.discovery.embeddings.CrossEncoderReranker;
+import io.agentweave.evals.discovery.rerank.CrossEncoderReranker;
 
 import java.util.ArrayList;
 import java.util.Collection;
