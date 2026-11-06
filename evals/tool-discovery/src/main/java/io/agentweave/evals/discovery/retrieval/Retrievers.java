@@ -19,8 +19,9 @@ public final class Retrievers {
             case "oracle":
                 return new OracleRetriever();
             default:
+                String base = name.split(":", 2)[0]; // "<retriever>:key=value:key=value" names a variant
                 for (RetrieverFactory f : ServiceLoader.load(RetrieverFactory.class)) {
-                    if (f.names().contains(name)) {
+                    if (f.names().contains(base)) {
                         return f.create(name, options);
                     }
                 }

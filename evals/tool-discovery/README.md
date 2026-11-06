@@ -147,7 +147,7 @@ ranks with `catalog.search`, so ranking, the vector floor and `Confidence` are t
 |---|---|
 | `catalog-bm25` | Keyword-only catalog (field-weighted BM25, no embedder) |
 | `catalog-dense` | Cosine only, with `bge-small-en-v1.5` (quantized, offline). A small `CapabilityIndex` wrapper (`VectorOnlyIndex`) lets a `HybridIndex` with the embedder index the documents, then re-ranks its hits by cosine and drops hits below the vector floor |
-| `catalog-hybrid` | The default hybrid catalog (BM25 + cosine, RRF k = 60) with `bge-small-en-v1.5` |
+| `catalog-hybrid` | The default hybrid catalog (BM25 + cosine, convex fusion α = 0.8) with `bge-small-en-v1.5`; variants such as `catalog-hybrid:fusion=rrf:rrf-k=60` select other fusions |
 | `catalog-hybrid-minilm` | The same with `all-MiniLM-L6-v2` |
 
 - **Catalog construction** (`CatalogBridge`): one fixed `ToolSource` per MCP server (MCPToolBench++

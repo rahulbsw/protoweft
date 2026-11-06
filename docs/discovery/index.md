@@ -83,7 +83,8 @@ How a search works:
    caller's scopes, and availability. Everything filtered out is never ranked.
 2. **Ranking:** a field-weighted BM25 (name weighted above summary and tags, which are weighted
    above parameters and description). With an embedder, cosine similarity is added and the two
-   rankings are fused with Reciprocal Rank Fusion (k = 60).
+   scores are blended: 0.8 × normalized similarity + 0.2 × normalized BM25 (the default
+   `HybridIndex.Fusion`, chosen by measurement; weighted Reciprocal Rank Fusion is an option).
 3. **Confidence:** `HIGH`, `MEDIUM` or `LOW`, from relative signals (query-term coverage, the
    margin between the top two scores, keyword/vector agreement, top similarity). The default
    thresholds are provisional; the evaluation harness has a `calibrate` command that suggests

@@ -36,10 +36,32 @@ public final class RetrievalRun {
      * @param depth        ranking depth requested from retrievers (MRR is computed at this depth)
      * @param maxQueries   stratified sample size per dataset; 0 = all
      * @param distractors  {@code own}, {@code toolret} or {@code both}
+     * @param split        {@code all}, or {@code dev}/{@code test}: score only that split of tasks (the
+     *                     same stable hash as {@code calibrate}); catalogs still hold every task's gold
+     *                     tools, so both splits search identical catalogs
+     * @param devFraction  share of tasks in the dev split
      */
     public record Config(List<String> datasets, List<String> retrievers, List<Integer> ks, List<Integer> catalogSizes,
                          int depth, int maxQueries, long seed, String distractors, Path mcpDir, Path toolretDir,
-                         Path outDir, Path repoDir) {
+                         Path outDir, Path repoDir, String split, double devFraction) {
+
+        public Config {
+            if (!List.of("all", "dev", "test").contains(split)) {
+                throw new IllegalArgumentException("split must be all, dev or test: " + split);
+            }
+        }
+
+        /** All tasks scored. */
+        public Config(List<String> datasets, List<String> retrievers, List<Integer> ks, List<Integer> catalogSizes,
+                      int depth, int maxQueries, long seed, String distractors, Path mcpDir, Path toolretDir,
+                      Path outDir, Path repoDir) {
+            this(datasets, retrievers, ks, catalogSizes, depth, maxQueries, seed, distractors, mcpDir, toolretDir,
+                    outDir, repoDir, "all", 0.5);
+        }
+
+        boolean scores(EvalTask task) {
+            return split.equals("all") || CalibrateRun.isDev(task.id(), devFraction) == split.equals("dev");
+        }
     }
 
     private final Config config;
@@ -83,6 +105,9 @@ public final class RetrievalRun {
                         String cell = spec + "|" + r.name() + "|" + catalog.size();
                         List<Map<String, Object>> rows = cells.computeIfAbsent(cell, k -> new ArrayList<>());
                         for (EvalTask t : usable) {
+                            if (!config.scores(t)) {
+                                continue;
+                            }
                             Map<String, Object> row = score(t, r.retrieve(t, catalog, depth), spec, r.name(), catalog);
                             rows.add(row);
                             out.row(row);
@@ -171,6 +196,8 @@ public final class RetrievalRun {
         m.put("maxQueries", config.maxQueries());
         m.put("seed", config.seed());
         m.put("distractors", config.distractors());
+        m.put("split", config.split());
+        m.put("devFraction", config.devFraction());
         return m;
     }
 }

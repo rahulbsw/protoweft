@@ -33,8 +33,8 @@ public record Confidence(Level level, double coverage, double margin, boolean ag
         /** Keyword-only default; also used for embedders without a calibrated preset. */
         public static final Policy DEFAULT = new Policy(0.6, 0.34, 0.70, 0.50, 0.05);
 
-        /** Calibrated for hybrid search with bge-small-en-v1.5 (see the evaluation in the module spec). */
-        public static final Policy BGE_SMALL_EN_V15 = new Policy(1.0, 0.9, 0.80, 0.65, 0.05);
+        /** Calibrated for hybrid search with bge-small-en-v1.5 and the default fusion (see the module spec). */
+        public static final Policy BGE_SMALL_EN_V15 = new Policy(0.6, 0.6, 0.90, 0.65, 0.05);
 
         /** Calibrated for hybrid search with all-MiniLM-L6-v2. */
         public static final Policy ALL_MINILM_L6_V2 = new Policy(0.6, 0.3, 0.85, 0.50, 0.05);

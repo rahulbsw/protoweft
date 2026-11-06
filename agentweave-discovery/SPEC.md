@@ -65,8 +65,18 @@ hooks build on this module and never re-implement search.
     plurals.
   - **Vectors:** cosine over normalized vectors, with `embedQuery` used for queries. Vector-only
     matches below a floor are dropped.
-  - **Fusion:** Reciprocal Rank Fusion with k = 60 (Cormack, Clarke and Büttcher, SIGIR 2009).
-    Keyword-only mode ranks by BM25 alone.
+  - **Fusion (default: convex, α = 0.8).** `alpha · cos' + (1 − alpha) · bm25'` over per-query
+    min-max-normalized scores, 0 for a list a capability isn't in (Bruch et al., "An Analysis of
+    Fusion Functions for Hybrid Retrieval", TOIS 2023). `HybridIndex.Fusion` also offers weighted
+    Reciprocal Rank Fusion (Cormack, Clarke and Büttcher, SIGIR 2009); the earlier default was
+    unweighted RRF, k = 60. Keyword-only mode ranks by BM25 alone. Embedding the full description
+    is an option, off by default.
+    - *Why convex 0.8:* chosen from 16 variants on the dev split (MCPToolBench++ and five ToolRet
+      subsets, N = 1,000 and 10,000; commit `fb7b4ae` plus the options), then judged once on the
+      held-out split against RRF: nDCG@10 +1.5 pts [+0.4, +2.7] at N = 1,000 and +2.1 [+1.2, +3.0]
+      at 10,000; R@5 +2.4 [+1.1, +4.0] at 10,000 but only +0.4 [−0.8, +1.5] at 1,000 (not
+      significant). No interval showed a loss; the user chose to adopt it on that evidence.
+      Dense-only ranked below every hybrid variant at 10,000.
   - BM25 is our own implementation: the target of about 5,000 capabilities fits in memory, and
     Lucene 10 would raise the Java baseline.
 - **Confidence uses relative signals only.** Raw BM25 isn't comparable across queries. Signals
@@ -85,7 +95,9 @@ hooks build on this module and never re-implement search.
   Why presets:
   - **Calibration result.** The `calibrate` command (dev/test split over ToolRet and
     MCPToolBench++) showed that the earlier provisional thresholds flagged only 1.4% of bge-hybrid
-    misses as LOW. The preset flags 45% of misses, with 18% false alarms on the held-out split.
+    misses as LOW. Re-run for the convex default, the bge preset (0.6, 0.6, 0.90, 0.65, 0.05) flags
+    46.3% of misses with 20.2% false alarms on the held-out split, and is right 83.2% of the time
+    when HIGH (the previous preset on convex fusion: 48.2%, 21.4%, 78.1%).
   - **Why the keyword default stays:** tuning it would cut miss detection from 58% to 18%, which
     is the wrong trade for a fallback whose job is to avoid silent omission.
   - **Limitation:** the fallback still doesn't flag more than half of hybrid misses. It reduces
@@ -156,7 +168,7 @@ hooks build on this module and never re-implement search.
 ## Verification
 
 - **Unit and end-to-end tests (33):**
-  - BM25 against a hand-computed score, field weights, the tokenizer, RRF arithmetic, the
+  - BM25 against a hand-computed score, field weights, the tokenizer, weighted RRF and convex arithmetic, the
     vector floor
   - every exact filter; permission hiding without leaks; availability (marked, probe, failed
     refresh)

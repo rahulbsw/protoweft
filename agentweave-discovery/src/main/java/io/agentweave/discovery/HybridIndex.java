@@ -15,7 +15,8 @@ import java.util.function.Predicate;
 
 /**
  * In-memory index: field-weighted BM25, plus cosine similarity when an {@link Embedder} is
- * given, fused with Reciprocal Rank Fusion. Sized for thousands of capabilities.
+ * given, fused per {@link Fusion} (default: a convex blend of normalized scores). Sized for
+ * thousands of capabilities.
  */
 public final class HybridIndex implements CapabilityIndex {
 
@@ -25,7 +26,43 @@ public final class HybridIndex implements CapabilityIndex {
     /** RRF constant from Cormack, Clarke and Büttcher (SIGIR 2009). */
     static final int RRF_K = 60;
 
+    /**
+     * How keyword and vector rankings combine in hybrid mode.
+     *
+     * @param kind          {@code RRF}: weighted Reciprocal Rank Fusion, {@code w / (k + rank)} per list;
+     *                      {@code CONVEX}: {@code alpha * cos' + (1 - alpha) * bm25'} over per-query
+     *                      min-max-normalized scores (0 for a list a capability isn't in)
+     * @param rrfK          the RRF constant
+     * @param keywordWeight RRF weight of the keyword list
+     * @param vectorWeight  RRF weight of the vector list
+     * @param alpha         CONVEX weight of the vector score, in [0, 1]
+     */
+    public record Fusion(Kind kind, int rrfK, double keywordWeight, double vectorWeight, double alpha) {
+
+        public enum Kind { RRF, CONVEX }
+
+        /** Convex fusion with alpha = 0.8, chosen by measurement (see the module spec). */
+        public static final Fusion DEFAULT = convex(0.8);
+
+        public Fusion {
+            java.util.Objects.requireNonNull(kind, "kind");
+            if (rrfK < 0 || keywordWeight < 0 || vectorWeight < 0 || alpha < 0 || alpha > 1) {
+                throw new IllegalArgumentException("fusion parameters out of range: " + this);
+            }
+        }
+
+        public static Fusion rrf(int k, double keywordWeight, double vectorWeight) {
+            return new Fusion(Kind.RRF, k, keywordWeight, vectorWeight, 0.5);
+        }
+
+        public static Fusion convex(double alpha) {
+            return new Fusion(Kind.CONVEX, RRF_K, 1, 1, alpha);
+        }
+    }
+
     private final Embedder embedder;
+    private final Fusion fusion;
+    private final boolean embedDescription;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final Map<String, Map<String, Double>> termFrequencies = new HashMap<>();
     private final Map<String, Double> lengths = new HashMap<>();
@@ -40,7 +77,26 @@ public final class HybridIndex implements CapabilityIndex {
 
     /** A hybrid index; {@code embedder} may be {@code null} for keyword-only. */
     public HybridIndex(Embedder embedder) {
+        this(embedder, Fusion.DEFAULT, false);
+    }
+
+    /**
+     * A hybrid index with explicit tuning.
+     *
+     * @param embedder         {@code null} for keyword-only (fusion then doesn't apply)
+     * @param fusion           how the keyword and vector rankings combine
+     * @param embedDescription embed the full description too, not only name, title, summary,
+     *                         tags and parameters
+     */
+    public HybridIndex(Embedder embedder, Fusion fusion, boolean embedDescription) {
         this.embedder = embedder;
+        this.fusion = java.util.Objects.requireNonNull(fusion, "fusion");
+        this.embedDescription = embedDescription;
+    }
+
+    /** The fusion in use. */
+    public Fusion fusion() {
+        return fusion;
     }
 
     @Override
@@ -54,7 +110,7 @@ public final class HybridIndex implements CapabilityIndex {
         if (embedder != null && !documents.isEmpty()) {
             List<String> texts = new ArrayList<>();
             for (Document d : documents) {
-                texts.add(vectorText(d));
+                texts.add(vectorText(d, embedDescription));
             }
             embedded = embedder.embedDocuments(texts);
         }
@@ -127,14 +183,14 @@ public final class HybridIndex implements CapabilityIndex {
                     }
                 }
             }
-            return fuse(keyword, cosine, limit, minCosine, queryVector != null);
+            return fuse(keyword, cosine, limit, minCosine, queryVector != null, fusion);
         } finally {
             lock.readLock().unlock();
         }
     }
 
     private static Result fuse(Map<String, double[]> keyword, Map<String, Double> cosine, int limit,
-                               double minCosine, boolean semantic) {
+                               double minCosine, boolean semantic, Fusion fusion) {
         List<String> byKeyword = new ArrayList<>(keyword.keySet());
         byKeyword.sort(Comparator.comparingDouble((String id) -> -keyword.get(id)[0]).thenComparing(id -> id));
         List<String> byVector = new ArrayList<>();
@@ -149,11 +205,22 @@ public final class HybridIndex implements CapabilityIndex {
         Map<String, Integer> vectorRank = ranks(byVector);
         Set<String> ids = new HashSet<>(keywordRank.keySet());
         ids.addAll(vectorRank.keySet());
+        double[] kwRange = range(byKeyword.stream().mapToDouble(id -> keyword.get(id)[0]));
+        double[] cosRange = range(byVector.stream().mapToDouble(cosine::get));
         List<Hit> hits = new ArrayList<>();
         for (String id : ids) {
             int kr = keywordRank.getOrDefault(id, 0);
             int vr = vectorRank.getOrDefault(id, 0);
-            double score = semantic ? rrf(kr) + rrf(vr) : keyword.get(id)[0];
+            double score;
+            if (!semantic) {
+                score = keyword.get(id)[0];
+            } else if (fusion.kind() == Fusion.Kind.RRF) {
+                score = fusion.keywordWeight() * rrf(kr, fusion.rrfK()) + fusion.vectorWeight() * rrf(vr, fusion.rrfK());
+            } else {
+                double kwNorm = kr == 0 ? 0 : normalized(keyword.get(id)[0], kwRange);
+                double cosNorm = vr == 0 ? 0 : normalized(cosine.get(id), cosRange);
+                score = fusion.alpha() * cosNorm + (1 - fusion.alpha()) * kwNorm;
+            }
             double[] kw = keyword.getOrDefault(id, new double[]{0, 0});
             hits.add(new Hit(id, score, kr, kw[0], kw[1], vr, cosine.getOrDefault(id, Double.NaN)));
         }
@@ -162,7 +229,21 @@ public final class HybridIndex implements CapabilityIndex {
     }
 
     static double rrf(int rank) {
-        return rank == 0 ? 0 : 1.0 / (RRF_K + rank);
+        return rrf(rank, RRF_K);
+    }
+
+    static double rrf(int rank, int k) {
+        return rank == 0 ? 0 : 1.0 / (k + rank);
+    }
+
+    private static double[] range(java.util.stream.DoubleStream values) {
+        java.util.DoubleSummaryStatistics s = values.summaryStatistics();
+        return s.getCount() == 0 ? new double[]{0, 0} : new double[]{s.getMin(), s.getMax()};
+    }
+
+    /** Min-max normalization; a list whose scores are all equal maps to 1. */
+    private static double normalized(double value, double[] range) {
+        return range[1] > range[0] ? (value - range[0]) / (range[1] - range[0]) : 1;
     }
 
     private static Map<String, Integer> ranks(List<String> ordered) {
@@ -192,9 +273,14 @@ public final class HybridIndex implements CapabilityIndex {
         return tf;
     }
 
-    private static String vectorText(Document d) {
+    private static final List<Field> VECTOR_FIELDS = List.of(Field.NAME, Field.TITLE, Field.SUMMARY, Field.TAGS,
+            Field.PARAMETERS);
+    private static final List<Field> VECTOR_FIELDS_WITH_DESCRIPTION = List.of(Field.NAME, Field.TITLE,
+            Field.DESCRIPTION, Field.TAGS, Field.PARAMETERS);
+
+    private static String vectorText(Document d, boolean withDescription) {
         StringBuilder out = new StringBuilder();
-        for (Field f : List.of(Field.NAME, Field.TITLE, Field.SUMMARY, Field.TAGS, Field.PARAMETERS)) {
+        for (Field f : withDescription ? VECTOR_FIELDS_WITH_DESCRIPTION : VECTOR_FIELDS) {
             String text = d.fields().get(f);
             if (text != null && !text.isBlank()) {
                 out.append(out.isEmpty() ? "" : ". ").append(text);

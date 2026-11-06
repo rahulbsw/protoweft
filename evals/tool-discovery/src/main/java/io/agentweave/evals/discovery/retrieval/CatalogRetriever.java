@@ -39,6 +39,8 @@ public final class CatalogRetriever implements Retriever {
     private final Embedder embedder;
     private final FallbackPolicy fallback;
     private final boolean withInstruction;
+    private final HybridIndex.Fusion fusion;
+    private final boolean embedDescription;
     private String fingerprint;
     private CatalogBridge.Built built;
 
@@ -49,6 +51,14 @@ public final class CatalogRetriever implements Retriever {
      */
     public CatalogRetriever(String name, Ranking ranking, Embedder embedder, FallbackPolicy fallback,
                             boolean withInstruction) {
+        this(name, ranking, embedder, fallback, withInstruction, HybridIndex.Fusion.DEFAULT, false);
+    }
+
+    /** As above, with hybrid tuning (see {@link HybridIndex#HybridIndex(Embedder, HybridIndex.Fusion, boolean)}). */
+    public CatalogRetriever(String name, Ranking ranking, Embedder embedder, FallbackPolicy fallback,
+                            boolean withInstruction, HybridIndex.Fusion fusion, boolean embedDescription) {
+        this.fusion = Objects.requireNonNull(fusion, "fusion");
+        this.embedDescription = embedDescription;
         this.name = Objects.requireNonNull(name, "name");
         this.ranking = Objects.requireNonNull(ranking, "ranking");
         if (ranking != Ranking.KEYWORD && embedder == null) {
@@ -61,7 +71,7 @@ public final class CatalogRetriever implements Retriever {
 
     /** The same retriever with another fallback policy (arms use the product default). */
     public CatalogRetriever withFallback(FallbackPolicy policy) {
-        return new CatalogRetriever(name, ranking, embedder, policy, withInstruction);
+        return new CatalogRetriever(name, ranking, embedder, policy, withInstruction, fusion, embedDescription);
     }
 
     @Override
@@ -113,8 +123,8 @@ public final class CatalogRetriever implements Retriever {
     private Supplier<CapabilityIndex> indexSupplier() {
         return switch (ranking) {
             case KEYWORD -> HybridIndex::new;
-            case HYBRID -> () -> new HybridIndex(embedder);
-            case DENSE -> () -> new VectorOnlyIndex(new HybridIndex(embedder));
+            case HYBRID -> () -> new HybridIndex(embedder, fusion, embedDescription);
+            case DENSE -> () -> new VectorOnlyIndex(new HybridIndex(embedder, fusion, embedDescription));
         };
     }
 }

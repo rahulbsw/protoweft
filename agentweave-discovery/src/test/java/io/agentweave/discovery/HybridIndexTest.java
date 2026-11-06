@@ -66,7 +66,7 @@ class HybridIndexTest {
     void reciprocalRankFusionCombinesBothRankings() {
         Embedder fake = new FakeEmbedder(Map.of(
                 "kw", new float[]{0, 1}, "vec", new float[]{1, 0}, "both", new float[]{0.9f, 0.1f}));
-        HybridIndex index = new HybridIndex(fake);
+        HybridIndex index = new HybridIndex(fake, HybridIndex.Fusion.rrf(HybridIndex.RRF_K, 1, 1), false);
         index.upsert(List.of(
                 new CapabilityIndex.Document("kw", Map.of(CapabilityIndex.Field.NAME, "kw", CapabilityIndex.Field.DESCRIPTION, "forecast")),
                 new CapabilityIndex.Document("vec", Map.of(CapabilityIndex.Field.NAME, "vec")),
@@ -80,6 +80,51 @@ class HybridIndexTest {
         assertThat(top.score()).isCloseTo(HybridIndex.rrf(top.keywordRank()) + HybridIndex.rrf(top.vectorRank()),
                 within(1e-12));
         assertThat(HybridIndex.rrf(1)).isEqualTo(1.0 / 61);
+    }
+
+    private static List<CapabilityIndex.Document> fusionDocs() {
+        return List.of(
+                new CapabilityIndex.Document("kw", Map.of(CapabilityIndex.Field.NAME, "kw", CapabilityIndex.Field.DESCRIPTION, "forecast")),
+                new CapabilityIndex.Document("vec", Map.of(CapabilityIndex.Field.NAME, "vec")),
+                new CapabilityIndex.Document("both", Map.of(CapabilityIndex.Field.NAME, "both", CapabilityIndex.Field.DESCRIPTION, "forecast tomorrow")));
+    }
+
+    private static Embedder fusionEmbedder() {
+        return new FakeEmbedder(Map.of("kw", new float[]{0, 1}, "vec", new float[]{1, 0}, "both", new float[]{0.9f, 0.1f}));
+    }
+
+    @Test
+    void weightedRrfScalesEachList() {
+        HybridIndex index = new HybridIndex(fusionEmbedder(), HybridIndex.Fusion.rrf(10, 0.5, 2), false);
+        index.upsert(fusionDocs());
+
+        for (CapabilityIndex.Hit h : index.search("forecast", id -> true, 10, 0.0).hits()) {
+            assertThat(h.score()).isCloseTo(0.5 * HybridIndex.rrf(h.keywordRank(), 10)
+                    + 2 * HybridIndex.rrf(h.vectorRank(), 10), within(1e-12));
+        }
+    }
+
+    @Test
+    void convexFusionBlendsNormalizedScores() {
+        HybridIndex vectorOnly = new HybridIndex(fusionEmbedder(), HybridIndex.Fusion.convex(1), false);
+        vectorOnly.upsert(fusionDocs());
+        HybridIndex keywordOnly = new HybridIndex(fusionEmbedder(), HybridIndex.Fusion.convex(0), false);
+        keywordOnly.upsert(fusionDocs());
+
+        // alpha = 1 ranks by cosine alone, alpha = 0 by BM25 alone (vector-only hits score 0).
+        CapabilityIndex.Hit topVector = vectorOnly.search("forecast", id -> true, 10, 0.0).hits().get(0);
+        assertThat(topVector.vectorRank()).isEqualTo(1);
+        assertThat(topVector.score()).isEqualTo(1.0);
+        CapabilityIndex.Hit topKeyword = keywordOnly.search("forecast", id -> true, 10, 0.0).hits().get(0);
+        assertThat(topKeyword.keywordRank()).isEqualTo(1);
+        assertThat(topKeyword.score()).isEqualTo(1.0);
+    }
+
+    @Test
+    void fusionRejectsOutOfRangeParameters() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> HybridIndex.Fusion.convex(1.5))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new HybridIndex(fusionEmbedder()).fusion()).isEqualTo(HybridIndex.Fusion.DEFAULT);
     }
 
     @Test

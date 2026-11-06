@@ -84,7 +84,9 @@ public final class EvalMain {
                 Path.of(cli.string("mcptoolbench-dir", data.resolve("mcptoolbench").toString())),
                 toolret,
                 Path.of(cli.string("out", "build/eval-results")),
-                Path.of(cli.string("repo-dir", ".")));
+                Path.of(cli.string("repo-dir", ".")),
+                cli.string("split", "all"),
+                cli.decimal("dev-fraction", 0.5));
         cli.rejectUnknown();
         Path dir = new RetrievalRun(config, name -> Retrievers.create(name, ropts)).run();
         System.out.println("results: " + dir.resolve("report.md"));
@@ -195,7 +197,8 @@ public final class EvalMain {
               run-retrieval   offline retrieval metrics (no model calls)
                 --datasets mcptoolbench,toolret:<subset>   --retrievers random,oracle
                 --k 1,3,5,10   --catalog-sizes all|N,...   --depth 100   --max-queries 0
-                --distractors own|toolret|both   --retriever-opt key=value
+                --distractors own|toolret|both   --retriever-opt key=value   --split all|dev|test   --dev-fraction 0.5
+                retriever variants: catalog-hybrid:fusion=rrf|convex:rrf-k=60:kw=1:vw=1:alpha=0.5:describe=true
                 retrievers: random, oracle, catalog-bm25, catalog-dense, catalog-hybrid, catalog-hybrid-minilm
                 (catalog-* options: fallback=none|progressive|all_schemas, min-cosine=x, instruction=true,
                  embedding-cache=build/embedding-cache|none)
