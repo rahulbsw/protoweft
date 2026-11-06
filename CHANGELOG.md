@@ -82,5 +82,7 @@ All notable changes to AgentWeave are documented here. The format follows
 ### Fixed
 - MCP tool results can carry embedded resources (`Content.Resource`), and A2A inline file parts
   keep their file name. Both were found by the conformance suites.
+- The OAuth client accepts authorization servers on `http://localhost` as loopback (previously
+  only literal loopback IPs), which the MCP conformance suite's authorization scenarios require.
 - Stopping an MCP HTTP server now releases MCP Java SDK 2.1.0's non-daemon session-sweeper thread,
   so the JVM can exit (works around an SDK issue; see `agentweave-mcp/SPEC.md`).
