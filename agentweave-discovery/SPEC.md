@@ -106,6 +106,16 @@ hooks build on this module and never re-implement search.
   session) and `call_capability`. Schemas are fetched by an explicit describe step, because the
   requirement is "full schemas only when selected". `inlineSchemas` on a query trades a round
   trip for tokens; which default is better is for the evaluation to show.
+- **Models get `query` and `limit` only.** Every search tool AgentWeave hands a model — the
+  generic `search_capabilities` and the native Anthropic/OpenAI search tools — uses
+  `Payloads.searchSchema()`, and `DiscoveryTools.query` ignores any other key. Protocol, source,
+  hint and permission filters are the application's (`DiscoveryQuery`, `SourcePolicy`, caller
+  scopes). *Why (bug post-mortem):* the meta-tool used to offer `protocols`, `sources` and
+  `read_only`. In the model-in-the-loop smoke run (commit `48b74f8`), GPT-5.4 set them on 7 of 10
+  tasks — `sources: ["all"]`, `protocols` without `local`, `read_only` on unannotated tools —
+  every such search came back empty, and the model answered that no tool existed. A model can't
+  know source names, protocol labels or which tools carry hints; the application can. An empty
+  result now says nothing matched and suggests different words.
 - **Provider payloads** are plain maps, built from the catalog with the same filters, so only
   permitted and available capabilities are ever sent.
   - **Anthropic** ([tool search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)):

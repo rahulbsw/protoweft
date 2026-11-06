@@ -166,15 +166,13 @@ class CatalogToolSearchStrategyTest {
     }
 
     @Test
-    void searchHonorsTheModelsFilters() {
+    void searchHonorsTheModelsLimitAndIgnoresOtherFilters() {
         CatalogToolSearchStrategy strategy = CatalogToolSearchStrategy.from(catalog(FallbackPolicy.of(FallbackPolicy.Mode.NONE)));
 
         assertThat(search(strategy, "{\"query\": \"integers\"}").foundToolNames())
                 .containsExactlyInAnyOrder("math__add", "math__multiply");
-        assertThat(search(strategy, "{\"query\": \"integers\", \"read_only\": true}").foundToolNames())
-                .containsExactly("math__add");
-        assertThat(search(strategy, "{\"query\": \"integers\", \"sources\": [\"text\"]}").foundToolNames())
-                .isEmpty();
+        assertThat(search(strategy, "{\"query\": \"integers\", \"read_only\": true, \"sources\": [\"text\"]}")
+                .foundToolNames()).containsExactlyInAnyOrder("math__add", "math__multiply");
         assertThat(search(strategy, "{\"query\": \"integers\", \"limit\": 1}").foundToolNames()).hasSize(1);
     }
 

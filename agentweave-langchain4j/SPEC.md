@@ -137,8 +137,9 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
 
   So `CatalogToolSearchStrategy` does this:
   - **Search tool.** It offers one tool, `search_capabilities`, with the `DiscoveryTools` input
-    schema (`query`, `limit`, `protocols`, `sources`, `read_only`).
-  - **Search.** It parses the arguments with `DiscoveryTools.query`, so the model's filters apply.
+    schema (`query`, `limit`).
+  - **Search.** It parses the arguments with `DiscoveryTools.query`, so the model's `limit` applies
+    and any other key is ignored (see `agentweave-discovery`).
     The caller comes from the `InvocationContext` function, so the caller's scopes apply too. A
     `queryCustomizer` can tighten the query per application, and `limit` is the default when the
     model passes none. Then it calls `catalog.search`.
@@ -204,7 +205,7 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
     - A scoped capability is found only for a caller holding the scope, and its existence
       doesn't leak to others.
     - `alwaysVisible` tools are in the first request.
-    - The model's filters (`read_only`, `sources`, `limit`) apply.
+    - The model's `limit` applies; invented filters (`read_only`, `sources`) are ignored.
     - `NAMES_ONLY` lists candidates without loading them, and `ALL_SCHEMAS` loads everything.
     - Unavailable sources are reported, tools found earlier are not found again, and invalid
       arguments are visible to the model.

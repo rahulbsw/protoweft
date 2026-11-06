@@ -53,20 +53,11 @@ public final class DiscoveryTools implements ToolSource {
 
     @Override
     public List<ToolSpec> listTools() {
-        Map<String, Object> stringArray = Map.of("type", "array", "items", Map.of("type", "string"));
         return List.of(
                 new ToolSpec(SEARCH, "Search the available capabilities (tools and agents) by what you need to do. "
                         + "Always search before calling. Returns short cards, not schemas. If confidence is LOW, "
                         + "rephrase or broaden the query.",
-                        schema(Map.of(
-                                "query", Map.of("type", "string", "description", "What you need to do, in plain words"),
-                                "limit", Map.of("type", "integer", "description", "Maximum results (default 5)"),
-                                "protocols", Map.of("type", "array", "items", Map.of("type", "string"),
-                                        "description", "Only these protocols, e.g. mcp, utcp, a2a"),
-                                "sources", Map.of("type", "array", "items", Map.of("type", "string"),
-                                        "description", "Only these sources"),
-                                "read_only", Map.of("type", "boolean", "description", "Only read-only capabilities")),
-                                List.of("query"))),
+                        Payloads.searchSchema()),
                 new ToolSpec(DESCRIBE, "Get the full input schemas of capabilities found by " + SEARCH
                         + ". Call this before " + CALL + ".",
                         schema(Map.of("names", Map.of("type", "array", "items", Map.of("type", "string"),
@@ -100,7 +91,11 @@ public final class DiscoveryTools implements ToolSource {
         };
     }
 
-    /** Parses {@code search_capabilities} arguments into a query for {@code caller}. */
+    /**
+     * Parses {@code search_capabilities} arguments into a query for {@code caller}: {@code query}
+     * and {@code limit} only. Other keys are ignored; protocol, source and hint filters are the
+     * application's to set on a {@link DiscoveryQuery}.
+     */
     public static DiscoveryQuery query(Map<String, Object> args, CallerIdentity caller) {
         Object text = args.get("query");
         if (!(text instanceof String s) || s.isBlank()) {
@@ -110,11 +105,6 @@ public final class DiscoveryTools implements ToolSource {
         DiscoveryQuery.Builder q = DiscoveryQuery.builder(s).caller(caller);
         if (args.get("limit") instanceof Number n) {
             q.limit(Math.max(1, Math.min(50, n.intValue())));
-        }
-        q.protocols(strings(args.get("protocols")));
-        q.sources(strings(args.get("sources")));
-        if (Boolean.TRUE.equals(args.get("read_only"))) {
-            q.require(CapabilityHint.READ_ONLY);
         }
         return q.build();
     }
@@ -171,7 +161,7 @@ public final class DiscoveryTools implements ToolSource {
             out.append(cardLine(h.card())).append('\n');
         }
         if (r.hits().isEmpty()) {
-            out.append("No matching capabilities.\n");
+            out.append("No capabilities matched this query; try different words for the task.\n");
         }
         if (!r.namesOnly().isEmpty()) {
             out.append("Other candidates (search or describe them by name):\n");

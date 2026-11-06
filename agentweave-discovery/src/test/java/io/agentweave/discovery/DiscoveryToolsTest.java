@@ -70,10 +70,16 @@ class DiscoveryToolsTest {
     }
 
     @Test
-    void readOnlyArgumentFiltersByHint() {
-        ToolOutcome r = DiscoveryTools.of(catalog).invoke(ToolInvocation.of("search_capabilities",
-                Map.of("query", "file", "read_only", true, "limit", 10)));
-        assertThat(r.text()).contains("files.readFile").doesNotContain("files.deleteFile");
+    void searchOffersOnlyQueryAndLimitAndIgnoresOtherFilters() {
+        DiscoveryTools tools = DiscoveryTools.of(catalog);
+        assertThat(tools.listTools().get(0).inputSchema().get("properties"))
+                .isEqualTo(Map.of("query", Map.of("type", "string", "description", "What you need to do, in plain words"),
+                        "limit", Map.of("type", "integer", "description", "Maximum results (default 5)")));
+
+        // Filters a model invents (seen from GPT-5.4 in the evaluation) must not empty the search.
+        ToolOutcome r = tools.invoke(ToolInvocation.of("search_capabilities", Map.of("query", "file",
+                "read_only", true, "sources", List.of("all"), "protocols", List.of("mcp"), "limit", 10)));
+        assertThat(r.text()).contains("files.readFile").contains("files.deleteFile");
     }
 
     @Test

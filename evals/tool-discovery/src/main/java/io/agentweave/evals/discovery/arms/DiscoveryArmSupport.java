@@ -56,6 +56,11 @@ final class DiscoveryArmSupport {
         DiscoveryResult search(Map<String, Object> args) {
             DiscoveryResult r = built.catalog().search(DiscoveryTools.query(args, CallerIdentity.ANONYMOUS));
             record(args.get("query"), r);
+            Map<String, Object> filters = new LinkedHashMap<>(args);
+            filters.remove("query");
+            if (!filters.isEmpty()) {
+                searches.get(searches.size() - 1).put("filters", filters);
+            }
             return r;
         }
 

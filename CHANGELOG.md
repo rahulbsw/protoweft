@@ -80,6 +80,9 @@ All notable changes to AgentWeave are documented here. The format follows
   Gradle dependency verification, SHA-pinned actions and OpenSSF Scorecard.
 
 ### Fixed
+- The discovery search meta-tool offers models only `query` and `limit`. Its former `protocols`,
+  `sources` and `read_only` arguments let GPT-5.4 filter searches into empty results in the
+  model-in-the-loop evaluation; those filters are now set by the application.
 - MCP tool results can carry embedded resources (`Content.Resource`), and A2A inline file parts
   keep their file name. Both were found by the conformance suites.
 - The OAuth client accepts authorization servers on `http://localhost` as loopback (previously
