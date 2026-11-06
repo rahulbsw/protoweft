@@ -60,7 +60,7 @@ RFC 9728 metadata; `BearerTokenAuthenticator` (an `InboundAuthenticator`) valida
 | Validate tokens per OAuth 2.1 §5.2 | MUST | `JwtTokenVerifier`: signature (RS256/ES256, JWKS), `typ` JWT/at+jwt, `exp` required, `nbf`, skew, `iss` allow-list |
 | Insufficient scope → 403 `error="insufficient_scope"`, `scope`, `resource_metadata` | SHOULD | `BearerTokenAuthenticator` (scope = required ∪ granted, the "recommended approach") |
 | No token passthrough | MUST | Token never stored in `CallerIdentity`, reasons or logs; only verified claims are exposed |
-| AS endpoints over HTTPS; redirect URIs localhost or HTTPS | MUST | `Uris.requireSecure` (literal loopback IPs allowed for tests); redirect is `http://127.0.0.1:<port>/callback` or a configured https URI |
+| AS endpoints over HTTPS; redirect URIs localhost or HTTPS | MUST | `Uris.requireSecure` (plain http allowed only for loopback: `127.0.0.0/8`, `::1` or the exact name `localhost`, as browsers' secure-context rule does; the MCP conformance suite's authorization server runs on `http://localhost`); redirect is `http://127.0.0.1:<port>/callback` or a configured https URI |
 | `state` used and verified; mismatches discarded | SHOULD | Loopback receiver answers 400 to wrong/missing state and keeps waiting; callback path fails |
 | Secure token storage | MUST | `TokenStore` SPI; default in-memory only; `toString` of tokens/secrets masked |
 | Refresh token rotation for public clients | AS MUST | AS-side; the client keeps a rotated refresh token, else the old one |

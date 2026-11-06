@@ -108,16 +108,17 @@ final class Uris {
         return pa.isEmpty() || pb.equals(pa) || pb.startsWith(pa + "/");
     }
 
-    /** Whether the host is a literal loopback address (127.0.0.0/8 or ::1); DNS names never count. */
+    /** Whether the host is loopback: 127.0.0.0/8, ::1, or the exact name {@code localhost}. */
     static boolean isLoopback(URI uri) {
         String host = uri.getHost();
         if (host == null) {
             return false;
         }
-        return IPV4_LOOPBACK.matcher(host).matches() || host.equals("[::1]") || host.equals("::1");
+        return IPV4_LOOPBACK.matcher(host).matches() || host.equals("[::1]") || host.equals("::1")
+                || host.equalsIgnoreCase("localhost");
     }
 
-    /** Enforces HTTPS for authorization-server endpoints (OAuth 2.1 §1.5), with literal loopback allowed for local testing. */
+    /** Enforces HTTPS for authorization-server endpoints (OAuth 2.1 §1.5), with loopback allowed for local testing. */
     static URI requireSecure(URI uri, String what) {
         if (uri == null) {
             throw auth(what + " is missing");

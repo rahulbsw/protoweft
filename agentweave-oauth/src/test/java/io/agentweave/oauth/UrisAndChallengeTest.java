@@ -59,10 +59,13 @@ class UrisAndChallengeTest {
     }
 
     @Test
-    void httpsRequiredExceptLiteralLoopback() {
+    void httpsRequiredExceptLoopback() {
         assertThat(Uris.requireSecure(URI.create("http://127.0.0.1:9/token"), "t")).isNotNull();
         assertThat(Uris.requireSecure(URI.create("http://[::1]:9/token"), "t")).isNotNull();
-        assertThatThrownBy(() -> Uris.requireSecure(URI.create("http://localhost:9/token"), "t"))
+        assertThat(Uris.requireSecure(URI.create("http://LocalHost:9/token"), "t")).isNotNull();
+        assertThatThrownBy(() -> Uris.requireSecure(URI.create("http://localhost.example.com/token"), "t"))
+                .hasMessageContaining("https");
+        assertThatThrownBy(() -> Uris.requireSecure(URI.create("http://evil-localhost/token"), "t"))
                 .hasMessageContaining("https");
         assertThatThrownBy(() -> Uris.requireSecure(URI.create("http://auth.example.com/token"), "t"))
                 .hasMessageContaining("https");
