@@ -85,6 +85,8 @@ All notable changes to AgentWeave are documented here. The format follows
 - The discovery search meta-tool offers models only `query` and `limit`. Its former `protocols`,
   `sources` and `read_only` arguments let GPT-5.4 filter searches into empty results in the
   model-in-the-loop evaluation; those filters are now set by the application.
+- The search meta-tool returns at least 10 cards per search (a model may ask for more, not
+  fewer), which lifted Claude Sonnet 5.5 by 10 points at 1,000 tools.
 - MCP tool results can carry embedded resources (`Content.Resource`), and A2A inline file parts
   keep their file name. Both were found by the conformance suites.
 - The OAuth client accepts authorization servers on `http://localhost` as loopback (previously

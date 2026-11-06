@@ -113,7 +113,7 @@ round trip at the cost of tokens.
 
 | Tool | Does |
 |---|---|
-| `search_capabilities` | Returns cards, confidence, fallback stage and hidden counts. Arguments: `query` and optional `limit`. Protocol, source and read-only filters are set by the application on `DiscoveryQuery`, not by the model. |
+| `search_capabilities` | Returns cards, confidence, fallback stage and hidden counts. Arguments: `query` and optional `limit`. At least 10 cards come back (`withDefaultLimit` changes that); a model may ask for up to 50 but not fewer. Protocol, source and read-only filters are set by the application on `DiscoveryQuery`, not by the model. |
 | `describe_capabilities` | Returns full input schemas for `names`, and marks them loaded in the session. |
 | `call_capability` | Calls `name` with `arguments`, re-checking permission and availability. |
 

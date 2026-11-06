@@ -129,6 +129,15 @@ hooks build on this module and never re-implement search.
   every such search came back empty, and the model answered that no tool existed. A model can't
   know source names, protocol labels or which tools carry hints; the application can. An empty
   result now says nothing matched and suggests different words.
+- **The meta-tool returns at least 10 cards per search** (`DiscoveryTools.DEFAULT_LIMIT`, changed
+  with `withDefaultLimit`); a model's `limit` may raise it to 50 but not lower it. The native
+  adapters and the LangChain4j strategy keep `DiscoveryQuery.DEFAULT_LIMIT` (5), because every
+  hit they return loads a full schema; their larger limits are unmeasured. *Why:* in the loop at
+  N = 1,000 (commits `c24f0ea`, `0dae6b5`; 50 tasks), 10 cards instead of 5 lifted Claude Sonnet
+  5.5's selection by +10 points [+2, +18] (5 wins, 0 losses) for about 540 more input tokens;
+  20 cards gained nothing further. GPT-5.4 set `limit: 5` itself on most searches, so a default
+  alone didn't reach it; with the floor it saw 10 cards and changed by +2 points [−6, +12] — its
+  misses at that size are choices among the cards, not missing cards. No change at N = 200.
 - **Provider payloads** are plain maps, built from the catalog with the same filters, so only
   permitted and available capabilities are ever sent.
   - **Anthropic** ([tool search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)):
