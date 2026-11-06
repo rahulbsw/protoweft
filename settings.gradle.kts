@@ -12,6 +12,7 @@ val modules = listOf(
     "agentweave-utcp",
     "agentweave-discovery",
     "agentweave-discovery-embeddings",
+    "agentweave-model-bge-small-en-v15",
     "agentweave-discovery-anthropic",
     "agentweave-discovery-openai",
     "agentweave-oauth",

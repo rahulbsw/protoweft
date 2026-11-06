@@ -1,6 +1,7 @@
 package io.agentweave.discovery.embeddings;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import io.agentweave.discovery.Embedder;
@@ -12,88 +13,83 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
-/** The real in-process models (ONNX Runtime, CPU). */
+/** The real in-process bge model (ONNX Runtime, CPU). */
 class OfflineModelsTest {
 
-    static Stream<Embedder> models() {
-        return Stream.of(OfflineEmbedders.bgeSmallEnV15(), OfflineEmbedders.allMiniLmL6V2());
-    }
+    private static final Embedder BGE = OfflineEmbedders.bgeSmallEnV15();
 
     @BeforeAll
     static void loadAndMeasure() {
         // Records first-load and steady-state latency in the test report's system-out.
-        models().forEach(embedder -> {
-            long start = System.nanoTime();
-            embedder.embedDocument("warm up");
-            long firstMillis = (System.nanoTime() - start) / 1_000_000;
+        long start = System.nanoTime();
+        BGE.embedDocument("warm up");
+        long firstMillis = (System.nanoTime() - start) / 1_000_000;
 
-            List<String> docs = IntStream.range(0, 50)
-                    .mapToObj(i -> "tool_" + i + ": reads the file at the given path and returns its lines")
-                    .toList();
-            start = System.nanoTime();
-            docs.forEach(embedder::embedDocument);
-            double sequentialMillis = (System.nanoTime() - start) / 1e6 / docs.size();
-            start = System.nanoTime();
-            embedder.embedDocuments(docs);
-            double batchedMillis = (System.nanoTime() - start) / 1e6 / docs.size();
+        List<String> docs = IntStream.range(0, 100)
+                .mapToObj(i -> "tool_" + i + ": reads the file at the given path and returns its lines")
+                .toList();
+        start = System.nanoTime();
+        docs.forEach(BGE::embedDocument);
+        double sequentialMillis = (System.nanoTime() - start) / 1e6 / docs.size();
+        start = System.nanoTime();
+        BGE.embedDocuments(docs);
+        double batchedMillis = (System.nanoTime() - start) / 1e6 / docs.size();
 
-            System.out.printf("[timing] %s: first embedding (incl. load) %d ms; %.2f ms/embedding sequential;"
-                            + " %.2f ms/embedding batched (%d cores)%n",
-                    embedder.name(), firstMillis, sequentialMillis, batchedMillis,
-                    Runtime.getRuntime().availableProcessors());
-        });
+        System.out.printf("[timing] %s: first embedding (incl. load) %d ms; %.2f ms/embedding sequential;"
+                        + " %.2f ms/embedding in a batch of 100 (%d cores)%n",
+                BGE.name(), firstMillis, sequentialMillis, batchedMillis, Runtime.getRuntime().availableProcessors());
     }
 
-    @ParameterizedTest
-    @MethodSource("models")
-    void producesVectorsOfTheDeclaredDimension(Embedder embedder) {
-        assertThat(embedder.dimension()).isEqualTo(384);
-        assertThat(embedder.embedDocument("fs.read: read a file")).hasSize(384);
-        assertThat(embedder.embedQuery("read a file")).hasSize(384);
+    @Test
+    void producesNormalizedVectorsOfTheDeclaredDimension() {
+        float[] vector = BGE.embedDocument("fs.read: read a file");
+
+        assertThat(BGE.dimension()).isEqualTo(384);
+        assertThat(vector).hasSize(384);
+        assertThat(BGE.embedQuery("read a file")).hasSize(384);
+        double norm = 0;
+        for (float v : vector) {
+            norm += v * v;
+        }
+        assertThat(Math.sqrt(norm)).isCloseTo(1.0, within(1e-5));
     }
 
-    @ParameterizedTest
-    @MethodSource("models")
-    void sameInputGivesTheSameVector(Embedder embedder) {
-        float[] first = embedder.embedDocument("git.commit: record changes to the repository");
-        float[] second = embedder.embedDocument("git.commit: record changes to the repository");
-
-        assertThat(second).containsExactly(first);
-        assertThat(embedder.embedQuery("commit my changes")).containsExactly(embedder.embedQuery("commit my changes"));
+    @Test
+    void sameInputGivesTheSameVector() {
+        assertThat(BGE.embedDocument("git.commit: record changes to the repository"))
+                .containsExactly(BGE.embedDocument("git.commit: record changes to the repository"));
+        assertThat(BGE.embedQuery("commit my changes")).containsExactly(BGE.embedQuery("commit my changes"));
     }
 
-    @ParameterizedTest
-    @MethodSource("models")
-    void paraphraseRanksAboveUnrelatedText(Embedder embedder) {
-        assertCloser(embedder, "list files in a directory", "List the contents of a folder", "Get the current weather");
-        assertCloser(embedder, "what's the temperature outside", "Get the current weather", "List the contents of a folder");
-        assertCloser(embedder, "send an email to my boss", "Compose and send an email message", "Delete a database table");
+    @Test
+    void paraphraseRanksAboveUnrelatedText() {
+        assertCloser("list files in a directory", "List the contents of a folder", "Get the current weather");
+        assertCloser("what's the temperature outside", "Get the current weather", "List the contents of a folder");
+        assertCloser("send an email to my boss", "Compose and send an email message", "Delete a database table");
     }
 
-    @ParameterizedTest
-    @MethodSource("models")
-    void batchedEmbeddingsMatchSingleEmbeddings(Embedder embedder) {
-        List<String> docs = List.of("Get the current weather", "List the contents of a folder", "Translate text");
+    @Test
+    void batchedEmbeddingsEqualSingleEmbeddings() {
+        List<String> docs = new ArrayList<>(List.of("Get the current weather", "List the contents of a folder",
+                "Translate text", "x", "word ".repeat(700)));
+        docs.addAll(ParityCorpus.tricky());
 
-        List<float[]> batched = embedder.embedDocuments(docs);
+        List<float[]> batched = BGE.embedDocuments(docs);
 
         assertThat(batched).hasSize(docs.size());
         for (int i = 0; i < docs.size(); i++) {
-            assertThat(batched.get(i)).containsExactly(embedder.embedDocument(docs.get(i)), within(1e-6f));
+            assertThat(batched.get(i)).as(docs.get(i)).containsExactly(BGE.embedDocument(docs.get(i)));
         }
+        assertThat(BGE.embedDocuments(List.of())).isEmpty();
     }
 
-    @ParameterizedTest
-    @MethodSource("models")
-    void concurrentUseGivesTheSameVectorsAsSequentialUse(Embedder embedder) throws Exception {
+    @Test
+    void concurrentUseGivesTheSameVectorsAsSequentialUse() throws Exception {
         List<String> texts = IntStream.range(0, 24).mapToObj(i -> "capability number " + i + " does task " + i).toList();
-        List<float[]> expected = texts.stream().map(embedder::embedDocument).toList();
+        List<float[]> expected = texts.stream().map(BGE::embedDocument).toList();
 
         int threads = 8;
         CountDownLatch start = new CountDownLatch(1);
@@ -105,9 +101,9 @@ class OfflineModelsTest {
                     start.await();
                     List<float[]> out = new ArrayList<>();
                     for (String text : texts) {
-                        out.add(embedder.embedDocument(text));
+                        out.add(BGE.embedDocument(text));
                     }
-                    out.addAll(embedder.embedDocuments(texts));
+                    out.addAll(BGE.embedDocuments(texts));
                     return out;
                 }));
             }
@@ -115,7 +111,7 @@ class OfflineModelsTest {
             for (Future<List<float[]>> future : futures) {
                 List<float[]> got = future.get(120, TimeUnit.SECONDS);
                 for (int i = 0; i < got.size(); i++) {
-                    assertThat(got.get(i)).containsExactly(expected.get(i % texts.size()), within(1e-6f));
+                    assertThat(got.get(i)).containsExactly(expected.get(i % texts.size()));
                 }
             }
         } finally {
@@ -124,39 +120,25 @@ class OfflineModelsTest {
     }
 
     @Test
-    void bgeQueryVectorDiffersFromDocumentVectorForTheSameText() {
-        Embedder bge = OfflineEmbedders.bgeSmallEnV15();
+    void queryVectorDiffersFromDocumentVectorForTheSameText() {
         String text = "list files in a directory";
 
-        assertThat(cosine(bge.embedQuery(text), bge.embedDocument(text))).isLessThan(0.9999);
+        assertThat(References.cosine(BGE.embedQuery(text), BGE.embedDocument(text))).isLessThan(0.9999);
     }
 
     @Test
-    void miniLmQueryAndDocumentVectorsAreTheSameForTheSameText() {
-        Embedder miniLm = OfflineEmbedders.allMiniLmL6V2();
-        String text = "list files in a directory";
-
-        assertThat(miniLm.embedQuery(text)).containsExactly(miniLm.embedDocument(text));
+    void textWithoutTokensIsRejected() {
+        assertThatThrownBy(() -> BGE.embedDocument("\u0000\u0001"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no tokens");
     }
 
-    private static void assertCloser(Embedder embedder, String query, String paraphrase, String unrelated) {
-        float[] q = embedder.embedQuery(query);
-        double near = cosine(q, embedder.embedDocument(paraphrase));
-        double far = cosine(q, embedder.embedDocument(unrelated));
+    private static void assertCloser(String query, String paraphrase, String unrelated) {
+        float[] q = BGE.embedQuery(query);
+        double near = References.cosine(q, BGE.embedDocument(paraphrase));
+        double far = References.cosine(q, BGE.embedDocument(unrelated));
         assertThat(near)
-                .as("%s: cos(%s, %s)=%.3f vs cos(.., %s)=%.3f", embedder.name(), query, paraphrase, near, unrelated, far)
+                .as("cos(%s, %s)=%.3f vs cos(.., %s)=%.3f", query, paraphrase, near, unrelated, far)
                 .isGreaterThan(far);
-    }
-
-    static double cosine(float[] a, float[] b) {
-        double dot = 0;
-        double na = 0;
-        double nb = 0;
-        for (int i = 0; i < a.length; i++) {
-            dot += a[i] * b[i];
-            na += a[i] * a[i];
-            nb += b[i] * b[i];
-        }
-        return dot / (Math.sqrt(na) * Math.sqrt(nb));
     }
 }
