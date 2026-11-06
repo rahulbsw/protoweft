@@ -127,7 +127,8 @@ public final class EvalMain {
         boolean dryRun = cli.flag("dry-run");
         ModelClients.Settings settings = new ModelClients.Settings(cli.optionalDecimal("temperature"),
                 cli.string("anthropic-effort", null), cli.string("anthropic-thinking", null),
-                cli.flag("anthropic-cache-tools"), cli.string("openai-reasoning-effort", null), cli.flag("count-tokens"));
+                cli.flag("anthropic-cache-tools"), cli.string("openai-reasoning-effort", null), cli.flag("count-tokens"),
+                cli.integer("max-retries", ModelClients.DEFAULT_MAX_RETRIES));
         List<String> models = cli.list("models", ModelClients.DEFAULT_MODELS);
         PriceTable prices = cli.string("prices", null) == null ? PriceTable.empty()
                 : PriceTable.load(Path.of(cli.string("prices", null)));
@@ -213,6 +214,7 @@ public final class EvalMain {
                 --ledger .eval-spend.json   --estimate-safety 1.3   --max-output-tokens 4096   --max-turns 6
                 --temperature none|<t>   --anthropic-effort <e>   --anthropic-thinking adaptive|between_tools|disabled
                 --anthropic-cache-tools   --openai-reasoning-effort <e>   --count-tokens   --dry-run
+                --max-retries <n> (SDK retries per call, default 2; raise for rate-limited proxies)
               list            available arms and retrievers
             common: --data-dir build/data  --mcptoolbench-dir  --toolret-dir  --out build/eval-results  --seed 42
             keys: ANTHROPIC_API_KEY, OPENAI_API_KEY (environment only; never printed)

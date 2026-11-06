@@ -63,12 +63,17 @@ public final class AnthropicModelClient implements ModelClient {
 
     /** A client using {@code ANTHROPIC_API_KEY}; fails fast when the variable is unset. */
     public static AnthropicModelClient fromEnv(Options options) {
-        return new AnthropicModelClient(sdkFromEnv(), options);
+        return fromEnv(options, ModelClients.DEFAULT_MAX_RETRIES);
+    }
+
+    /** As {@link #fromEnv(Options)}, retrying each call up to {@code maxRetries} times. */
+    public static AnthropicModelClient fromEnv(Options options, int maxRetries) {
+        return new AnthropicModelClient(sdkFromEnv(maxRetries), options);
     }
 
     /** An SDK client with {@code ANTHROPIC_API_KEY}, at {@code ANTHROPIC_BASE_URL} when set. */
-    static AnthropicClient sdkFromEnv() {
-        AnthropicOkHttpClient.Builder b = AnthropicOkHttpClient.builder().apiKey(requireKey());
+    static AnthropicClient sdkFromEnv(int maxRetries) {
+        AnthropicOkHttpClient.Builder b = AnthropicOkHttpClient.builder().apiKey(requireKey()).maxRetries(maxRetries);
         String base = ModelClients.baseUrl(ModelClients.ANTHROPIC_BASE_URL);
         if (base != null) {
             b.baseUrl(base);

@@ -26,7 +26,7 @@ public final class AnthropicTokenCounter {
 
     public static AnthropicTokenCounter fromEnv(String model) {
         return new AnthropicTokenCounter(
-                AnthropicModelClient.sdkFromEnv(), model);
+                AnthropicModelClient.sdkFromEnv(ModelClients.DEFAULT_MAX_RETRIES), model);
     }
 
     /** Input tokens of a full request (system, conversation and tools). */

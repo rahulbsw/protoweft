@@ -64,11 +64,16 @@ public final class OpenAiModelClient implements ModelClient {
 
     /** A client using {@code OPENAI_API_KEY}; fails fast when the variable is unset. */
     public static OpenAiModelClient fromEnv(Options options) {
+        return fromEnv(options, ModelClients.DEFAULT_MAX_RETRIES);
+    }
+
+    /** As {@link #fromEnv(Options)}, retrying each call up to {@code maxRetries} times. */
+    public static OpenAiModelClient fromEnv(Options options, int maxRetries) {
         String key = System.getenv("OPENAI_API_KEY");
         if (key == null || key.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY is not set");
         }
-        OpenAIOkHttpClient.Builder b = OpenAIOkHttpClient.builder().apiKey(key);
+        OpenAIOkHttpClient.Builder b = OpenAIOkHttpClient.builder().apiKey(key).maxRetries(maxRetries);
         String base = ModelClients.baseUrl(ModelClients.OPENAI_BASE_URL);
         if (base != null) {
             b.baseUrl(base);

@@ -12,6 +12,8 @@ public final class ModelClients {
     /** Environment variables (the SDKs' own names) that point a provider client at another endpoint, such as a proxy. */
     public static final String ANTHROPIC_BASE_URL = "ANTHROPIC_BASE_URL";
     public static final String OPENAI_BASE_URL = "OPENAI_BASE_URL";
+    /** Both SDKs' default number of retries. */
+    public static final int DEFAULT_MAX_RETRIES = 2;
 
     private ModelClients() {
     }
@@ -44,9 +46,19 @@ public final class ModelClients {
      *
      * @param anthropicCacheTools prompt-cache the tool block on Anthropic (see {@link AnthropicModelClient.Options})
      * @param countTokens wrap Anthropic clients in a {@link TokenCountingClient} using {@code count_tokens}
+     * @param maxRetries  SDK retries per call (both SDKs back off and honor {@code retry-after});
+     *                    rate-limited proxies need more than the SDK default of 2
      */
     public record Settings(Double temperature, String anthropicEffort, String anthropicThinking,
-                           boolean anthropicCacheTools, String openaiReasoningEffort, boolean countTokens) {
+                           boolean anthropicCacheTools, String openaiReasoningEffort, boolean countTokens,
+                           int maxRetries) {
+
+        /** Settings with the SDKs' default of 2 retries. */
+        public Settings(Double temperature, String anthropicEffort, String anthropicThinking,
+                        boolean anthropicCacheTools, String openaiReasoningEffort, boolean countTokens) {
+            this(temperature, anthropicEffort, anthropicThinking, anthropicCacheTools, openaiReasoningEffort,
+                    countTokens, DEFAULT_MAX_RETRIES);
+        }
 
         public Map<String, Object> describe() {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -56,6 +68,7 @@ public final class ModelClients {
             m.put("anthropicCacheTools", anthropicCacheTools);
             m.put("openaiReasoningEffort", openaiReasoningEffort == null ? "default" : openaiReasoningEffort);
             m.put("countTokens", countTokens);
+            m.put("maxRetries", maxRetries);
             m.put("anthropicBaseUrl", describeBaseUrl(ANTHROPIC_BASE_URL));
             m.put("openaiBaseUrl", describeBaseUrl(OPENAI_BASE_URL));
             return m;
@@ -77,7 +90,8 @@ public final class ModelClients {
         switch (pm[0]) {
             case "anthropic": {
                 AnthropicModelClient c = AnthropicModelClient.fromEnv(new AnthropicModelClient.Options(pm[1],
-                        s.temperature(), s.anthropicEffort(), s.anthropicThinking(), s.anthropicCacheTools()));
+                        s.temperature(), s.anthropicEffort(), s.anthropicThinking(), s.anthropicCacheTools()),
+                        s.maxRetries());
                 if (s.countTokens()) {
                     AnthropicTokenCounter counter = new AnthropicTokenCounter(c.sdk(), pm[1]);
                     return new TokenCountingClient(c, counter::count);
@@ -86,7 +100,7 @@ public final class ModelClients {
             }
             case "openai":
                 return OpenAiModelClient.fromEnv(new OpenAiModelClient.Options(pm[1], s.temperature(),
-                        s.openaiReasoningEffort()));
+                        s.openaiReasoningEffort()), s.maxRetries());
             default:
                 throw new IllegalArgumentException("unknown provider '" + pm[0] + "' (anthropic or openai)");
         }

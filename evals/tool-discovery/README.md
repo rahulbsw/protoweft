@@ -234,6 +234,9 @@ extras log every search (query, results, confidence, stage) and `goldFound`. Com
   - Without a price for a model, paid calls are refused.
   - To run without prices, pass `--allow-unpriced --max-calls N`. The report then shows tokens
     only.
+- Each call is retried by the SDK (backoff, honoring `retry-after`) up to `--max-retries` times
+  (default 2). Rate-limited proxies need more: through the local LiteLLM proxy, 100k-token
+  all-tools requests at N=1000 hit 429s that 2 retries didn't outlast. Latency includes retry waits.
 - After 3 consecutive call errors (`--max-consecutive-errors`), a (model, arm, N) cell is aborted.
   For example, the all-tools arm at an N that exceeds a provider limit. The report's notes say so.
 
