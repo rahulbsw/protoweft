@@ -63,10 +63,10 @@ artifacts.
 
 These come from local runs on 2026-11-05. The MCP server suite and the A2A TCK were re-run on
 `main` after commit `d62edad`, which fixed the two library gaps those suites found (embedded
-resources in MCP tool results, and inline file names in A2A). The MCP client figures are from a
-run of all 18 required client scenarios on the same day, on a tree based on commit `5945750`
-(`main`) plus the `auth/*` client wiring in `conformance/mcp-client`. The apps were built with the JDK 17 toolchain and run
-on JDK 21.0.10, with Node 26.3.1, Python 3.12.0 and uv 0.5.1. All three scripts exited 0.
+resources in MCP tool results, and inline file names in A2A). All 18 required MCP client
+scenarios were re-run on `main` after commit `0961934`, which let the OAuth client accept
+authorization servers on `http://localhost`. The apps were built with the JDK 17 toolchain and
+run on JDK 21.0.10, with Node 26.3.1, Python 3.12.0 and uv 0.5.1. All three scripts exited 0.
 
 ### MCP server: 31 scenarios, 65 checks
 
@@ -85,27 +85,30 @@ not support), each in a different scenario. 27 scenarios passed completely.
 
 In every scenario with a failure, the `wire-schema-valid` check still passed.
 
-### MCP client: 18 scenarios, 67 scored checks
+### MCP client: 18 scenarios
 
-18 checks passed and 49 are in the baseline; `mcp-client.sh` exited 0. Check counts are distinct
-check ids per scenario. In the `auth/*` scenarios fewer checks are emitted than a complete flow
-produces, because the flow stops after discovering the protected resource metadata (see the
-agentweave-oauth bug below). With that bug patched in a scratch copy (not in this tree), all 14
-`auth/*` scenarios passed every check: 183 of 183.
+Counts are the suite's own `Passed:` totals per scenario. Every `auth/*` scenario passed every
+check (227 of 227); the only failures are the baselined elicitation and SSE-retry checks.
+`mcp-client.sh` exited 0.
 
-| Scenario | Passed | Baselined |
+| Scenario | Passed | Failed (baselined) |
 |---|---|---|
 | `initialize` | 1/1 | 0 |
 | `tools_call` | 2/2 | 0 |
 | `elicitation-sep1034-client-defaults` | 0/6 | 6 (unsupported) |
-| `sse-retry` | 1/3 (`client-sse-graceful-reconnect`) | 2 (upstream SDK bug) |
-| `auth/metadata-default`, `auth/metadata-var1`, `auth/metadata-var2`, `auth/metadata-var3` | 1/7 each (`prm-pathbased-requested`) | 6 each (agentweave-oauth bug) |
-| `auth/basic-cimd` | 1/2 | 1 (agentweave-oauth bug) |
-| `auth/scope-from-www-authenticate`, `auth/scope-from-scopes-supported`, `auth/scope-omitted-when-undefined` | 1/2 each | 1 each (agentweave-oauth bug) |
-| `auth/scope-step-up` | 1/3 | 2 (agentweave-oauth bug) |
-| `auth/scope-retry-limit` | 1/2 | 1 (agentweave-oauth bug) |
-| `auth/token-endpoint-auth-basic`, `-post`, `-none` | 1/4 each | 3 each (agentweave-oauth bug) |
-| `auth/pre-registration` | 1/2 | 1 (agentweave-oauth bug) |
+| `sse-retry` | 1/2 | 1 failure and 1 warning, both baselined (upstream SDK bug) |
+| `auth/metadata-default`, `auth/metadata-var1`, `auth/metadata-var2`, `auth/metadata-var3` | 18/18 each | 0 |
+| `auth/basic-cimd` | 13/13 | 0 |
+| `auth/scope-from-www-authenticate`, `auth/scope-from-scopes-supported`, `auth/scope-omitted-when-undefined` | 14/14 each | 0 |
+| `auth/scope-step-up` | 20/20 | 0 |
+| `auth/scope-retry-limit` | 10/10 (the client stops with 403 after its retry limit, as the scenario requires) | 0 |
+| `auth/token-endpoint-auth-basic`, `-post`, `-none` | 19/19 each | 0 |
+| `auth/pre-registration` | 13/13 | 0 |
+
+Before `0961934`, the OAuth client refused the suite's authorization server: plain `http` was
+allowed only for the literal addresses `127.0.0.0/8` and `::1`, not the name `localhost`, so every
+`auth/*` flow stopped after fetching the protected resource metadata. It now also accepts the exact
+name `localhost` (see `agentweave-oauth`); the redirect receiver still binds `127.0.0.1`.
 
 ### A2A TCK, MUST level: 235 test cases
 
@@ -137,25 +140,6 @@ deselected.
 |---|---|
 | `elicitation-sep1034-client-defaults:*`: the 6 checks `general`, `string-`, `integer-`, `number-`, `enum-` and `boolean-default` | `McpFeatures.ELICITATION` is unsupported. The connector declares no elicitation capability, so `elicitation/create` is answered with `-32601`. |
 | `sse-retry:client-sse-retry-timing`, `sse-retry:client-sse-last-event-id` | Upstream bug in MCP Java SDK 2.1.0 (see below). The MCP Java SDK's own baseline lists `sse-retry` too. |
-| `auth/metadata-{default,var1,var2,var3}`: `authorization-server-metadata`, `client-registration`, `authorization-request`, `token-request`, `resource-parameter-in-authorization`, `resource-parameter-in-token` | agentweave-oauth bug: `http://localhost` authorization servers are refused (see below). |
-| `auth/basic-cimd:cimd-client-id-used`; `auth/scope-from-www-authenticate`, `auth/scope-from-scopes-supported`, `auth/scope-omitted-when-undefined`, `auth/scope-retry-limit`: the check named like the scenario; `auth/scope-step-up`: `scope-step-up-initial`, `scope-step-up-escalation`; `auth/pre-registration:pre-registration-auth` | Same agentweave-oauth bug. |
-| `auth/token-endpoint-auth-{basic,post,none}`: `token-endpoint-auth-method`, `resource-parameter-in-authorization`, `resource-parameter-in-token` | Same agentweave-oauth bug. |
-
-The agentweave-oauth bug in detail:
-
-- Every mock server of the suite listens on `http://localhost:<port>`, its authorization server
-  included.
-- `Uris.requireSecure` (`agentweave-oauth/src/main/java/io/agentweave/oauth/Uris.java:121-132`)
-  allows plain `http` only when `Uris.isLoopback` (`Uris.java:112-118`) is true, and
-  `isLoopback` accepts the literal addresses `127.0.0.0/8` and `::1` only, never the name
-  `localhost`.
-- `Discovery.authorizationServer` (`Discovery.java:92`) applies it to the issuer listed in the
-  protected resource metadata, so `OAuthClient.handleUnauthorized` gives up with
-  `authorization server issuer must use https: http://localhost:<port>`. No authorization server
-  metadata, registration, authorization or token request is sent, and the connector surfaces the
-  401.
-- With `isLoopback` also accepting `localhost` (tried in a scratch copy only), every `auth/*`
-  check passes, so this is the only gap the 14 scenarios find.
 
 The SDK bug in detail:
 
