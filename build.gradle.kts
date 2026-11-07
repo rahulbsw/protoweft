@@ -27,23 +27,54 @@ val libraryProjects = subprojects.filter {
         it.buildFile.exists()
 }
 
-// One Javadoc site for all library modules, published with the documentation under /api/.
-tasks.register<Javadoc>("aggregateJavadoc") {
-    description = "Generates combined Javadoc for all Protoweft library modules."
-    group = "documentation"
-    title = "Protoweft ${project.property("version")} API"
-    setDestinationDir(layout.buildDirectory.dir("docs/javadoc").get().asFile)
-    (options as StandardJavadocDocletOptions).apply {
-        encoding = "UTF-8"
-        addStringOption("Xdoclint:none", "-quiet")
-        links("https://docs.oracle.com/en/java/javase/17/docs/api/")
+// Each library module builds its own Javadoc (resolving only its own compile classpath, which Gradle
+// 9 allows, unlike a root task resolving another project's configuration). Apply the shared Javadoc
+// options to every module so the per-module output is consistent and lenient about doc lint.
+libraryProjects.forEach { p ->
+    p.plugins.withId("java") {
+        p.tasks.withType<Javadoc>().configureEach {
+            (options as StandardJavadocDocletOptions).apply {
+                encoding = "UTF-8"
+                addStringOption("Xdoclint:none", "-quiet")
+                links("https://docs.oracle.com/en/java/javase/17/docs/api/")
+            }
+        }
     }
+}
+
+// Collect every library module's Javadoc under one directory (published with the documentation under
+// /api/<module>/), with a landing page linking each module's API.
+tasks.register<Sync>("aggregateJavadoc") {
+    description = "Collects each Protoweft library module's Javadoc for publishing."
+    group = "documentation"
+    into(layout.buildDirectory.dir("docs/javadoc"))
     libraryProjects.forEach { p ->
         p.plugins.withId("java") {
-            val main = p.extensions.getByType<SourceSetContainer>()["main"]
-            source(main.allJava)
-            classpath += main.compileClasspath + main.output
+            val javadoc = p.tasks.named<Javadoc>("javadoc")
+            from(javadoc.map { it.destinationDir!! }) { into(p.name) }
         }
+    }
+    doLast {
+        val root = layout.buildDirectory.dir("docs/javadoc").get().asFile
+        // Only link modules that actually produced Javadoc (a source-less module makes none).
+        val modules = root.listFiles { f -> f.isDirectory && f.resolve("index.html").exists() }
+            ?.map { it.name }?.sorted() ?: emptyList()
+        val links = modules.joinToString("\n") { "      <li><a href=\"$it/index.html\">$it</a></li>" }
+        root.resolve("index.html").writeText(
+            """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head><meta charset="utf-8"><title>Protoweft ${project.property("version")} API</title></head>
+            <body>
+              <h1>Protoweft ${project.property("version")} API</h1>
+              <p>Javadoc by module:</p>
+              <ul>
+            $links
+              </ul>
+            </body>
+            </html>
+            """.trimIndent(),
+        )
     }
 }
 
