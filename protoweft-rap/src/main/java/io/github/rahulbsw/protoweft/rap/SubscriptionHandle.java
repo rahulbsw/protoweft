@@ -95,13 +95,12 @@ final class SubscriptionHandle implements RapSubscription {
 
     /** The call's result was delivered: held events may follow. */
     void release() {
-        List<Map<String, Object>> out;
+        // Enqueue under the lock: an event emitted concurrently must not overtake the held ones.
         synchronized (this) {
             released = true;
-            out = new ArrayList<>(held);
+            held.forEach(queue::send);
             held.clear();
         }
-        out.forEach(queue::send);
     }
 
     /** {@code /cancel_tool_call}: stop without another event (subscription-events.md "Security Considerations"). */

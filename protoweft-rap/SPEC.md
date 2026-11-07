@@ -160,6 +160,12 @@ protocols need it); the context SPI keeps every RAP type out of core.
   first, then held events), on a delivery pool separate from the tool executor. 5xx, connection
   errors and timeouts are retried (default 5 attempts, 500 ms doubling to 30 s); 4xx is not.
   `callbackAuthorizer(..)` adds an `Authorization` header for runtimes that want one.
+  - *Bug post-mortem (ordering).* Held events used to be enqueued after the subscription's lock was
+    released, so an event a tool's own thread emitted in that gap — typically the `final` one —
+    overtook them; the client then closed the subscription and ignored the earlier events as late.
+    Found by repeated runs of the gateway example (1 in 6 lost two events). Held events are now
+    enqueued under the same lock that orders new emissions; `SubscriptionOrderingTest` (300
+    immediate three-event bursts) failed within 90 calls before the fix and passes after.
 - **Callback URL policy (spec silent; Protoweft decision).** `RapCallbackPolicy.DEFAULT`: `https`
   to any host except literal link-local, wildcard or multicast addresses, or `http` to
   `localhost`/a literal loopback address; no DNS resolution. `allowingHosts(..)` extends it;
