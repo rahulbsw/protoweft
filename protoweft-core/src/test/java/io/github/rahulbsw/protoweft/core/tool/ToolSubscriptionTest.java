@@ -115,4 +115,20 @@ class ToolSubscriptionTest {
         assertThat(out.subscription()).containsSame(sub);
         assertThat(out.withSubscription(null).subscription()).isEmpty();
     }
+
+    @Test
+    void droppingASubscriptionCancelsItSoTheToolStops() {
+        AtomicInteger cancels = new AtomicInteger();
+        BufferedToolSubscription subscription = new BufferedToolSubscription("s", cancels::incrementAndGet);
+        ToolOutcome outcome = ToolOutcome.text("first").withSubscription(subscription);
+
+        ToolOutcome dropped = outcome.dropSubscription();
+
+        assertThat(dropped.subscription()).isEmpty();
+        assertThat(dropped.text()).isEqualTo("first");
+        assertThat(cancels.get()).isEqualTo(1);
+        assertThat(subscription.isActive()).isFalse();
+        ToolOutcome plain = ToolOutcome.text("x");
+        assertThat(plain.dropSubscription()).isSameAs(plain);
+    }
 }

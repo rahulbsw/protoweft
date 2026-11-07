@@ -92,8 +92,10 @@ Dependency rules, enforced by module boundaries:
   - **Subscriptions.** A `ToolOutcome` may carry a `ToolSubscription`: an id, a single-subscriber
     `Flow.Publisher<ToolEvent>` that completes after a `last` event or a cancel, and `cancel()`.
     Registries, the discovery catalog and its meta-tools return the source's outcome object, so
-    the subscription survives; adapters that hand results to a model (LangChain4j, Spring AI) pass
-    the first result only.
+    the subscription survives. Every consumer with no event channel — the MCP and UTCP servers,
+    the LangChain4j, Spring AI, ARGI and native discovery adapters — keeps the first result and
+    calls `ToolOutcome.dropSubscription()`, which cancels the subscription so the tool stops
+    producing events nobody reads.
   - **Per-call contexts.** A protocol defines a context as an interface extending `ToolContext`;
     `ToolContexts` carries one call's instances, passed by `ToolSource.invoke(invocation, caller,
     progress, contexts)`. `LocalTools` injects any `@AgentTool` parameter whose type extends

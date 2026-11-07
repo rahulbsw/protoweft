@@ -68,7 +68,7 @@ final class ManualServlet extends HttpServlet {
                 return;
             }
             ToolOutcome outcome = provider.tools().invoke(ToolInvocation.of(spec.name(), arguments),
-                    InboundAuthFilter.caller(req));
+                    InboundAuthFilter.caller(req)).dropSubscription();
             if (outcome.error()) {
                 String text = outcome.text();
                 error(res, 500, text.isEmpty() ? "tool '" + published + "' failed" : text);

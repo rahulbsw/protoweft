@@ -1,8 +1,9 @@
 # Protoweft
 
 **The protocol backbone for Java agents.** Protoweft puts the agent and tool interoperability
-protocols — [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org) and
-[UTCP](https://www.utcp.io) — behind one protocol-neutral Java 17 API, in both the client and the
+protocols — [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org),
+[UTCP](https://www.utcp.io) and [RAP](https://infinity.hydro.run/docs/rap/what-is-rap) — behind one
+protocol-neutral Java 17 API, in both the client and the
 server role, with optional LangChain4j, Spring AI, ARGI and Spring Boot 4 integrations.
 
 ```java
@@ -108,7 +109,7 @@ Run an example:
 
 ```bash
 ./gradlew :examples:mcp-client-example:run          # MCP client against a bundled stdio server
-./gradlew :examples:plain-java-gateway:run          # one tool and agent over MCP, UTCP and A2A
+./gradlew :examples:plain-java-gateway:run          # one tool and agent over MCP, UTCP, A2A and RAP
 ./gradlew :examples:spring-boot-example:bootRun     # the same in Spring Boot
 ```
 
@@ -119,7 +120,8 @@ Run an example:
   [agents](docs/concepts/agents.md), [security](docs/concepts/security.md),
   [errors and observability](docs/concepts/errors-and-observability.md),
   [versions and compliance](docs/concepts/compliance.md)
-- Protocols: [MCP](docs/protocols/mcp.md), [A2A](docs/protocols/a2a.md), [UTCP](docs/protocols/utcp.md)
+- Protocols: [MCP](docs/protocols/mcp.md), [A2A](docs/protocols/a2a.md), [UTCP](docs/protocols/utcp.md),
+  [RAP](docs/protocols/rap.md)
 - Integrations: [Spring Boot](docs/integrations/spring-boot.md),
   [LangChain4j](docs/integrations/langchain4j.md), [Spring AI](docs/integrations/spring-ai.md),
   [ARGI](docs/integrations/argi.md), [OAuth](docs/integrations/oauth.md),

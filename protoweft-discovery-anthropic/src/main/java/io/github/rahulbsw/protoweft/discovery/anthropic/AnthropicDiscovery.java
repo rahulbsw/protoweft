@@ -198,7 +198,7 @@ public final class AnthropicDiscovery {
         }
         ToolOutcome outcome;
         try {
-            outcome = catalog.invoke(catalogName.get(), input, caller);
+            outcome = catalog.invoke(catalogName.get(), input, caller).dropSubscription();
         } catch (ProtoweftException e) {
             return e.category() == ErrorCategory.TOOL_NOT_FOUND ? unknown(id, name) : error(id, e.getMessage());
         }

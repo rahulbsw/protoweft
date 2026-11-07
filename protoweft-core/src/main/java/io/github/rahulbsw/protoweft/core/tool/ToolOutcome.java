@@ -42,10 +42,23 @@ public record ToolOutcome(List<Content> content, boolean error, Object structure
 
     /**
      * The subscription this call started, if any: the tool keeps sending events after this
-     * result. Consumers that can only use the first result ignore it.
+     * result. A consumer that can only use the first result must call {@link #dropSubscription()},
+     * so the tool stops producing events nobody will read.
      */
     public Optional<ToolSubscription> subscription() {
         return Optional.ofNullable(subscriptionHandle);
+    }
+
+    /**
+     * For consumers that can't deliver events (a protocol or framework with no event channel):
+     * cancels the subscription, if any, and returns this outcome without it.
+     */
+    public ToolOutcome dropSubscription() {
+        if (subscriptionHandle == null) {
+            return this;
+        }
+        subscriptionHandle.cancel();
+        return new ToolOutcome(content, error, structured, null);
     }
 
     /** A copy carrying {@code subscription} (or none, for {@code null}). */

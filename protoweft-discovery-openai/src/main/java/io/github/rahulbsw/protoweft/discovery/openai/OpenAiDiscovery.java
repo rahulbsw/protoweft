@@ -378,7 +378,7 @@ public final class OpenAiDiscovery {
             session.select(List.of(name.get()));
         }
         try {
-            return OutcomeText.of(catalog.invoke(name.get(), arguments, caller));
+            return OutcomeText.of(catalog.invoke(name.get(), arguments, caller).dropSubscription());
         } catch (ProtoweftException e) {
             return e.category() == ErrorCategory.TOOL_NOT_FOUND ? unknown : "Error: " + e.getMessage();
         } catch (RuntimeException e) {

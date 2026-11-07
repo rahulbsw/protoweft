@@ -62,7 +62,7 @@ final class ProtoweftToolCallback implements ToolCallback {
         ToolOutcome outcome;
         try {
             outcome = source.invoke(new ToolInvocation(toolName, arguments),
-                    who == null ? CallerIdentity.ANONYMOUS : who, progress(toolContext));
+                    who == null ? CallerIdentity.ANONYMOUS : who, progress(toolContext)).dropSubscription();
         } catch (ProtoweftException e) {
             throw new ToolExecutionException(definition, e);
         }

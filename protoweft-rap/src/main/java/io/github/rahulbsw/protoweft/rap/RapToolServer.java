@@ -168,7 +168,7 @@ public final class RapToolServer implements ServerEndpointProvider, AutoCloseabl
 
         /** Timeout of each callback request; default 30 seconds. */
         public Builder requestTimeout(Duration timeout) {
-            this.requestTimeout = Objects.requireNonNull(timeout, "timeout");
+            this.requestTimeout = positive(timeout, "requestTimeout");
             return this;
         }
 
@@ -186,7 +186,7 @@ public final class RapToolServer implements ServerEndpointProvider, AutoCloseabl
 
         /** How long {@link RapCallContext#askUser(String, List, int)} waits before using the default; default 10 minutes. */
         public Builder choiceTimeout(Duration timeout) {
-            this.choiceTimeout = Objects.requireNonNull(timeout, "timeout");
+            this.choiceTimeout = positive(timeout, "choiceTimeout");
             return this;
         }
 
@@ -214,6 +214,14 @@ public final class RapToolServer implements ServerEndpointProvider, AutoCloseabl
             return new RapToolServer(new ServerState(tools, name, description, baseUrl, basePath,
                     store != null ? store : new InMemoryRapStore(), storeKey != null ? storeKey : name, exec, owns,
                     deliveries, sender, callbackPolicy, choiceTimeout, clock));
+        }
+
+        private static Duration positive(Duration value, String name) {
+            Objects.requireNonNull(value, name);
+            if (value.isZero() || value.isNegative()) {
+                throw new IllegalArgumentException(name + " must be positive: " + value);
+            }
+            return value;
         }
     }
 }

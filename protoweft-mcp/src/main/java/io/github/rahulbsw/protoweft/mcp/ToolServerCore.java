@@ -155,7 +155,7 @@ final class ToolServerCore {
         ToolProgress progress = new SessionProgress(exchange, request.progressToken(), request.name());
         ToolInvocation invocation = ToolInvocation.of(request.name(), request.arguments());
         Observation observation = new Observation(ProtocolId.MCP, "tools/call", request.name());
-        Mono<McpSchema.CallToolResult> work = Mono.fromCallable(() -> toResult(tools.invoke(invocation, caller, progress)))
+        Mono<McpSchema.CallToolResult> work = Mono.fromCallable(() -> toResult(tools.invoke(invocation, caller, progress).dropSubscription()))
                 .subscribeOn(Schedulers.boundedElastic())
                 .timeout(requestTimeout, Mono.error(() -> new ProtoweftException(ErrorCategory.TIMEOUT, ProtocolId.MCP,
                         "tool call '" + request.name() + "' timed out after " + requestTimeout)));

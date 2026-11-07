@@ -71,7 +71,7 @@ final class ProtoweftTool implements Tool {
     private ToolResult run(Map<String, Object> arguments, CallerIdentity identity, ToolProgress progress) {
         ToolOutcome outcome;
         try {
-            outcome = source.invoke(new ToolInvocation(toolName, arguments), identity, progress);
+            outcome = source.invoke(new ToolInvocation(toolName, arguments), identity, progress).dropSubscription();
         } catch (ProtoweftException e) {
             return Results.failure(e);
         }

@@ -280,6 +280,14 @@ Paths are under `docs/docs/rap/spec/` at Infinity `e1a3e4b`.
   this module follows the current spec and will track the rename.
 - Serial processing per `group_id` uses 256 striped locks (a thread id always maps to the same
   lock, so ordering holds; unrelated threads may occasionally wait on each other).
+- **Not yet offered:** an `ObservationHandler` hook on the connector and server (so no Micrometer
+  observations for RAP); a configurable callback path (fixed at `/rap/callback/`); static outbound
+  headers (only `CredentialProvider` / `HttpAuthorizer`); argument validation against
+  `inputSchema` (a SHOULD; no JSON Schema validator dependency).
+- **Elsewhere in Protoweft**, outcomes reach consumers with no event channel (MCP, UTCP, the
+  framework and native-discovery adapters); they keep the first result and cancel the
+  subscription (`ToolOutcome.dropSubscription()`), so a RAP-backed subscription re-served over MCP
+  ends at once.
 
 ## Coverage
 

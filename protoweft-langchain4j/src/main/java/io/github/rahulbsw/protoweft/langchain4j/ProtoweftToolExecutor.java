@@ -57,7 +57,8 @@ final class ProtoweftToolExecutor implements ToolExecutor {
         CallerIdentity who = caller.apply(context);
         ToolOutcome outcome;
         try {
-            outcome = source.invoke(new ToolInvocation(toolName, arguments), who == null ? CallerIdentity.ANONYMOUS : who);
+            outcome = source.invoke(new ToolInvocation(toolName, arguments), who == null ? CallerIdentity.ANONYMOUS : who)
+                    .dropSubscription();
         } catch (ProtoweftException e) {
             // Wrapped so LangChain4j's error handlers receive the ProtoweftException itself.
             throw e.category() == ErrorCategory.INVALID_ARGUMENTS

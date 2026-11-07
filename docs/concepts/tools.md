@@ -265,9 +265,10 @@ out.subscription().ifPresent(subscription -> subscription.events().subscribe(new
   (`RapClientConnector`), and on the server, where a tool subscribes through `RapCallContext`.
   `LocalTools`, `ToolRegistry` and the discovery catalog return the source's outcome object, so the
   subscription passes through, and `RapToolServer` re-serves one as RAP subscription events.
-- **Everywhere else** (the MCP, UTCP and A2A servers, and the LangChain4j, Spring AI and ARGI
-  adapters) only the first result is used and events don't reach a model. Nothing cancels the
-  subscription for you there, so cancel subscriptions you don't consume.
+- **Everywhere else** (the MCP and UTCP servers, and the LangChain4j, Spring AI, ARGI and native
+  discovery adapters) only the first result is used: they call `ToolOutcome.dropSubscription()`,
+  which cancels the subscription so the tool stops producing events nobody reads. Your own code
+  that ignores `subscription()` should do the same.
 
 ## The tool registry
 
