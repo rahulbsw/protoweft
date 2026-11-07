@@ -44,4 +44,14 @@ public interface ToolSource {
     default ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress) {
         return invoke(invocation, caller);
     }
+
+    /**
+     * Calls one tool with the {@link ToolContext}s its serving protocol provides (for example RAP's
+     * call context). Sources that don't hand contexts to tools inherit the default, which drops
+     * them; sources that wrap others pass them on.
+     */
+    default ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress,
+                               ToolContexts contexts) {
+        return invoke(invocation, caller, progress);
+    }
 }
