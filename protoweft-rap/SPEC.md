@@ -325,8 +325,8 @@ field); the client's negotiated revision is that same value after `start()`.
   recovered subscription, whose cancel reaches the server; store persistence and concurrent writers.
 - Core: `ToolSubscriptionTest` (5), `ToolContextsTest` (4).
 
-Interop with Hydro's reference implementations (their `get-time` `local.mjs` against our client,
-their Rust `rap-client` against our server) is not part of this module's tests.
+Interop with Hydro's reference implementations runs from `scripts/interop/rap.sh` through
+env-gated tests (skipped in a normal build); results are in *Interoperability* below.
 
 ## Sources
 

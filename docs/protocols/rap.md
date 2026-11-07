@@ -27,8 +27,16 @@ all at Infinity commit `e1a3e4b`.
     - Open upstream issue [hydro-project/infinity#101](https://github.com/hydro-project/infinity/issues/101)
       proposes renaming `group_id` to `thread_id`, a breaking wire change. Protoweft follows the
       current specification (`group_id`) and will track the rename.
-    - Interoperability with Hydro's reference implementations is recorded in the module's
-      `SPEC.md` (`protoweft-rap/SPEC.md`), section *Interoperability*.
+    - **Interoperability is tested both ways** against Hydro's own code at `e1a3e4b`
+      (`scripts/interop/rap.sh`): the Protoweft client against five Hydro tool servers (JS
+      `get-time`, the Rust stub servers, `sandbox-local`, the steering server and the GitHub
+      poller) covering text, image and error results, `view_update`, user choice (answered and
+      dismissed), subscriptions with `final`, cancellation and thread closure; and Hydro's Rust
+      runtime code (toolset loader, invocation, callback bridge, notifier) against `RapToolServer`,
+      covering all of those plus `oauth`. No Hydro tool server sends `oauth` at this commit, so the
+      client's OAuth path is tested only against Protoweft's own server. Differences found on
+      Hydro's side (for example an event after a cancel, and 404s on the lifecycle routes) are
+      listed in the module's `SPEC.md`, section *Interoperability*.
 
 ## What RAP is, and isn't
 
