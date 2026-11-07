@@ -27,6 +27,9 @@ import java.util.regex.Pattern;
  *         .build();
  * }</pre>
  *
+ * <p>An {@link AgentTool} method may also declare {@link CallerIdentity}, {@link ToolProgress} and
+ * {@link ToolContext} parameters; they are injected per call and left out of the schema.
+ *
  * <p>Immutable and thread-safe once built; tool implementations must be thread-safe.
  */
 public final class LocalTools implements ToolSource {
@@ -44,10 +47,15 @@ public final class LocalTools implements ToolSource {
     }
 
     /** One tool: its description and implementation. */
-    public record LocalTool(ToolSpec spec, ProgressAwareToolHandler handler) {
+    public record LocalTool(ToolSpec spec, ContextualToolHandler handler) {
         public LocalTool {
             Objects.requireNonNull(spec, "spec");
             Objects.requireNonNull(handler, "handler");
+        }
+
+        /** A tool whose handler reports progress but uses no {@link ToolContext}. */
+        public LocalTool(ToolSpec spec, ProgressAwareToolHandler handler) {
+            this(spec, adapt(Objects.requireNonNull(handler, "handler")));
         }
 
         /** A tool whose handler doesn't report progress. */
@@ -55,8 +63,12 @@ public final class LocalTools implements ToolSource {
             this(spec, adapt(Objects.requireNonNull(handler, "handler")));
         }
 
-        private static ProgressAwareToolHandler adapt(ToolHandler handler) {
-            return (args, caller, progress) -> handler.handle(args, caller);
+        private static ContextualToolHandler adapt(ToolHandler handler) {
+            return (args, caller, progress, contexts) -> handler.handle(args, caller);
+        }
+
+        private static ContextualToolHandler adapt(ProgressAwareToolHandler handler) {
+            return (args, caller, progress, contexts) -> handler.handle(args, caller, progress);
         }
     }
 
@@ -78,13 +90,20 @@ public final class LocalTools implements ToolSource {
 
     @Override
     public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress) {
+        return invoke(invocation, caller, progress, ToolContexts.EMPTY);
+    }
+
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress,
+                              ToolContexts contexts) {
         LocalTool tool = tools.get(invocation.toolName());
         if (tool == null) {
             throw new ProtoweftException(ErrorCategory.TOOL_NOT_FOUND, null, "unknown tool: " + invocation.toolName());
         }
         try {
             ToolOutcome outcome = tool.handler().handle(invocation.arguments(),
-                    caller == null ? CallerIdentity.ANONYMOUS : caller, progress == null ? ToolProgress.NOOP : progress);
+                    caller == null ? CallerIdentity.ANONYMOUS : caller, progress == null ? ToolProgress.NOOP : progress,
+                    contexts == null ? ToolContexts.EMPTY : contexts);
             return outcome == null ? new ToolOutcome(List.of(), false, null) : outcome;
         } catch (ProtoweftException e) {
             throw e;
@@ -106,6 +125,12 @@ public final class LocalTools implements ToolSource {
         /** Adds a programmatic tool that reports progress or log messages. */
         public Builder tool(String name, String description, Map<String, Object> inputSchema,
                             ProgressAwareToolHandler handler) {
+            return add(new LocalTool(new ToolSpec(name, description, inputSchema), handler));
+        }
+
+        /** Adds a programmatic tool that uses a protocol's {@link ToolContext}. */
+        public Builder tool(String name, String description, Map<String, Object> inputSchema,
+                            ContextualToolHandler handler) {
             return add(new LocalTool(new ToolSpec(name, description, inputSchema), handler));
         }
 
@@ -162,7 +187,11 @@ public final class LocalTools implements ToolSource {
             List<String> required = new ArrayList<>();
             for (int i = 0; i < params.length; i++) {
                 Parameter p = params[i];
-                if (p.getType() == CallerIdentity.class || p.getType() == ToolProgress.class) {
+                if (isInjected(p.getType())) {
+                    if (ToolContext.class.isAssignableFrom(p.getType()) && !p.getType().isInterface()) {
+                        throw new IllegalArgumentException(where + ": a ToolContext parameter must have an interface "
+                                + "type: " + p.getType().getName());
+                    }
                     continue;
                 }
                 ToolParam tp = p.getAnnotation(ToolParam.class);
@@ -194,7 +223,7 @@ public final class LocalTools implements ToolSource {
             }
             ToolSpec spec = new ToolSpec(toolName, annotation.description(),
                     JavaTypes.objectSchema(properties, required), metadata);
-            return new LocalTool(spec, (args, caller, progress) -> {
+            return new LocalTool(spec, (args, caller, progress, contexts) -> {
                 Object[] values = new Object[params.length];
                 for (int i = 0; i < params.length; i++) {
                     if (params[i].getType() == CallerIdentity.class) {
@@ -203,6 +232,10 @@ public final class LocalTools implements ToolSource {
                     }
                     if (params[i].getType() == ToolProgress.class) {
                         values[i] = progress;
+                        continue;
+                    }
+                    if (ToolContext.class.isAssignableFrom(params[i].getType())) {
+                        values[i] = contexts.resolve(params[i].getType().asSubclass(ToolContext.class));
                         continue;
                     }
                     Object raw = args.get(names[i]);
@@ -226,6 +259,10 @@ public final class LocalTools implements ToolSource {
                     throw e.getCause() instanceof Exception ex ? ex : new IllegalStateException(e.getCause());
                 }
             });
+        }
+
+        private static boolean isInjected(Class<?> type) {
+            return type == CallerIdentity.class || type == ToolProgress.class || ToolContext.class.isAssignableFrom(type);
         }
 
         private static ToolOutcome toOutcome(Object result) {

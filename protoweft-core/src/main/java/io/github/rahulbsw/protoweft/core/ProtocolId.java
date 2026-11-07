@@ -21,6 +21,9 @@ public record ProtocolId(String value) {
     /** Universal Tool Calling Protocol. */
     public static final ProtocolId UTCP = new ProtocolId("utcp");
 
+    /** Reactive Agent Protocol (Hydro project / AWS Infinity). */
+    public static final ProtocolId RAP = new ProtocolId("rap");
+
     public ProtocolId {
         Objects.requireNonNull(value, "value");
         if (value.isBlank()) {

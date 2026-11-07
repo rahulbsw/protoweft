@@ -13,7 +13,9 @@ import java.util.regex.Pattern;
 
 /**
  * Combines many {@link ToolSource}s (MCP servers, UTCP manuals, A2A agents, local tools)
- * into one, addressing each tool as {@code <source>.<tool>} so names never clash.
+ * into one, addressing each tool as {@code <source>.<tool>} so names never clash. Calls pass
+ * the caller, progress and {@link ToolContexts} through, and return the source's outcome unchanged
+ * (including any {@link ToolOutcome#subscription()}).
  *
  * <p>Thread-safe. Closing the registry closes every registered source that is
  * {@link AutoCloseable}.
@@ -76,6 +78,12 @@ public final class ToolRegistry implements ToolSource, AutoCloseable {
 
     @Override
     public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress) {
+        return invoke(invocation, caller, progress, ToolContexts.EMPTY);
+    }
+
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller, ToolProgress progress,
+                              ToolContexts contexts) {
         String qualified = invocation.toolName();
         int dot = qualified.indexOf(SEPARATOR);
         ToolSource source = dot > 0 ? snapshot().get(qualified.substring(0, dot)) : null;
@@ -83,7 +91,8 @@ public final class ToolRegistry implements ToolSource, AutoCloseable {
             throw new ProtoweftException(ErrorCategory.TOOL_NOT_FOUND, null,
                     "no source for tool '" + qualified + "'; expected '<source>" + SEPARATOR + "<tool>'");
         }
-        return source.invoke(new ToolInvocation(qualified.substring(dot + 1), invocation.arguments()), caller, progress);
+        return source.invoke(new ToolInvocation(qualified.substring(dot + 1), invocation.arguments()), caller, progress,
+                contexts == null ? ToolContexts.EMPTY : contexts);
     }
 
     @Override
