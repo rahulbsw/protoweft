@@ -59,7 +59,8 @@ its `Authorization` header replaces a static header of the same name. `protoweft
 `OAuthClient` implements it with the full MCP authorization flow: protected resource metadata,
 authorization server discovery, client registration, PKCE, refresh and step-up. See
 [MCP authorization](../protocols/mcp.md#authorization) and [OAuth](../integrations/oauth.md). The
-A2A and UTCP connectors don't take an authorizer; they use the `CredentialProvider` only.
+RAP connector also accepts one (`RapClientConnector.Builder.authorizer(..)`). The A2A and UTCP
+connectors don't take an authorizer; they use the `CredentialProvider` only.
 
 Credentials never reach observation hooks. Telemetry sees only the target: the executable for MCP
 stdio (never its arguments), and a URL without user info, query or fragment for HTTP.
@@ -67,8 +68,11 @@ stdio (never its arguments), and a URL without user info, query or fragment for 
 ## Inbound: `InboundAuthenticator`
 
 Every Protoweft server endpoint runs one `InboundAuthenticator` before handling a request. That
-covers MCP over HTTP, **both** A2A endpoints (the agent card and JSON-RPC), and the UTCP manual and
-tool routes, so one implementation protects all three protocols.
+covers MCP over HTTP, **both** A2A endpoints (the agent card and JSON-RPC), the UTCP manual and
+tool routes, and every RAP tool-server route, so one implementation protects all four protocols.
+The one exception is the RAP *client's* callback endpoint, which tool servers call without
+credentials: wrap your authenticator with `RapCallbackEndpoint.exemptCallbacks(..)` (see
+[RAP](../protocols/rap.md#callbacks-on-the-applications-server)).
 
 ```java
 InboundAuthenticator apiKeys = request -> request.header("X-Api-Key")

@@ -19,23 +19,23 @@ report.require(McpFeatures.TOOLS_LIST);   // throws UNSUPPORTED if not implement
 
 | Field | Meaning |
 |---|---|
-| `protocol` | The `ProtocolId`: `mcp`, `a2a` or `utcp`. |
+| `protocol` | The `ProtocolId`: `mcp`, `a2a`, `utcp` or `rap`. |
 | `sdkName` | The SDK artifact the module is built on, or `none` for a module implemented from the specification. |
 | `sdkVersion` | That SDK's version. For an SDK-less module, the module's own version. Never a spec revision. |
-| `wireRevisions` | The protocol revisions the component can speak, oldest first. |
+| `wireRevisions` | The protocol revisions the component can speak, oldest first. For RAP, which has no version, the commit of the specification followed (`infinity@e1a3e4b`). |
 | `negotiatedRevision` | The revision agreed with the peer. `null` before `start()`; always `null` for servers, which negotiate per session. `negotiated()` wraps it in an `Optional`. |
 | `supported` | Feature ids the component implements. |
 | `unsupported` | Feature ids the protocol defines but the component doesn't implement. |
 
-A feature id can't be in both sets. Feature-id constants live in `McpFeatures`, `A2aFeatures`
-and `UtcpFeatures`; each protocol guide lists them under *Coverage*.
+A feature id can't be in both sets. Feature-id constants live in `McpFeatures`, `A2aFeatures`,
+`UtcpFeatures` and `RapFeatures`; each protocol guide lists them under *Coverage*.
 
 Where to read reports:
 
 | Component | Report |
 |---|---|
-| `McpClientConnector`, `A2aAgentConnector`, `UtcpClientConnector` | `compliance()`, with the negotiated revision after `start()` |
-| `McpToolServer.Http`, `McpToolServer.Stdio`, `A2aAgentServer` | `compliance()`, no negotiated revision |
+| `McpClientConnector`, `A2aAgentConnector`, `UtcpClientConnector`, `RapClientConnector` | `compliance()`, with the negotiated revision after `start()` |
+| `McpToolServer.Http`, `McpToolServer.Stdio`, `A2aAgentServer`, `RapToolServer` | `compliance()`, no negotiated revision |
 | `UtcpManualProvider` | none; it declares `utcp_version` `1.1.0` in the manual it serves |
 | Spring Boot | Actuator `info` under `protoweft.connectors.<name>`, for client connectors |
 
@@ -90,6 +90,22 @@ lists every feature id per role.
 | Negotiated revision | the manual's declared `utcp_version`, as declared and not validated, like the Python reference | — |
 | Reference checked against | python-utcp core `1.2.0`, `utcp-http` `1.1.15` | same |
 
+### RAP
+
+| | Client (`RapClientConnector`) | Server (`RapToolServer`) |
+|---|---|---|
+| SDK | `none`: no Java SDK exists; implemented from the specification | same |
+| `sdkVersion` | the `protoweft-rap` module version (`0.1.0-SNAPSHOT`) | same |
+| Specification | Hydro Infinity's RAP, unversioned; followed at commit `e1a3e4b`, reported as wire revision `infinity@e1a3e4b` | same |
+| Negotiated revision | `infinity@e1a3e4b` after `start()` (RAP negotiates nothing) | not reported |
+| Reference checked against | Rust `rap-protocol`/`rap-client` 0.2.0, JS `rap-js`, example servers `get-time` and `sandbox-core` (code at `e1a3e4b`) | same |
+| Not supported | `view_update`, `/migrate`, `display_as`, `displayScript` | same |
+
+Open upstream issue hydro-project/infinity#101 proposes renaming `group_id` to `thread_id`; the
+module follows the current specification. Interoperability results against Hydro's reference
+implementations are in the module's `SPEC.md`, section *Interoperability*. See the
+[RAP guide](../protocols/rap.md).
+
 ### Frameworks and runtime
 
 | Component | Version |
@@ -103,7 +119,7 @@ lists every feature id per role.
 | Nimbus (OAuth module, internal) | `oauth2-oidc-sdk` `11.39`, `nimbus-jose-jwt` `10.10` |
 | Jetty (embedded host) | `12.1.14` (Jakarta EE 11, Servlet 6.1) |
 | Servlet API (any host) | compiled against Jakarta Servlet `6.1.0` |
-| Jackson (UTCP module, internal) | `3.1.4` |
+| Jackson (UTCP and RAP modules, internal) | `3.1.4` |
 
 These versions are pinned in the build's `gradle.properties` (the ARGI snapshot commit in
 `scripts/install-argi-snapshot.sh`). The BOM aligns the published Protoweft modules; the protocol

@@ -3,12 +3,13 @@
 **The protocol backbone for Java agents.** Protoweft connects Java applications to the agent and
 tool interoperability protocols —
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io),
-[Agent2Agent (A2A)](https://a2a-protocol.org) and the
-[Universal Tool Calling Protocol (UTCP)](https://www.utcp.io) — behind one protocol-neutral Java 17
-API, in both the client and the server role.
+[Agent2Agent (A2A)](https://a2a-protocol.org), the
+[Universal Tool Calling Protocol (UTCP)](https://www.utcp.io) and the Hydro project's
+[Reactive Agent Protocol (RAP)](protocols/rap.md) — behind one protocol-neutral Java 17 API, in both
+the client and the server role.
 
-Write a tool once and serve it over MCP and UTCP. Consume MCP servers, UTCP manuals and remote A2A
-agents through a single tool registry. Publish your own agent over A2A. Use all of it from plain
+Write a tool once and serve it over MCP, UTCP and RAP. Consume MCP servers, UTCP manuals, RAP tool
+servers and remote A2A agents through a single tool registry. Publish your own agent over A2A. Use all of it from plain
 Java, Spring Boot 4, or the [LangChain4j](integrations/langchain4j.md),
 [Spring AI](integrations/spring-ai.md) and [ARGI](integrations/argi.md) agent frameworks.
 
@@ -36,7 +37,7 @@ System.out.println(out.text());   // 21.5
 
 <div class="grid cards" markdown>
 
-- **One API, three protocols**
+- **One API, four protocols**
 
     ---
 
@@ -68,15 +69,15 @@ System.out.println(out.text());   // 21.5
 
     ---
 
-    MCP and A2A are built on their official Java SDKs. UTCP, which has no Java SDK, is implemented
-    from the specification and checked against the Python reference client.
+    MCP and A2A are built on their official Java SDKs. UTCP and RAP, which have no Java SDK, are
+    implemented from their specifications and checked against the reference implementations.
 
 - **One registry for everything**
 
     ---
 
     `ToolRegistry` namespaces every source as `<source>.<tool>`: local methods, MCP servers, UTCP
-    manuals, and A2A agents (as an `ask` tool).
+    manuals, RAP tool servers, and A2A agents (as an `ask` tool).
 
 </div>
 
@@ -87,9 +88,10 @@ System.out.println(out.text());   // 21.5
 | MCP | `McpClientConnector` | `McpToolServer` | stdio, Streamable HTTP | `2024-11-05` to `2025-11-25` | MCP Java SDK `2.1.0` |
 | A2A | `A2aAgentConnector` | `A2aAgentServer` | JSON-RPC over HTTP, SSE streaming | `1.0` | a2a-java `1.5.0.Final` |
 | UTCP | `UtcpClientConnector` | `UtcpManualProvider` | HTTP, text and file manuals; `http` and `text` tools | `1.1` (accepts `1.0` manuals) | Implemented from the spec |
+| RAP | `RapClientConnector` | `RapToolServer` | HTTP + JSON with callbacks; subscriptions, OAuth and choice prompts, cancellation, thread closure | unversioned; Hydro Infinity `e1a3e4b` | Implemented from the spec |
 
 Each protocol guide lists exactly what is and isn't covered: [MCP](protocols/mcp.md),
-[A2A](protocols/a2a.md), [UTCP](protocols/utcp.md). The full version matrix is in
+[A2A](protocols/a2a.md), [UTCP](protocols/utcp.md), [RAP](protocols/rap.md). The full version matrix is in
 [Versions and compliance](concepts/compliance.md).
 
 ## What Protoweft is not
@@ -101,8 +103,8 @@ Each protocol guide lists exactly what is and isn't covered: [MCP](protocols/mcp
   state is kept in memory.
 - **Not a re-implementation of the protocol SDKs.** Where an official Java SDK exists, Protoweft
   wraps it.
-- **Not a lowest-common-denominator façade.** Tools (MCP, UTCP) and agents (A2A) stay separate
-  concepts in the core API.
+- **Not a lowest-common-denominator façade.** Tools (MCP, UTCP, RAP) and agents (A2A) stay
+  separate concepts in the core API.
 
 !!! note "Pre-release"
     Protoweft is at `0.1.0-SNAPSHOT` and isn't published to Maven Central yet.

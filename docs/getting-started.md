@@ -97,6 +97,7 @@ Import the BOM so every Protoweft module has the same version, then add only the
 | `protoweft-mcp` | MCP client and tool server (stdio, Streamable HTTP). |
 | `protoweft-a2a` | A2A client and agent server (JSON-RPC binding). |
 | `protoweft-utcp` | UTCP client and manual provider. |
+| `protoweft-rap` | [RAP](protocols/rap.md) (Reactive Agent Protocol, Hydro Infinity) client and tool server, with subscriptions, prompts and a durable store. |
 | `protoweft-server` | The servlet hosting contract the protocol servers use. Comes with each protocol module. |
 | `protoweft-server-jetty` | An embedded Jetty 12 host for servers in plain Java. |
 | `protoweft-oauth` | [OAuth 2.1](integrations/oauth.md) for MCP authorization: a token-obtaining client for the MCP connector, and a bearer-token resource server for any endpoint. |

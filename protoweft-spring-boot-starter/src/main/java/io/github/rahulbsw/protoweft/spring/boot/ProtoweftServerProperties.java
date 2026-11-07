@@ -21,6 +21,7 @@ public class ProtoweftServerProperties {
     private final McpServer mcp = new McpServer();
     private final UtcpServer utcp = new UtcpServer();
     private final A2aServer a2a = new A2aServer();
+    private final RapServer rap = new RapServer();
 
     public int getAuthFilterOrder() {
         return authFilterOrder;
@@ -40,6 +41,10 @@ public class ProtoweftServerProperties {
 
     public A2aServer getA2a() {
         return a2a;
+    }
+
+    public RapServer getRap() {
+        return rap;
     }
 
     /** Which tools a tool server publishes. */
@@ -333,6 +338,109 @@ public class ProtoweftServerProperties {
 
         public void setAgentTimeout(Duration agentTimeout) {
             this.agentTimeout = agentTimeout;
+        }
+    }
+
+    /**
+     * The RAP (Reactive Agent Protocol) tool server: {@code GET <base-path>/.well-known/rap-toolset},
+     * {@code POST <base-path>/invoke}, {@code /close_thread}, {@code /cancel_tool_call} and
+     * {@code /user_choice_response}.
+     */
+    public static class RapServer {
+
+        /** Whether to serve tools over RAP. */
+        private boolean enabled;
+
+        /** Path every RAP route is mounted under; "/" mounts them at the root. */
+        private String basePath = "/rap";
+
+        /**
+         * Public URL runtimes use as this server's base (where .well-known/rap-toolset lives,
+         * including the base path), used in the toolset's endpoint and in choice response URLs.
+         * When unset it is derived from each request.
+         */
+        private String baseUrl;
+
+        /** Which tools to serve. */
+        private Exposure expose = Exposure.LOCAL;
+
+        /** Toolset name (1 to 128 characters); also the server's key in the RAP store. */
+        private String name = "protoweft";
+
+        /** Toolset description. */
+        private String description;
+
+        /**
+         * Hosts the server may also post callbacks to over plain http or https, beyond the default
+         * policy (https to non-link-local hosts, http to loopback).
+         */
+        private List<String> allowedCallbackHosts = new ArrayList<>();
+
+        /** How long a tool's user-choice prompt waits before using the default (server default: 10 minutes). */
+        private Duration choiceTimeout;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getBasePath() {
+            return basePath;
+        }
+
+        public void setBasePath(String basePath) {
+            this.basePath = basePath;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public Exposure getExpose() {
+            return expose;
+        }
+
+        public void setExpose(Exposure expose) {
+            this.expose = expose;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
+
+        public List<String> getAllowedCallbackHosts() {
+            return allowedCallbackHosts;
+        }
+
+        public void setAllowedCallbackHosts(List<String> allowedCallbackHosts) {
+            this.allowedCallbackHosts = allowedCallbackHosts;
+        }
+
+        public Duration getChoiceTimeout() {
+            return choiceTimeout;
+        }
+
+        public void setChoiceTimeout(Duration choiceTimeout) {
+            this.choiceTimeout = choiceTimeout;
         }
     }
 

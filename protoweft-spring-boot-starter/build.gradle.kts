@@ -21,6 +21,7 @@ dependencies {
     compileOnly(project(":protoweft-mcp"))
     compileOnly(project(":protoweft-a2a"))
     compileOnly(project(":protoweft-utcp"))
+    compileOnly(project(":protoweft-rap"))
     // Optional tool discovery (protoweft.discovery.enabled).
     compileOnly(project(":protoweft-discovery"))
     // Optional Spring AI integration (protoweft.spring-ai.*).
@@ -40,6 +41,7 @@ dependencies {
     testImplementation(project(":protoweft-mcp"))
     testImplementation(project(":protoweft-a2a"))
     testImplementation(project(":protoweft-utcp"))
+    testImplementation(project(":protoweft-rap"))
     testImplementation(project(":protoweft-discovery"))
     testImplementation(project(":protoweft-spring-ai"))
     testImplementation("org.springframework.ai:spring-ai-client-chat:$springAi")

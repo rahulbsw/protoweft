@@ -26,12 +26,15 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
 
 ## Features
 
-- **One API, three protocols.** Application code depends on `ToolSource`, `ToolConnector` and
+- **One API, four protocols.** Application code depends on `ToolSource`, `ToolConnector` and
   `AgentConnector`; only the builder call names a protocol.
-- **Client and server for every protocol.** Consume MCP servers, UTCP manuals and A2A agents;
-  publish tools over MCP and UTCP and agents over A2A, all behind one `InboundAuthenticator`.
-- **One tool registry.** `ToolRegistry` namespaces local methods, MCP servers, UTCP manuals and A2A
-  agents (as an `ask` tool) as `<source>.<tool>`.
+- **Client and server for every protocol.** Consume MCP servers, UTCP manuals, RAP tool servers and
+  A2A agents; publish tools over MCP, UTCP and RAP and agents over A2A, all behind one
+  `InboundAuthenticator`.
+- **One tool registry.** `ToolRegistry` namespaces local methods, MCP servers, UTCP manuals, RAP
+  tool servers and A2A agents (as an `ask` tool) as `<source>.<tool>`.
+- **Subscriptions.** A tool call can keep streaming events after its first result
+  (`ToolOutcome.subscription()`, a `Flow.Publisher<ToolEvent>`); RAP carries them both ways.
 - **Honest compatibility.** Every connector publishes a `ComplianceReport` with the SDK version, the
   wire revisions it speaks, the negotiated revision, and the supported and unsupported features.
 - **Tool discovery at scale.** A provider-neutral capability catalog keeps short cards apart from
@@ -51,6 +54,7 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
 | MCP | `McpClientConnector` | `McpToolServer` | stdio, Streamable HTTP; tools, resources, prompts, completion, logging, progress, OAuth | `2024-11-05` to `2025-11-25` | MCP Java SDK `2.1.0` |
 | A2A | `A2aAgentConnector` | `A2aAgentServer` | JSON-RPC, SSE streaming | `1.0` | a2a-java `1.5.0.Final` |
 | UTCP | `UtcpClientConnector` | `UtcpManualProvider` | HTTP, text and file manuals; `http` and `text` tools | `1.1` (accepts `1.0`) | implemented from the spec |
+| RAP (Hydro Infinity) | `RapClientConnector` | `RapToolServer` | HTTP + JSON with callbacks; subscriptions, OAuth and choice prompts, cancellation, thread closure, durable store | unversioned; Infinity `e1a3e4b` | implemented from the spec |
 
 Coverage and limitations are documented per protocol in the [user guide](docs/index.md).
 
@@ -66,6 +70,7 @@ Protoweft is not an LLM framework: it has no model clients, chains, memory or RA
 | `protoweft-mcp` | MCP client and tool server (stdio, Streamable HTTP). |
 | `protoweft-a2a` | A2A client and agent server (JSON-RPC). |
 | `protoweft-utcp` | UTCP client and manual provider. |
+| `protoweft-rap` | RAP (Reactive Agent Protocol) client and tool server, with subscriptions, prompts and a durable store. |
 | `protoweft-server`, `protoweft-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
 | `protoweft-oauth` | OAuth 2.1 for MCP authorization: client and resource-server pieces (Nimbus). |
 | `protoweft-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
