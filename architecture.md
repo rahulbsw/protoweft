@@ -32,6 +32,7 @@ compatibility matrix. Each module's own decisions live in its `SPEC.md`, linked 
 | Protocols | `protoweft-mcp` | MCP client and tool server, over stdio and Streamable HTTP (MCP Java SDK 2.1.0) | `protoweft-mcp` |
 | | `protoweft-a2a` | A2A client and full-lifecycle agent server, JSON-RPC binding (a2a-java 1.5.0.Final) | `protoweft-a2a` |
 | | `protoweft-utcp` | UTCP client and manual provider, implemented from spec 1.1 | `protoweft-utcp` |
+| | `protoweft-rap` | RAP client (callback endpoint mounted or built-in) and tool server, durable store; implemented from the unversioned spec at Infinity `e1a3e4b` | `protoweft-rap` |
 | Security | `protoweft-oauth` | Protocol-neutral OAuth 2.1: an `HttpAuthorizer` client and resource-server pieces (Nimbus) | `protoweft-oauth` |
 | Discovery | `protoweft-discovery` | Capability catalog, hybrid search, fallback, sessions, generic meta-tools, raw provider payloads | `protoweft-discovery` |
 | | `protoweft-discovery-embeddings` | Offline bge-small `Embedder` and a pure-Java WordPiece tokenizer on ONNX Runtime alone | `protoweft-discovery-embeddings` |
@@ -54,7 +55,7 @@ Dependency rules, enforced by module boundaries:
 - `server` depends on `core` and on the servlet API (compileOnly). Only `server-jetty` brings a
   container.
 - Each protocol module depends on `core`, on `server` (for its endpoints), and on exactly its own
-  protocol SDK (or none, for UTCP).
+  protocol SDK (or none, for UTCP and RAP).
 - `discovery` depends on `core` only. Its embedding and provider modules add one library each
   (ONNX Runtime for embeddings, plus the model artifact, which holds only data files).
 - `oauth` depends on `core`, `server` and Nimbus. Protocol modules depend only on core's
@@ -88,6 +89,16 @@ Dependency rules, enforced by module boundaries:
     parameters like `CallerIdentity` and passed by `ToolSource.invoke(invocation, caller,
     progress)`; `ProgressAwareToolHandler` is its programmatic form. Protocols without progress
     get `ToolProgress.NOOP`.
+  - **Subscriptions.** A `ToolOutcome` may carry a `ToolSubscription`: an id, a single-subscriber
+    `Flow.Publisher<ToolEvent>` that completes after a `last` event or a cancel, and `cancel()`.
+    Registries, the discovery catalog and its meta-tools return the source's outcome object, so
+    the subscription survives; adapters that hand results to a model (LangChain4j, Spring AI) pass
+    the first result only.
+  - **Per-call contexts.** A protocol defines a context as an interface extending `ToolContext`;
+    `ToolContexts` carries one call's instances, passed by `ToolSource.invoke(invocation, caller,
+    progress, contexts)`. `LocalTools` injects any `@AgentTool` parameter whose type extends
+    `ToolContext`; where the serving protocol offers none, the tool gets a stand-in whose
+    `available()` is false. RAP's `RapCallContext` is the first; core never depends on a protocol.
 - **Agents.** `AgentHandler` with `AgentTaskContext` (reply; working; artifact; require input or
   auth; complete, fail or reject; cancellation) is the server-side contract. `AgentMessage`,
   `AgentReply`, `AgentEvent`, `AgentDescriptor` and `TaskState` are the neutral data model. A2A is
@@ -112,7 +123,17 @@ Dependency rules, enforced by module boundaries:
   Reports keep the two in separate fields.
 - **Wrap, don't reimplement.** MCP and A2A wrap the official Java SDKs. UTCP has none, so it is
   implemented from the spec, with the official Python implementation as the authority where the
-  docs disagree.
+  docs disagree. RAP has none either; it is implemented from the Hydro spec, with Hydro's Rust and
+  JS implementations as the reference.
+- **Subscriptions entered core for one protocol, by decision.** Principle 9 keeps protocol-specific
+  types out of core until two integrations need them. RAP is the only protocol that delivers tool
+  events after a call returns today; the user chose to add `ToolSubscription` to core anyway, so
+  it was designed protocol-neutral (no RAP types, fields or ids in it), leaving MCP notifications
+  or A2A streams free to use it later.
+- **Asynchronous protocols keep the synchronous API.** A RAP call is fire-and-forget with a later
+  callback; `ToolSource.invoke` still returns one outcome by waiting (default 10 minutes), and
+  `invokeAsync` exposes the future. State that outlives a process (pending calls, subscriptions)
+  goes through a store SPI rather than being assumed in memory.
 - **One hosting contract.** Every server role is a set of async-capable servlets behind
   `InboundAuthFilter`. Jetty and Spring Boot mount the same endpoints, so auth and caller
   propagation behave the same everywhere. SDK resources are released on servlet `destroy()`.
@@ -154,6 +175,7 @@ Dependency rules, enforced by module boundaries:
 | **MCP** | `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25`, `2026-07-28` (stateless) | `io.modelcontextprotocol.sdk:mcp` 1.x, **2.x** (2.1.0 latest GA), 2.2.x milestones | Client and tool server on **SDK 2.1.0**. stdio speaks `2024-11-05`…`2025-11-25`; Streamable HTTP speaks `2025-03-26`…`2025-11-25`; both offer `2025-11-25`. Tools, resources (templates, subscriptions), prompts, completion, logging and progress on both roles; OAuth authorization on the client and, via `protoweft-oauth`, as a resource server. Not built: the SSE transport, sampling, roots, elicitation, `2026-07-28`. SSE stream resumption fails in SDK 2.1.0 (upstream bug) |
 | **A2A** | `1.0` (prior `0.3.0`, `0.2.6`, `0.1.0`) | `org.a2aproject.sdk` **1.5.0.Final** (spec 1.0) | Client and full-lifecycle server over JSON-RPC; A2A TCK `1.0.0.alpha3` MUST level passes with an empty baseline. Not built: gRPC and HTTP+JSON bindings, card signatures, multi-tenancy |
 | **UTCP** | **`1.1`** (`1.0` manuals accepted) | none (Python, TypeScript and Go only) | Client (http, text and file manuals; http tools; api_key, basic and oauth2 auth) and manual provider. Not built: YAML, OpenAPI conversion, non-HTTP tool templates |
+| **RAP** | unversioned; recorded as `infinity@e1a3e4b` | none (Rust `rap-protocol`/`rap-client` 0.2.0 and JS `rap-js` only) | Client and tool server: toolset discovery, invocation, text and image results, subscriptions, OAuth and user-choice prompts, cancellation, thread closure, durable state. Not built: view updates, migration, `display_as`, `displayScript`, argument validation against `inputSchema` |
 
 Frameworks: LangChain4j 1.23.0, Spring AI 2.0.2, ARGI 2.1.0-RC1 (plus ARGI main at
 `a869538` for `protoweft-argi-neutral`), Spring Boot 4.1.2.
@@ -167,6 +189,9 @@ the generic meta-tools.
 
 - UTCP is implemented from a spec whose docs and reference implementation disagree.
   Deviations are tracked in `protoweft-utcp`.
+- RAP is young: its spec has no version or negotiation, no conformance suite exists, and a
+  breaking rename (`group_id` → `thread_id`, Hydro issue #101) is open. `protoweft-rap` records
+  the Infinity commit it follows and its interop results with Hydro's implementations.
 - SDKs move fast. Versions are pinned, and SDK workarounds live in module specs; for example, the
   MCP session-sweeper thread leak is documented in `protoweft-mcp`.
 - LangChain4j's tool-search API is `@Experimental`.
@@ -202,6 +227,9 @@ Taken from official specifications and reference implementations on 2026-11-05:
   - [TCK](https://github.com/a2aproject/a2a-tck) tag `1.0.0.alpha3`
   - [Specification 1.0](https://a2a-protocol.org/latest/specification/)
   - [a2a-java](https://github.com/a2aproject/a2a-java), at `v1.5.0.Final`
+- RAP:
+  - [Specification](https://infinity.hydro.run/docs/rap/spec/overview) and
+    [hydro-project/infinity](https://github.com/hydro-project/infinity) at `e1a3e4b` (Apache-2.0)
 - UTCP:
   - [utcp.io](https://www.utcp.io/)
   - [Specification repository](https://github.com/universal-tool-calling-protocol/utcp-specification)

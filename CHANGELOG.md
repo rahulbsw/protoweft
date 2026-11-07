@@ -26,6 +26,13 @@ All notable changes to Protoweft are documented here. The format follows
   logging and progress, authored with `McpResources`/`McpPrompts` builders or `@McpResource`,
   `@McpResourceTemplate`, `@McpPrompt` and `@McpComplete`. The client takes an `HttpAuthorizer`
   for MCP authorization.
+- **RAP (`protoweft-rap`, Reactive Agent Protocol, implemented from the Hydro spec at Infinity
+  `e1a3e4b`).** `RapClientConnector` (toolset discovery, blocking and async invocation, callbacks
+  mounted on the app's server or on a built-in listener, subscriptions, OAuth and user-choice
+  prompts, cancellation, thread closure) and `RapToolServer` (any `ToolSource` over RAP, with an
+  injectable `RapCallContext`), plus a `RapStore` SPI with in-memory and file stores so pending
+  calls and subscriptions survive a restart. Core gains `ToolSubscription`/`ToolEvent` and the
+  `ToolContext` per-call context SPI.
 - **OAuth (`protoweft-oauth`, Nimbus).** `OAuthClient` (MCP 2025-11-25 authorization: discovery
   from a 401, PKCE, resource indicators, client credentials and interactive authorization code,
   pre-registration, client ID metadata documents and dynamic registration, refresh and step-up)

@@ -7,7 +7,7 @@ title: Protoweft — interoperable agent & tool protocols for Java
 
 # Protoweft
 
-*The protocol backbone for Java agents: MCP, A2A and UTCP behind one protocol-neutral API, in both
+*The protocol backbone for Java agents: MCP, A2A, UTCP and RAP behind one protocol-neutral API, in both
 directions, plugged into LangChain4j, Spring AI, ARGI, Spring Boot or plain Java.*
 
 ## Goal
@@ -27,7 +27,7 @@ service all use the same stable interfaces.
 
 ## Problem
 
-Three overlapping standards are converging on how applications expose and consume AI tools and
+Several overlapping standards are converging on how applications expose and consume AI tools and
 agents:
 
 - **Model Context Protocol (MCP)** — tool/resource/prompt access over JSON-RPC (stdio, SSE,
@@ -35,9 +35,12 @@ agents:
 - **Agent2Agent (A2A)** — agent-to-agent task/message exchange over JSON-RPC, gRPC, or REST.
 - **Universal Tool Calling Protocol (UTCP)** — direct, "no wrapper server" tool calls described by a
   published manual.
+- **Reactive Agent Protocol (RAP)** — the Hydro project's (AWS and UC Berkeley) fire-and-forget
+  tool calls over HTTP, whose results, subscription events and user prompts are posted back to a
+  callback URL, so a waiting agent holds no connection.
 
 Today a Java team wanting more than one of these must pull in each protocol's SDK directly (and for
-UTCP, there is no official Java SDK at all), learn three different domain models, and scatter
+UTCP and RAP, there is no official Java SDK at all), learn several different domain models, and scatter
 protocol-specific types, auth, and error handling through their application. Version confusion makes
 it worse: MCP alone carries two independent version axes — the date-based wire revision and the Java
 SDK major version — that are routinely conflated. There is no neutral Java seam that lets an
@@ -104,6 +107,9 @@ What Protoweft provides:
   - **A2A**: an agent client, plus a full-lifecycle agent server (tasks, streaming, input-required,
     cancel, resubscribe, push notifications, extended card).
   - **UTCP**: a manual client, plus a manual provider for the app's own tools.
+  - **RAP**: a client that receives results on a mounted or built-in callback endpoint, and a
+    tool server for the app's own tools, with subscriptions (event streams), OAuth and user-choice
+    prompts, cancellation, thread closure, and state that can survive a restart.
 - **Hosting:** the same endpoints in embedded Jetty or Spring Boot, each behind the same
   authentication hook.
 - **Tool discovery:**
@@ -134,9 +140,9 @@ What Protoweft provides:
   a planner, memory store, prompt-chaining library or RAG framework. LangChain4j, Spring AI and ARGI
   are the model and agent-runtime layers that Protoweft plugs into.
 - **Not a reimplementation of the protocol SDKs.** Where an official Java SDK exists (MCP, A2A),
-  Protoweft wraps it rather than re-deriving the wire format. (UTCP has no official Java SDK, so its
-  connector is implemented directly from the specification.)
-- **Not a lowest-common-denominator façade.** The core does not force MCP, A2A, and UTCP into a single
+  Protoweft wraps it rather than re-deriving the wire format. (UTCP and RAP have no official Java
+  SDK, so their connectors are implemented directly from the specifications.)
+- **Not a lowest-common-denominator façade.** The core does not force the protocols into a single
   unified model where their domains genuinely differ (e.g. A2A tasks vs. tool calls).
 - **No guarantee of full feature coverage** for any protocol; coverage is declared per connector.
 
