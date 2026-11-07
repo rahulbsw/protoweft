@@ -336,3 +336,134 @@ Hydro Infinity @ `e1a3e4b` (https://github.com/hydro-project/infinity): spec pag
 `agent/lib/infinity-agents/rap-js/index.mjs`; `agent/lib/toolsets/get-time/get-time-tool/{tool,local}.mjs`;
 `crates/sandbox-core/src/server.rs` (routes `/invoke`, `/close_thread`, `/cancel_tool_call`,
 `/user_choice_response`).
+
+## Interoperability
+
+Checked against Hydro's own implementations in both directions, reproducibly, by
+`scripts/interop/rap.sh` (harness and notes in `interop/rap/`). The interop tests are env-gated
+(`RAP_INTEROP_*`) and skip in the normal build.
+
+**Versions (last run 2026-11-07, all checks passed):** Infinity
+`e1a3e4b36e5f6143e03a59a7ad86e1abacfd22e8` (the revision this module implements); protoweft-rap
+at `4ce1352` plus the interop files; node v26.3.1; cargo/rustc 1.89.0 (Hydro crates are edition
+2024); Java 17 toolchain via Gradle 9.8.2; macOS 27 (darwin, `sandbox-exec` enabled for
+sandbox-local). The harness crate depends on Hydro's crates by git at the pinned revision; its
+`Cargo.lock` was seeded from Infinity's lock file. Hydro's own RAP-related tests pass on this
+toolchain: `cargo test -p rap-protocol -p rap-client -p infinity-rap-bridge` and
+`-p infinity-agent-core --lib rap_tool`, 19 passed (`rap-protocol` and `rap-client` have no unit
+tests at this revision).
+
+### Direction A — our client against Hydro's tool servers
+
+`RapClientConnector` with the built-in `RapCallbackListener` on 127.0.0.1; a recording proxy
+(`HydroInterop.CallbackTap`) in front of the listener logs every callback type and our answer.
+
+| Server (Infinity path) | Test | Exchanged and verified |
+|---|---|---|
+| get-time, JS (`agent/lib/toolsets/get-time/get-time-tool/local.mjs`, run with plain `node`, no `npm install`) | `HydroGetTimeInteropTest` | discovery (`get_time` schema); `tool_result` text ×2 and `"Error: "` (invalid zone → error outcome); POSTs to our tokenized `/rap/callback/<token>` URL answered 200; `/close_thread` |
+| stub servers, Rust (`crates/rap-test-servers`, via `rap-stub-servers`) | `HydroStubServersInteropTest` | two toolsets on one connector; `content`-only result (text + image, no `text`) → `Content.Text` + `Content.Data(image/png)`; text result with `display_as` diff (dropped); `displayScript` ignored |
+| sandbox-local over sandbox-core (`crates/sandbox-local`, `crates/sandbox-core`) on a scratch git repo | `HydroSandboxInteropTest` | 9-tool discovery; text results; `read_file` image `content` (bytes match the file); `view_update` before `edit_file`'s result (200, ignored); `user_choice` answered `{id, selected}` at their `/user_choice_response` ("Yes once" → command ran) and dismissed (our default "No" → `"Error: write permission denied by user."`); command still running after 5 s → `subscription: true`, then a streamed event (`associative: true`) and a `final` event with the exit code; `ToolSubscription.cancel()` and a cancelled `invokeAsync` future → `/cancel_tool_call` (their log: "sent cancel signal to command handler" +1 each); `/close_thread` (their log: "received close_thread notification") |
+| steering (`crates/rap-steering-server`) | `HydroSteeringInteropTest` | `list_steering`/`load_steering` text results and an `"Error: "` result |
+| GitHub event poller (`crates/rap-github-event-poller`) | `HydroGithubPollerInteropTest` | `subscription: true` confirmation; `cancel()` → `/cancel_tool_call` |
+
+### Direction B — Hydro's Rust runtime against our server
+
+`interop/rap/rust-client` (`rap-interop-client`) drives `RapToolServer` on Jetty
+(`HydroRuntimeServeInteropTest`) only through Hydro's code: discovery with
+`rap_client::toolset_loader::ToolsetLoader`; invocation with
+`infinity_agent_core::tools::rap_tool::RapTool::execute` (= `invoke_rap_tool`, used by every
+Infinity surface; sends `user_id` and `thread_ancestors`); callbacks through
+`infinity_rap_bridge::RapCallbackBridge` (their `callback_server` + `prepare_callback`), so each
+message must parse as `rap_protocol::RapCallback` and convert into the runtime's `InputMessage`;
+choice answers POSTed to `response_url` as `infinity-daemon/src/client_handler.rs:615` does;
+`rap_client::notifier::RapNotifier` for `/cancel_tool_call` and `/close_thread`. 15 checks passed:
+discovery (`x-protoweft-readOnly` annotation passes through); text result with `call_id` and
+`group_id` echoed and dedup id `rap-tool-result-<id>`; text + image `content` (→ `ImageMediaType::PNG`,
+base64); tool failure and unknown operation → `"Error: "`; `user_id` and `thread_ancestors`
+reach `RapCallContext`; `subscription: true` then 3 events (associative flag kept) and a `final`
+event, in order; `user_choice` (prompt, choices, default, `response_url`, `call_id`) answered
+`selected: 0` → HTTP 200 → `askUser` returned it; `oauth` (`auth_url`) then the result; cancelling
+a subscription stops its heartbeats with no further event; cancelling a running call reaches
+`onCancel`; `/close_thread` ends the thread's subscription with one empty `final` event and nothing
+after it; both lifecycle routes answer 200 for unknown ids. The JUnit side asserts every tool ran,
+`user_id` was `alice`, the answer reached `askUser`, and both subscriptions and the running call
+saw the cancellation.
+
+### Per message type
+
+| Message / route | A (our client ← Hydro servers) | B (Hydro runtime ← our server) |
+|---|---|---|
+| discovery `/.well-known/rap-toolset` | pass (all 6 servers) | pass |
+| `tool_result` text / `"Error: "` | pass (get-time, stubs, sandbox, steering) | pass |
+| `tool_result` `content` with image | pass (stub, sandbox `read_file`) | pass |
+| `tool_result` `display_as` | received and dropped (stubs, sandbox) | not sent by us |
+| `subscription: true` + `subscription_event` + `final` | pass (sandbox; poller confirmation only) | pass |
+| `user_choice` + `response_url` answer | pass (sandbox, answer and dismissal) | pass |
+| `oauth` | **not exercised**: no Hydro tool server emits `oauth` at this revision | pass |
+| `view_update` | received, 200, ignored (sandbox) | not sent by us |
+| `/cancel_tool_call` | pass (sandbox subscription and pending call; poller) | pass (subscription and running call) |
+| `/close_thread` | pass (sandbox; get-time/steering/poller see below) | pass |
+
+### Not run, and why
+
+- Subscription events from the GitHub poller: they need live GitHub activity (it polls the public
+  Events API every 60 s and only forwards events newer than the subscription); only the
+  confirmation and cancellation are checked. No GitHub token is used.
+- Hydro's Lambda toolsets (`agent/lib/toolsets/{finance,ec2,github-event}`, `rap-js`) and
+  `sandbox-remote`: AWS-only (SigV4-signed callbacks, Lambda, DynamoDB/SQS).
+- `/migrate` and `needsMigration` (sandbox-local advertises it): unsupported here by decision.
+
+### Differences found (no bug in protoweft-rap)
+
+1. sandbox-core sends one more `final` `subscription_event` (`[cancelled]`, plus a `view_update`)
+   after receiving `/cancel_tool_call` for a streaming command (`crates/sandbox-core/src/server.rs:1170-1201`),
+   though tools MUST NOT send events after a cancellation (`server/subscription-events.md:173`). Our
+   client answers 200 (the token is remembered as finished) and delivers nothing; checked.
+2. `rap-steering-server` has no `/close_thread` or `/cancel_tool_call` route
+   (`crates/rap-steering-server/src/main.rs:155-156`) and the GitHub poller no `/close_thread`
+   (`crates/rap-github-event-poller/src/main.rs:164-166`): both answer 404, where the spec requires
+   200 (`basic/thread-closure.md:35`, `basic/tool-cancellation.md:37`). Our notifications never fail,
+   so this is harmless.
+3. get-time's `local.mjs` treats every POST as an invocation and answers 200 before reading the
+   body (`local.mjs:37-38`); our `/close_thread` is run as a `get_time` call without a callback URL
+   (it logs a `TypeError`). Harmless to us.
+4. Infinity's runtime uses one callback URL per process with no token and accepts any path
+   (`crates/infinity-rap-bridge/src/lib.rs:72`, `crates/rap-client/src/callback_server.rs:16,104`);
+   it does not check the pending call at the listener (`basic/transport.md:83,87` are SHOULDs). Our
+   server treats callback URLs as opaque, so this works; every Hydro server accepted our per-call
+   tokenized URLs (node `fetch`, `reqwest`).
+5. `RapUserChoice.default` is `#[serde(default)]` in `crates/rap-protocol/src/lib.rs:160-161`,
+   while the spec makes it required (`server/user-choice.md:40`); our client requires it (400 if
+   missing). No Hydro server omits it.
+6. `RapSubscriptionEvent.text` is a required `String` (`crates/rap-protocol/src/lib.rs:169`): our
+   empty `final` event on `/close_thread` parses and reaches Hydro's runtime as an empty event for
+   a closed thread (orphaned events SHOULD be handled, `server/subscription-events.md:165`). Hydro's
+   own servers send nothing on `/close_thread`; ours keeps the documented decision so runtimes that
+   still track the subscription stop.
+7. `RapNotifier` notifies servers one after another (`crates/rap-client/src/notifier.rs:25,49`);
+   the spec says SHOULD concurrently (`basic/thread-closure.md:80`, `basic/tool-cancellation.md:85`).
+8. sandbox-core derives `response_url` from the `Host` of the first toolset request it served,
+   else `http://localhost` (`crates/sandbox-core/src/server.rs:897,1420`), and waits for an answer
+   without a timeout (`:917,1440`). A runtime that did not fetch the toolset from that server
+   process would get an unreachable `response_url`; ours fetches at `start()`.
+9. Invocations from Hydro's runtime carry `"thread_ancestors": null` for root threads
+   (`crates/rap-protocol/src/lib.rs:56-57`, `crates/infinity-agent-core/src/tools/rap_tool.rs:91`);
+   our server accepts `null`. Their callback listener answers 400 to a body it cannot parse, which
+   our server (correctly, `basic/transport.md:64`) does not retry, so a schema mismatch would lose a
+   callback silently; the harness would see it as a timeout. None occurred.
+
+### Rerun
+
+    scripts/interop/rap.sh
+
+Needs git, curl, node ≥ 18, cargo (Rust ≥ 1.85) and a JDK for Gradle; network on the first run
+(clone, crates.io); no AWS. It clones Infinity to `RAP_INTEROP_INFINITY_DIR` (default
+`/tmp/rap-infinity`) if missing and refuses any other revision; builds Hydro's servers and the
+harness into `RAP_INTEROP_WORK` (default `/tmp/rap-interop`); runs Hydro's RAP tests; prepares a
+scratch git repo; starts get-time, the stub servers, sandbox-local, steering and the poller on
+`RAP_INTEROP_PORT_BASE`.. (default 3101–3104, Protoweft's server on +10; 8080 is never used); runs
+direction A (`./gradlew :protoweft-rap:test --tests '*.Hydro*InteropTest' --rerun`), then
+direction B (the serving test in the background plus `rap-interop-client`); prints a summary and
+stops every process it started. Results: `build/interop/rap/` (`summary.txt`, logs, reports,
+JUnit XML). About 75 s once built. `RAP_INTEROP_SANDBOX_EXEC=false` disables sandbox-local's
+`sandbox-exec`/`bwrap`; `RAP_INTEROP_SKIP_HYDRO_TESTS=1` skips Hydro's cargo tests.

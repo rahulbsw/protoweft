@@ -1,0 +1,37 @@
+# Interop harness: Hydro Infinity's own Rust RAP runtime pieces driven against Protoweft's
+# RapToolServer (direction B), plus a launcher for Hydro's in-process stub tool servers
+# (direction A). Never published; not part of the Gradle build. Run via scripts/interop/rap.sh.
+#
+# Every Hydro crate is pinned to Infinity commit e1a3e4b (Apache-2.0), the revision
+# protoweft-rap was implemented against. Cargo.lock was seeded from Infinity's own lock file
+# at that commit so third-party versions match theirs.
+[package]
+name = "rap-interop"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[[bin]]
+name = "rap-interop-client"
+path = "src/main.rs"
+
+[[bin]]
+name = "rap-stub-servers"
+path = "src/bin/rap-stub-servers.rs"
+
+[dependencies]
+rap-protocol = { git = "https://github.com/hydro-project/infinity", rev = "e1a3e4b36e5f6143e03a59a7ad86e1abacfd22e8" }
+rap-client = { git = "https://github.com/hydro-project/infinity", rev = "e1a3e4b36e5f6143e03a59a7ad86e1abacfd22e8" }
+rap-test-servers = { git = "https://github.com/hydro-project/infinity", rev = "e1a3e4b36e5f6143e03a59a7ad86e1abacfd22e8" }
+infinity-rap-bridge = { git = "https://github.com/hydro-project/infinity", rev = "e1a3e4b36e5f6143e03a59a7ad86e1abacfd22e8" }
+infinity-agent-core = { git = "https://github.com/hydro-project/infinity", rev = "e1a3e4b36e5f6143e03a59a7ad86e1abacfd22e8" }
+infinity-provider-protocol = { git = "https://github.com/hydro-project/infinity", rev = "e1a3e4b36e5f6143e03a59a7ad86e1abacfd22e8" }
+async-trait = "0.1"
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "signal", "io-util", "io-std"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "default-tls"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Standalone: not a member of any enclosing workspace.
+[workspace]
