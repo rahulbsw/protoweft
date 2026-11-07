@@ -278,7 +278,8 @@ Paths are under `docs/docs/rap/spec/` at Infinity `e1a3e4b`.
   "SHOULD record as tool results" (`basic/lifecycle.md:117`) is left to the agent framework.
 - Open upstream issue hydro-project/infinity#101 proposes renaming `group_id` to `thread_id`;
   this module follows the current spec and will track the rename.
-- The per-`group_id` lock map grows with the number of distinct thread ids in a JVM.
+- Serial processing per `group_id` uses 256 striped locks (a thread id always maps to the same
+  lock, so ordering holds; unrelated threads may occasionally wait on each other).
 
 ## Coverage
 

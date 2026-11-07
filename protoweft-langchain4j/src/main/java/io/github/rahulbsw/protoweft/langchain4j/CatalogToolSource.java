@@ -45,4 +45,11 @@ final class CatalogToolSource implements ToolSource {
     public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller) {
         return catalog.invoke(invocation.toolName(), invocation.arguments(), caller);
     }
+
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller,
+                              io.github.rahulbsw.protoweft.core.tool.ToolProgress progress,
+                              io.github.rahulbsw.protoweft.core.tool.ToolContexts contexts) {
+        return catalog.invoke(invocation.toolName(), invocation.arguments(), caller, progress, contexts);
+    }
 }

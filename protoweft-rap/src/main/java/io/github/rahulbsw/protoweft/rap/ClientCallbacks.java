@@ -29,7 +29,18 @@ final class ClientCallbacks implements CallbackRouter.Target {
     private static final System.Logger LOG = System.getLogger(RapClientConnector.class.getName());
     private static final String ERROR_PREFIX = "Error: ";
     /** Serial processing per {@code group_id}, across every connector in the JVM. */
-    private static final Map<String, ReentrantLock> THREAD_LOCKS = new ConcurrentHashMap<>();
+    /** Striped per-thread locks: a thread id always maps to the same lock, and memory stays bounded. */
+    private static final ReentrantLock[] THREAD_LOCKS = new ReentrantLock[256];
+
+    static {
+        for (int i = 0; i < THREAD_LOCKS.length; i++) {
+            THREAD_LOCKS[i] = new ReentrantLock();
+        }
+    }
+
+    static ReentrantLock threadLock(String threadId) {
+        return THREAD_LOCKS[Math.floorMod(threadId.hashCode(), THREAD_LOCKS.length)];
+    }
 
     /** What processing needs from the connector. */
     interface Hooks {
@@ -159,7 +170,7 @@ final class ClientCallbacks implements CallbackRouter.Target {
             return 400;
         }
         List<Runnable> after = new ArrayList<>();
-        ReentrantLock lock = THREAD_LOCKS.computeIfAbsent(call.info.threadId(), k -> new ReentrantLock());
+        ReentrantLock lock = threadLock(call.info.threadId());
         int status;
         lock.lock();
         try {

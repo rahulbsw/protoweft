@@ -102,11 +102,17 @@ public final class DiscoveryTools implements ToolSource {
     @Override
     public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller,
                               io.github.rahulbsw.protoweft.core.tool.ToolProgress progress) {
+        return invoke(invocation, caller, progress, io.github.rahulbsw.protoweft.core.tool.ToolContexts.EMPTY);
+    }
+
+    @Override
+    public ToolOutcome invoke(ToolInvocation invocation, CallerIdentity caller,
+                              io.github.rahulbsw.protoweft.core.tool.ToolProgress progress, io.github.rahulbsw.protoweft.core.tool.ToolContexts contexts) {
         Map<String, Object> args = invocation.arguments();
         return switch (invocation.toolName()) {
             case SEARCH -> search(args, caller);
             case DESCRIBE -> describe(args, caller);
-            case CALL -> call(args, caller, progress);
+            case CALL -> call(args, caller, progress, contexts);
             default -> throw new ProtoweftException(ErrorCategory.TOOL_NOT_FOUND, CapabilityCatalog.DISCOVERY,
                     "unknown tool: " + invocation.toolName());
         };
@@ -175,7 +181,7 @@ public final class DiscoveryTools implements ToolSource {
     }
 
     private ToolOutcome call(Map<String, Object> args, CallerIdentity caller,
-                             io.github.rahulbsw.protoweft.core.tool.ToolProgress progress) {
+                             io.github.rahulbsw.protoweft.core.tool.ToolProgress progress, io.github.rahulbsw.protoweft.core.tool.ToolContexts contexts) {
         if (!(args.get("name") instanceof String name)) {
             throw new ProtoweftException(ErrorCategory.INVALID_ARGUMENTS, CapabilityCatalog.DISCOVERY,
                     "'name' must be a string");
@@ -187,7 +193,7 @@ public final class DiscoveryTools implements ToolSource {
             throw new ProtoweftException(ErrorCategory.INVALID_ARGUMENTS, CapabilityCatalog.DISCOVERY,
                     "'arguments' must be an object");
         }
-        return catalog.invoke(name, arguments, caller, progress);
+        return catalog.invoke(name, arguments, caller, progress, contexts);
     }
 
     static String render(DiscoveryResult r) {
