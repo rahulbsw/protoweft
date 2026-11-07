@@ -15,8 +15,10 @@ Makes Protoweft idiomatic in a **Spring Boot 4.x** application (built and tested
 - Discovers `@AgentTool` beans and combines them into one `LocalTools` bean.
 - Creates the client connectors declared in `application.yml` and merges them into one
   `ToolRegistry` bean.
-- Serves tools over MCP, UTCP and A2A on the application's servlet container, only for the
-  protocols that are opted in.
+- Serves tools over MCP, UTCP and RAP, and an agent over A2A, on the application's servlet
+  container, only for the protocols that are opted in.
+- Hosts the callbacks of RAP connectors (on the servlet container or a built-in listener) and
+  provides their shared `RapStore`.
 - Bridges observations to Micrometer and reports connectors through Actuator.
 - Optionally builds a capability catalog for on-demand tool discovery and serves its meta-tools
   over MCP.
@@ -30,16 +32,19 @@ Nothing here is needed outside Spring. Every capability comes from `protoweft-co
   - `api`: `protoweft-core`, `protoweft-server`.
   - `compileOnly`: Spring Boot (`spring-boot-autoconfigure`, `-health`, `-actuator`,
     `-actuator-autoconfigure`), the servlet API, Micrometer observation, `spring-security-core`
-    and **the protocol modules** (`protoweft-mcp`, `protoweft-utcp`, `protoweft-a2a`), plus
-    `protoweft-discovery`.
+    and **the protocol modules** (`protoweft-mcp`, `protoweft-utcp`, `protoweft-a2a`,
+    `protoweft-rap`), plus `protoweft-discovery`.
 - Applications add the starter plus each protocol module they use, for example
   `implementation("io.github.rahulbsw:protoweft-mcp")`. Each auto-configuration is guarded by
   `@ConditionalOnClass` on its protocol.
 - Auto-configurations, registered in `META-INF/spring/…AutoConfiguration.imports`:
-  - `ProtoweftAutoConfiguration`: `LocalTools`, `ToolRegistry`, `ProtoweftConnectors`.
+  - `ProtoweftAutoConfiguration`: `LocalTools`, `ToolRegistry`, `ProtoweftConnectors`; with
+    `protoweft-rap`, the `RapStore` and (opt-in) the `RapCallbackListener`.
   - `ProtoweftServerAutoConfiguration`: servlet web applications only. It provides
-    `McpToolServer.Http`, `UtcpManualProvider`, `A2aAgentServer`, and one
-    `ProtoweftEndpointRegistrar` per enabled protocol.
+    `McpToolServer.Http`, `UtcpManualProvider`, `A2aAgentServer`, `RapToolServer`, and one
+    `ProtoweftEndpointRegistrar` per enabled protocol; when RAP connectors are declared (and the
+    listener isn't used), the `RapCallbackEndpoint` and its registrar
+    `protoweftRapCallbackEndpoints`.
   - `ProtoweftMicrometerAutoConfiguration`: `MicrometerObservationHandler`.
   - `ProtoweftActuatorAutoConfiguration`: `ProtoweftHealthIndicator` (`protoweft`) and
     `ProtoweftInfoContributor` (`protoweft`).
@@ -54,6 +59,10 @@ Nothing here is needed outside Spring. Every capability comes from `protoweft-co
   - `ObservationHandler` (any number).
   - `AgentHandler`, with an optional `AgentDescriptor`.
   - `Embedder` (optional): enables hybrid discovery search.
+  - `RapPromptHandler` (optional): shows RAP tools' OAuth and user-choice prompts, for every RAP
+    connector.
+  - `RapStore`, `RapCallbackEndpoint`, `RapCallbackListener`, `RapToolServer`: replace the
+    starter's.
 
 ## Properties
 
@@ -63,11 +72,14 @@ Nothing here is needed outside Spring. Every capability comes from `protoweft-co
 | `protoweft.mcp.clients.<name>` | `command` + `args` + `env` (stdio) **or** `url` + `endpoint` (`/mcp`) + `headers` (HTTP) · `request-timeout` |
 | `protoweft.utcp.manuals.<name>` | `url` **or** `file` · `headers` · `variables` · `discovery-timeout` · `call-timeout` |
 | `protoweft.a2a.agents.<name>` | `url` · `timeout` · `streaming` (true) |
+| `protoweft.rap.servers.<name>` | `url` · `additional-urls` · `timeout` (connector: 10 min) · `request-timeout` (connector: 30 s) · `thread-id` |
+| `protoweft.rap` | `callback.public-base-url` · `callback.listener.enabled` (false) · `callback.listener.host` (`127.0.0.1`) · `callback.listener.port` (0) · `store.dir` |
 | `protoweft.server` | `auth-filter-order` (0) |
 | `protoweft.server.mcp` | `enabled` · `path` (`/mcp`) · `expose` (`local`\|`registry`) · `server-name` · `server-version` · `allowed-origins` · `request-timeout` |
 | `protoweft.server.utcp` | `enabled` · `base-url` · `expose` · `manual-version` · `api-key-header` + `api-key-variable` |
 | `protoweft.discovery` | `enabled` (false) · `fallback` (`progressive`\|`all-schemas`\|`none`) · `sources.<name>.required-scopes` · `expose-mcp` (false) · `mcp-path` (`/mcp-discovery`) |
 | `protoweft.server.a2a` | `enabled` · `public-url` · `path` (`/a2a`) · `name` · `description` · `version` · `skills[]` · `streaming` · `push-notifications` · `agent-timeout` |
+| `protoweft.server.rap` | `enabled` · `base-path` (`/rap`) · `base-url` · `expose` · `name` (`protoweft`) · `description` · `allowed-callback-hosts` · `choice-timeout` |
 
 `<name>` is the registry source name, so tools appear as `<name>.<tool>`; an A2A agent appears as
 `<name>.ask`. The configuration processor generates metadata, including the
@@ -80,6 +92,11 @@ The checks:
   the other kind.
 - A UTCP manual sets exactly one of `url` and `file`.
 - An A2A agent has a `url`.
+- A RAP connector has a `url`; it, its `additional-urls` and `protoweft.rap.callback.public-base-url`
+  are absolute http(s) URLs. A `thread-id` isn't empty.
+- RAP connectors without a servlet web application need `protoweft.rap.callback.listener.enabled`.
+- The RAP server's `base-path` is `/` or an exact path not under `/rap/callback`; its `base-url` is
+  absolute http(s); its `name` has 1 to 128 characters.
 - Names match `[A-Za-z0-9_-]+` and are unique across protocols and the local tools.
 - A protocol that is configured has its module on the classpath.
 - Server paths are exact and don't collide. That includes `protoweft.discovery.mcp-path`.
@@ -190,6 +207,38 @@ The checks:
   - **Optional module.** `protoweft-discovery` is `compileOnly`, and its beans are guarded by
     `@ConditionalOnClass`. Enabling discovery without the module fails startup and names the
     artifact.
+- **RAP (`protoweft-rap`).**
+  - *Connectors.* `RapConnectorFactory` builds one `RapClientConnector` per
+    `protoweft.rap.servers.<name>` with the `CredentialProvider` bean, the `RapStore` bean, the
+    optional `RapPromptHandler` bean, and store key `<name>` (stable across restarts even if the
+    URL changes). They join `ProtoweftConnectors`, so lifecycle, fail-fast, health and info are
+    the same as for other protocols. RAP connectors have no observation hook, so they emit no
+    Micrometer observations.
+  - *Callbacks on the servlet container (default).* When connectors are declared and the
+    listener isn't enabled, a `RapCallbackEndpoint` bean is mounted at `/rap/callback/*` (fixed by
+    the module) through `protoweftRapCallbackEndpoints`. Its `InboundAuthFilter` uses
+    `RapCallbackEndpoint.exemptCallbacks(authenticator)`, because tool servers send no credentials:
+    the unguessable per-call token in the URL authenticates them. Spring Security must permit
+    `/rap/callback/**` and exempt it from CSRF. The public URL is
+    `protoweft.rap.callback.public-base-url` (including any context path); without it the
+    endpoint falls back to `http://localhost:<local.server.port><context-path>`, resolved per call,
+    and a WARN is logged, as for the A2A card.
+  - *Built-in listener.* `protoweft.rap.callback.listener.enabled=true` starts a
+    `RapCallbackListener` bean (host, port, the same public URL) and no endpoint is mounted. A
+    non-web application with RAP connectors must enable it; otherwise startup fails and names the
+    property, rather than building connectors that can never receive a result.
+  - *Store.* One `RapStore` bean serves connectors and the server: `InMemoryRapStore`, or
+    `FileRapStore` in `protoweft.rap.store.dir`. Recovered results and subscriptions are read from
+    the connector (`connectors.connector(name, RapClientConnector.class)`), which holds them until
+    a listener is set.
+  - *Server.* `protoweft.server.rap.enabled` builds `RapToolServer` over `expose` (as UTCP, the
+    toolset is built per request, so `registry` is live) and mounts its five routes under
+    `base-path` (default `/rap`, not the module's root default, so the routes don't sit at the
+    application root) behind the normal `InboundAuthFilter`; the same authenticator protects
+    `/close_thread` and `/cancel_tool_call`, as the RAP spec requires. `allowed-callback-hosts`
+    becomes `RapCallbackPolicy.DEFAULT.allowingHosts(..)`; any other policy, a callback
+    authorizer or retry policy needs an own `RapToolServer` bean. The bean is injectable, so the
+    application can resume `recoveredSubscriptions()` after a restart.
 - **Actuator.**
   - Health `protoweft` reports connector lifecycle state; it doesn't probe peers on every check.
     It is DOWN if any connector failed, OUT_OF_SERVICE while any is pending, and UP otherwise.
@@ -231,13 +280,18 @@ Not implemented:
 - A2A extended cards and custom executors through properties. Define an `A2aAgentServer` bean for
   those.
 - Server compliance reports in Actuator info.
+- RAP through properties: static headers (use the `CredentialProvider` bean), per-connector prompt
+  handlers, executors and retry policies; the server's callback authorizer, retry policy and a
+  custom callback policy (define a `RapToolServer` bean); a configurable callback path; mounting
+  an application-defined `RapCallbackEndpoint` when no RAP connector is declared; Micrometer
+  observations for RAP.
 - Discovery through properties: per-tool scopes, source tags, confidence thresholds and a
   names-only limit; a catalog over sources registered after startup; LangChain4j wiring. Define a
   `CapabilityCatalog` bean for those.
 
 ## Verification
 
-`./gradlew :protoweft-spring-boot-starter:build` runs 33 tests on Boot 4.1.2:
+`./gradlew :protoweft-spring-boot-starter:build` runs 53 tests on Boot 4.1.2:
 
 - **`ApplicationContextRunner`:**
   - `@AgentTool` and `LocalTool` beans end up in the registry, and the local name is
@@ -281,9 +335,36 @@ Not implemented:
   - The scoped local tools are found and called only with the bearer token that grants the scope,
     and the caller's name reaches the tool.
   - Anonymous clients get 401.
+- **RAP, context runners (`ProtoweftRapConfigurationTest`):**
+  - The store is in memory by default, a `FileRapStore` with `protoweft.rap.store.dir`, and an
+    application bean replaces it.
+  - A connector with the built-in listener (public URL honoured) is built, fails to start against
+    an unreachable server with `fail-fast=false`, is left out of the registry, and appears in
+    health (DOWN) and info (protocol `rap`, `infinity@e1a3e4b`, unsupported `view_update`).
+  - A non-web application with RAP connectors and no listener fails, naming
+    `protoweft.rap.callback.listener.enabled`.
+  - Invalid connector properties and a missing `protoweft-rap` are rejected.
+  - The server is mounted at `/rap/...` (or the root with `base-path=/`) behind the auth filter;
+    declared connectors mount `/rap/callback/*` unless the listener is enabled; nothing is mounted
+    without opt-in.
+  - Invalid server configuration is rejected (base path, callback-path overlap, collision with
+    `/mcp`, base URL, name length, missing module).
+- **Real Tomcat, RAP (`ProtoweftRapHttpTest`):** one application serves its `@AgentTool`s over RAP
+  behind a bearer `InboundAuthenticator` and consumes them through `protoweft.rap.servers.self`,
+  with callbacks on the mounted endpoint:
+  - results and the authenticated caller; the negotiated revision;
+  - a subscription's events (associative, final) through `ToolRegistry`, and the unavailable
+    `RapCallContext` stand-in over the local registry;
+  - the `RapPromptHandler` bean answers a user choice;
+  - health UP and info with the RAP compliance report;
+  - server routes answer 401 without a token while the callback path is exempt (404 for an
+    unknown token);
+  - `allowed-callback-hosts` admits a named host and the default policy still refuses `10.x`;
+  - a second, non-web context consumes the same server through the built-in listener.
 - **Real Tomcat with Spring Security:** HTTP Basic on `/mcp` rejects anonymous MCP clients, and
   the authenticated user reaches the tool as the caller, which proves the filter order.
 
 `examples/spring-boot-example` runs `@SpringBootTest(RANDOM_PORT)` end to end, with an MCP, a UTCP
-and an A2A client (including `input-required`). It was also checked manually with curl and the
+and an A2A client (including `input-required`). The RAP wiring is exercised in plain Java by
+`examples/plain-java-gateway` (`GatewayExampleTest`). It was also checked manually with curl and the
 MCP Inspector CLI 2.13.0.

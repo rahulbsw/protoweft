@@ -13,6 +13,7 @@ flowchart BT
     mcp["protoweft-mcp"]
     a2a["protoweft-a2a"]
     utcp["protoweft-utcp"]
+    rap["protoweft-rap"]
     oauth["protoweft-oauth"]
     disc["protoweft-discovery"]
     discx["protoweft-discovery-embeddings<br/>-anthropic, -openai"]
@@ -26,6 +27,7 @@ flowchart BT
     mcp --> server
     a2a --> server
     utcp --> server
+    rap --> server
     oauth --> server
     disc --> core
     discx --> disc
@@ -38,6 +40,7 @@ flowchart BT
     starter -. optional .-> mcp
     starter -. optional .-> a2a
     starter -. optional .-> utcp
+    starter -. optional .-> rap
     starter -. optional .-> disc
     starter -. optional .-> sai
 ```
@@ -55,6 +58,7 @@ and isn't part of the default build.
 | `protoweft-mcp` | `McpClientConnector`, `McpToolServer`, `McpResources`, `McpPrompts`. | server, MCP Java SDK |
 | `protoweft-a2a` | `A2aAgentConnector`, `A2aAgentServer`. | server, a2a-java client, server-common and JSON-RPC transport |
 | `protoweft-utcp` | `UtcpClientConnector`, `UtcpManualProvider`. | server, Jackson 3 (internal), `java.net.http` |
+| `protoweft-rap` | [RAP](../protocols/rap.md): `RapClientConnector`, `RapCallbackEndpoint`, `RapCallbackListener`, `RapToolServer`, `RapCallContext`, `RapStore`. | server, Jackson 3 (internal), `java.net.http`, the JDK HTTP server |
 | `protoweft-oauth` | [OAuth 2.1](../integrations/oauth.md): `OAuthClient` (an `HttpAuthorizer`), `BearerTokenAuthenticator`, `ProtectedResourceMetadataEndpoint`. | server, Nimbus (internal) |
 | `protoweft-discovery` | [Tool discovery](../discovery/index.md): `CapabilityCatalog`, search, fallback, meta-tools. | core |
 | `protoweft-discovery-embeddings` | Semantic ranking: the offline bge-small embedder and a pure-Java WordPiece tokenizer. | discovery, ONNX Runtime, `protoweft-model-bge-small-en-v15` |
@@ -86,7 +90,7 @@ and isn't part of the default build.
 
 | Area | Types | Page |
 |---|---|---|
-| Tools | `ToolSource`, `ToolConnector`, `ToolSpec`, `ToolInvocation`, `ToolOutcome`, `Content`, `ToolRegistry`, `LocalTools`, `@AgentTool`, `@ToolParam`, `ToolHandler`, `ProgressAwareToolHandler`, `ToolProgress` | [Tools and the registry](tools.md) |
+| Tools | `ToolSource`, `ToolConnector`, `ToolSpec`, `ToolInvocation`, `ToolOutcome`, `Content`, `ToolRegistry`, `LocalTools`, `@AgentTool`, `@ToolParam`, `ToolHandler`, `ProgressAwareToolHandler`, `ContextualToolHandler`, `ToolProgress`, `ToolContext`, `ToolContexts`, `ToolSubscription`, `ToolEvent`, `BufferedToolSubscription` | [Tools and the registry](tools.md) |
 | Agents | `AgentConnector`, `AgentHandler`, `AgentTaskContext`, `AgentRequest`, `AgentMessage`, `AgentReply`, `AgentEvent`, `AgentArtifact`, `AgentDescriptor`, `TaskState` | [Agents](agents.md) |
 | Security | `CredentialProvider`, `Credential`, `HttpAuthorizer`, `InboundAuthenticator`, `InboundRequest`, `AuthDecision`, `CallerIdentity` | [Security and credentials](security.md) |
 | Errors and telemetry | `ProtoweftException`, `ErrorCategory`, `ObservationHandler` | [Errors and observability](errors-and-observability.md) |
@@ -94,8 +98,12 @@ and isn't part of the default build.
 
 Every connector is a `ProtocolConnector`: it is built by a protocol-specific builder, started
 explicitly with `start()`, and closed with `close()` (safe to call more than once). Tool connectors
-(MCP, UTCP, and A2A's `ask` tool) also implement `ToolConnector`; the A2A connector additionally
-implements `AgentConnector`.
+(MCP, UTCP, RAP, and A2A's `ask` tool) also implement `ToolConnector`; the A2A connector
+additionally implements `AgentConnector`.
+
+Subscriptions (`ToolSubscription`, `ToolEvent`) are a core concept although RAP is so far the only
+protocol that produces them. Protocol-specific per-call features reach tools through the
+`ToolContext` SPI, so RAP's own types (such as `RapCallContext`) stay in `protoweft-rap`.
 
 The core API is blocking. The MCP SDK is reactive internally; Protoweft uses its synchronous
 facade on the client and keeps Reactor off the public API.
@@ -111,6 +119,8 @@ needs async support.
 | `McpToolServer.Http` | `/mcp` | yes |
 | `A2aAgentServer` | `/.well-known/agent-card.json`, `/a2a` | yes |
 | `UtcpManualProvider` | `/utcp`, `/utcp/*` | no |
+| `RapToolServer` | `/.well-known/rap-toolset`, `/invoke`, `/close_thread`, `/cancel_tool_call`, `/user_choice_response`, under an optional base path | no |
+| `RapCallbackEndpoint` (RAP client callbacks) | `/rap/callback/*` | no |
 | `ProtectedResourceMetadataEndpoint` (`protoweft-oauth`) | `/.well-known/oauth-protected-resource/<resource path>`, optionally the root well-known URI | no |
 
 A host mounts every endpoint and puts an `InboundAuthFilter` in front of it, so one

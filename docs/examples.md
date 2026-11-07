@@ -7,7 +7,7 @@ JDK (17 or newer).
 | Example | Shows | Needs |
 |---|---|---|
 | [`mcp-client-example`](#mcp-client) | The MCP client through the neutral `ToolConnector` API | nothing (Node.js optional) |
-| [`plain-java-gateway`](#plain-java-gateway) | One tool and one agent over MCP, UTCP and A2A from plain Java | nothing |
+| [`plain-java-gateway`](#plain-java-gateway) | One tool and one agent over MCP, UTCP, A2A and RAP from plain Java, plus a RAP subscription | nothing |
 | [`spring-boot-example`](#spring-boot) | The Spring Boot starter serving all three protocols | nothing |
 | [`langchain4j-example`](#langchain4j) | A LangChain4j AI Service with Protoweft tools, served over A2A | an OpenAI-compatible API key to run the agent |
 | [`spring-ai-example`](#spring-ai) | A Spring AI `ChatClient` with Protoweft tools, served over A2A with streaming | an OpenAI-compatible API key to run; its test needs none |
@@ -51,41 +51,59 @@ Pass a server command line to use another server, for example the official refer
 ## Plain-Java gateway
 
 `examples/plain-java-gateway` defines one tool and one agent in plain Java, serves them over MCP,
-UTCP and A2A from a single embedded Jetty server on a free local port, then consumes all three back
-through one `ToolRegistry`.
+UTCP, A2A and RAP from a single embedded Jetty server on a free local port, then consumes all four
+back through one `ToolRegistry`. The RAP server also offers a subscription tool, `updates`, whose
+events the program prints.
 
 ```bash
 ./gradlew :examples:plain-java-gateway:run
 ```
 
 ```text
-Serving MCP at http://127.0.0.1:50684/mcp, UTCP at http://127.0.0.1:50684/utcp, A2A at http://127.0.0.1:50684
+Serving MCP at http://127.0.0.1:50684/mcp, UTCP at http://127.0.0.1:50684/utcp, A2A at http://127.0.0.1:50684, RAP at http://127.0.0.1:50684/rap
 
-One registry, three protocols:
+One registry, four protocols:
   - via_mcp.forecast: Weather forecast for a city
   - via_utcp.forecast: Weather forecast for a city
   - via_a2a.ask: Send a message to the remote A2A agent 'Weather agent': Answers weather questions by city
+  - via_rap.forecast: Weather forecast for a city
+  - via_rap.updates: Streams forecast updates for a city
 
 Calls:
   via_mcp.forecast   -> {"city":"Oslo","celsius":21.5,"summary":"Sunny"}
   via_utcp.forecast  -> {"city":"Oslo","celsius":21.5,"summary":"Sunny"}
   via_a2a.ask        -> {"city":"Oslo","celsius":21.5,"summary":"Sunny"}
+  via_rap.forecast   -> {"city":"Oslo","celsius":21.5,"summary":"Sunny"}
+
+RAP subscription:
+  via_rap.updates    -> Watching Oslo
+    event: Oslo: 22.0 C, sunny
+    event: Oslo: 19.5 C, showers (associative)
+    event: Oslo: no more updates (final)
 
 Compliance:
   mcp   sdk=io.modelcontextprotocol.sdk:mcp 2.1.0  wire=[2025-03-26, 2025-06-18, 2025-11-25] negotiated=2025-11-25
   utcp  sdk=none 0.1.0-SNAPSHOT  wire=[1.0, 1.1] negotiated=1.1.0
   a2a   sdk=org.a2aproject.sdk:a2a-java-sdk-client 1.5.0.Final  wire=[1.0] negotiated=1.0
+  rap   sdk=none 0.1.0-SNAPSHOT  wire=[infinity@e1a3e4b] negotiated=infinity@e1a3e4b
 ```
 
-The port differs on every run. Things the output shows:
+Only the port differs between runs; `GatewayExampleTest` runs the program and checks the rest.
+Things the output shows:
 
-- The same `forecast` method answers over all three protocols.
+- The same `forecast` method answers over all four protocols.
 - The UTCP call passes its arguments as `{"body": {"city": "Oslo"}}`, because Protoweft's UTCP
   provider [publishes the argument object as the JSON body](protocols/utcp.md#manual-shape).
 - The A2A agent appears as one `ask` tool.
 - MCP over Streamable HTTP lists only the revisions that have that transport.
+- RAP answers through callbacks: a `RapCallbackEndpoint` mounted on the same server receives them.
+  The `updates` tool takes a [`RapCallContext`](protocols/rap.md#tools-that-use-rap-rapcallcontext),
+  subscribes, and streams three events from another thread after its first result; the client
+  reads them from `ToolOutcome.subscription()`. Over another protocol the same tool would get the
+  unavailable context stand-in.
+- RAP has no version, so its wire revision is the Hydro Infinity commit the module follows.
 
-The program exits when it's done; closing the registry and the server releases every thread.
+The program exits when it's done; closing the registry and the servers releases every thread.
 
 ## Spring Boot
 

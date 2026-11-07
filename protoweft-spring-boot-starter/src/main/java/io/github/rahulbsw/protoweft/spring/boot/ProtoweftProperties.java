@@ -11,7 +11,8 @@ import java.util.Map;
 
 /**
  * Client-side Protoweft configuration: local tools and the connectors declared under
- * {@code protoweft.mcp.clients}, {@code protoweft.utcp.manuals} and {@code protoweft.a2a.agents}.
+ * {@code protoweft.mcp.clients}, {@code protoweft.utcp.manuals}, {@code protoweft.a2a.agents} and
+ * {@code protoweft.rap.servers}, plus how RAP connectors receive callbacks and keep their state.
  * Each entry's key is its name in the {@link io.github.rahulbsw.protoweft.core.tool.ToolRegistry}, so its
  * tools appear as {@code <name>.<tool>}.
  */
@@ -28,6 +29,7 @@ public class ProtoweftProperties {
     private final Mcp mcp = new Mcp();
     private final Utcp utcp = new Utcp();
     private final A2a a2a = new A2a();
+    private final Rap rap = new Rap();
 
     public boolean isFailFast() {
         return failFast;
@@ -51,6 +53,10 @@ public class ProtoweftProperties {
 
     public A2a getA2a() {
         return a2a;
+    }
+
+    public Rap getRap() {
+        return rap;
     }
 
     /** Discovery of {@code @AgentTool} beans. */
@@ -312,6 +318,175 @@ public class ProtoweftProperties {
 
         public void setStreaming(boolean streaming) {
             this.streaming = streaming;
+        }
+    }
+
+    /** RAP (Reactive Agent Protocol) client connectors, their callback hosting and the RAP store. */
+    public static class Rap {
+
+        /** RAP tool servers to connect to, by registry name. */
+        private Map<String, RapRemote> servers = new LinkedHashMap<>();
+
+        private final RapCallbacks callback = new RapCallbacks();
+        private final RapStoreOptions store = new RapStoreOptions();
+
+        public Map<String, RapRemote> getServers() {
+            return servers;
+        }
+
+        public void setServers(Map<String, RapRemote> servers) {
+            this.servers = servers;
+        }
+
+        public RapCallbacks getCallback() {
+            return callback;
+        }
+
+        public RapStoreOptions getStore() {
+            return store;
+        }
+    }
+
+    /** One RAP connector: a tool server (plus optional further servers whose toolsets it also loads). */
+    public static class RapRemote {
+
+        /** Base URL of the tool server; its toolset is read from {@code <url>/.well-known/rap-toolset}. */
+        private String url;
+
+        /** More tool servers loaded by the same connector; tool names must be unique across all of them. */
+        private List<String> additionalUrls = new ArrayList<>();
+
+        /** How long a blocking call waits for the tool's result (connector default: 10 minutes). */
+        private Duration timeout;
+
+        /** Timeout of each HTTP request to the tool server (connector default: 30 seconds). */
+        private Duration requestTimeout;
+
+        /** The thread id (group_id) of calls made through the registry (connector default: a random id). */
+        private String threadId;
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public List<String> getAdditionalUrls() {
+            return additionalUrls;
+        }
+
+        public void setAdditionalUrls(List<String> additionalUrls) {
+            this.additionalUrls = additionalUrls;
+        }
+
+        public Duration getTimeout() {
+            return timeout;
+        }
+
+        public void setTimeout(Duration timeout) {
+            this.timeout = timeout;
+        }
+
+        public Duration getRequestTimeout() {
+            return requestTimeout;
+        }
+
+        public void setRequestTimeout(Duration requestTimeout) {
+            this.requestTimeout = requestTimeout;
+        }
+
+        public String getThreadId() {
+            return threadId;
+        }
+
+        public void setThreadId(String threadId) {
+            this.threadId = threadId;
+        }
+    }
+
+    /**
+     * Where RAP tool servers post results and events. By default the callback endpoint
+     * ({@code /rap/callback/*}) is mounted on the application's servlet container; with
+     * {@code listener.enabled} a built-in listener is started instead.
+     */
+    public static class RapCallbacks {
+
+        /**
+         * The URL tool servers reach this application at, including any context path (or the
+         * listener's public URL). When unset: http://localhost:<port><context-path> for the mounted
+         * endpoint, or the bound address for the listener, which only local tool servers can reach.
+         */
+        private String publicBaseUrl;
+
+        private final RapListener listener = new RapListener();
+
+        public String getPublicBaseUrl() {
+            return publicBaseUrl;
+        }
+
+        public void setPublicBaseUrl(String publicBaseUrl) {
+            this.publicBaseUrl = publicBaseUrl;
+        }
+
+        public RapListener getListener() {
+            return listener;
+        }
+    }
+
+    /** The built-in RAP callback listener (JDK HTTP server), for applications without a servlet container. */
+    public static class RapListener {
+
+        /** Whether RAP callbacks are received on a built-in listener instead of the servlet container. */
+        private boolean enabled;
+
+        /** Interface the listener binds. */
+        private String host = "127.0.0.1";
+
+        /** Port the listener binds; 0 picks a free port. */
+        private int port;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(String host) {
+            this.host = host;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void setPort(int port) {
+            this.port = port;
+        }
+    }
+
+    /** The RAP store shared by the RAP connectors and the RAP tool server. */
+    public static class RapStoreOptions {
+
+        /**
+         * Directory of a file-based store (rap-store.json), so pending calls and subscriptions survive
+         * a restart. When unset, the state is kept in memory.
+         */
+        private Path dir;
+
+        public Path getDir() {
+            return dir;
+        }
+
+        public void setDir(Path dir) {
+            this.dir = dir;
         }
     }
 }

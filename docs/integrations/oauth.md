@@ -25,11 +25,12 @@ PKCE and JWT/JWKS processing come from Nimbus; `WWW-Authenticate` parsing, prote
 metadata and the MCP rules are Protoweft's own.
 
 !!! note "Where it plugs in"
-    On the client side, only the MCP Streamable HTTP connector takes an `HttpAuthorizer` today
-    (`McpClientConnector.http(..).authorizer(..)`); the A2A and UTCP connectors use static
+    On the client side, the MCP Streamable HTTP connector (`McpClientConnector.http(..).authorizer(..)`)
+    and the RAP connector (`RapClientConnector.builder(..).authorizer(..)`) take an `HttpAuthorizer`;
+    the A2A and UTCP connectors use static
     [credentials](../concepts/security.md#outbound-credentialprovider). On the server side,
     `BearerTokenAuthenticator` is an ordinary `InboundAuthenticator`, so it protects every endpoint
-    of a host: MCP, A2A and UTCP alike.
+    of a host: MCP, A2A, UTCP and RAP alike.
 
 ## Client: `OAuthClient`
 

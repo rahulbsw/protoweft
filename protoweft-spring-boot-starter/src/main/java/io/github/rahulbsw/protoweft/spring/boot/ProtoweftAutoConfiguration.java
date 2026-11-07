@@ -5,6 +5,12 @@ import io.github.rahulbsw.protoweft.core.observe.ObservationHandler;
 import io.github.rahulbsw.protoweft.core.tool.LocalTools;
 import io.github.rahulbsw.protoweft.core.tool.ToolConnector;
 import io.github.rahulbsw.protoweft.core.tool.ToolRegistry;
+import io.github.rahulbsw.protoweft.rap.FileRapStore;
+import io.github.rahulbsw.protoweft.rap.InMemoryRapStore;
+import io.github.rahulbsw.protoweft.rap.RapCallbackEndpoint;
+import io.github.rahulbsw.protoweft.rap.RapCallbackListener;
+import io.github.rahulbsw.protoweft.rap.RapPromptHandler;
+import io.github.rahulbsw.protoweft.rap.RapStore;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -16,6 +22,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ResourceLoader;
 
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -91,6 +98,45 @@ public class ProtoweftAutoConfiguration {
         @Bean
         ConnectorFactory protoweftA2aConnectorFactory() {
             return new A2aConnectorFactory();
+        }
+    }
+
+    /**
+     * RAP connectors and what they share: the {@link RapStore} (also used by the RAP tool server)
+     * and, with {@code protoweft.rap.callback.listener.enabled}, the built-in callback listener.
+     * The mounted callback endpoint is configured with the servlet servers.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = PropertiesValidator.RAP_CLASS)
+    static class RapClients {
+
+        @Bean
+        ConnectorFactory protoweftRapConnectorFactory(ObjectProvider<RapCallbackEndpoint> endpoint,
+                                                      ObjectProvider<RapCallbackListener> listener,
+                                                      ObjectProvider<RapPromptHandler> prompts,
+                                                      ObjectProvider<RapStore> store) {
+            return new RapConnectorFactory(endpoint, listener, prompts, store);
+        }
+
+        /** In memory, or a {@link FileRapStore} in {@code protoweft.rap.store.dir}. */
+        @Bean
+        @ConditionalOnMissingBean
+        RapStore protoweftRapStore(ProtoweftProperties properties) {
+            Path dir = properties.getRap().getStore().getDir();
+            return dir != null ? new FileRapStore(dir) : new InMemoryRapStore();
+        }
+
+        @Bean(destroyMethod = "close")
+        @ConditionalOnMissingBean
+        @ConditionalOnProperty(prefix = "protoweft.rap.callback.listener", name = "enabled", havingValue = "true")
+        RapCallbackListener protoweftRapCallbackListener(ProtoweftProperties properties) {
+            ProtoweftProperties.RapCallbacks callback = properties.getRap().getCallback();
+            RapCallbackListener.Builder b = RapCallbackListener.builder()
+                    .host(callback.getListener().getHost()).port(callback.getListener().getPort());
+            if (callback.getPublicBaseUrl() != null) {
+                b.publicBaseUrl(callback.getPublicBaseUrl());
+            }
+            return b.start();
         }
     }
 }

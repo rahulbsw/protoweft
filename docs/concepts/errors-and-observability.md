@@ -81,7 +81,7 @@ ObservationHandler logging = new ObservationHandler() {
 ```
 
 Pass it to a builder: `observations(handler)` on the MCP, A2A and UTCP builders and on
-`McpToolServer`.
+`McpToolServer`. The RAP connector and server have no observation hook yet.
 
 Each event carries an `Observation`: the protocol, a stable operation name, and a target.
 

@@ -6,8 +6,10 @@
 - `@AgentTool` methods of your beans are collected into one `LocalTools` bean.
 - Client connectors declared in `application.yml` are created, started and merged into one
   `ToolRegistry` bean.
-- Tools are served over MCP and UTCP, and an `AgentHandler` bean over A2A, on the application's
-  servlet container, **only for the protocols you enable**.
+- Tools are served over MCP, UTCP and RAP, and an `AgentHandler` bean over A2A, on the
+  application's servlet container, **only for the protocols you enable**.
+- RAP connectors get their callback endpoint mounted on the same container (or a built-in
+  listener), a shared `RapStore`, and your `RapPromptHandler` bean.
 - Observations are bridged to Micrometer, and connectors are reported through Actuator.
 
 Nothing in the starter is needed outside Spring: it only wires the core and protocol modules.
@@ -28,6 +30,7 @@ dependencies {
     implementation("io.github.rahulbsw:protoweft-mcp")     // only the protocols you use
     implementation("io.github.rahulbsw:protoweft-utcp")
     implementation("io.github.rahulbsw:protoweft-a2a")
+    implementation("io.github.rahulbsw:protoweft-rap")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")     // for the servers
     implementation("org.springframework.boot:spring-boot-starter-actuator")   // optional
 }
@@ -47,13 +50,17 @@ Protoweft into your local Maven repository.
 | `McpToolServer.Http` | `protoweft.server.mcp.enabled=true`, servlet web app, `protoweft-mcp` present | defining your own bean |
 | `UtcpManualProvider` | `protoweft.server.utcp.enabled=true`, servlet web app, `protoweft-utcp` present | defining your own bean |
 | `A2aAgentServer` | `protoweft.server.a2a.enabled=true`, servlet web app, `protoweft-a2a` present, and an `AgentHandler` bean | defining your own bean |
+| `RapToolServer` | `protoweft.server.rap.enabled=true`, servlet web app, `protoweft-rap` present | defining your own bean |
+| `RapCallbackEndpoint` (mounted at `/rap/callback/*`) | `protoweft.rap.servers` declared, servlet web app, listener not enabled | defining your own bean |
+| `RapCallbackListener` | `protoweft.rap.callback.listener.enabled=true` | defining your own bean |
+| `RapStore` | `protoweft-rap` present: `InMemoryRapStore`, or `FileRapStore` with `protoweft.rap.store.dir` | defining your own bean |
 | `InboundAuthenticator` | Spring Security present and no bean of your own: `SpringSecurityInboundAuthenticator` | defining your own bean |
 | `MicrometerObservationHandler` | an `ObservationRegistry` bean exists and `protoweft.observations.enabled` (default) | defining your own bean |
 | Health indicator `protoweft`, info contributor `protoweft` | Actuator present | beans named `protoweftHealthIndicator` / `protoweftInfoContributor`, or `management.health.protoweft.enabled` / `management.info.protoweft.enabled` |
 
 Beans of yours that the starter uses: `@AgentTool` beans and `LocalTools.LocalTool` beans,
-`InboundAuthenticator`, `CredentialProvider`, any number of `ObservationHandler`s, and an
-`AgentHandler` with an optional `AgentDescriptor`.
+`InboundAuthenticator`, `CredentialProvider`, any number of `ObservationHandler`s, an
+`AgentHandler` with an optional `AgentDescriptor`, and a `RapPromptHandler`.
 
 ## Local tools
 
@@ -123,6 +130,10 @@ protoweft:
       travel:
         url: https://travel.example.com
         timeout: 120s
+  rap:
+    servers:
+      repos:                                   # a RAP tool server; see "RAP" below
+        url: https://repos.example.com
 ```
 
 UTCP `variables` are keyed by the name used in the manual; the starter namespaces them by the
@@ -183,6 +194,86 @@ public class Startup {
   left out of the registry (so it can't break listing), and health reports it `FAILED` (DOWN).
 - There are no retries, and connectors are never restarted.
 
+## RAP
+
+[RAP](../protocols/rap.md) needs `protoweft-rap` on the classpath. It answers through HTTP
+callbacks, so a RAP connector must be reachable by the tool servers it calls.
+
+### RAP connectors
+
+```yaml
+protoweft:
+  rap:
+    servers:
+      repos:
+        url: https://repos.example.com        # toolset at <url>/.well-known/rap-toolset
+        additional-urls: [https://ci.example.com]
+        timeout: 2m                           # how long a blocking call waits (default 10 min)
+    callback:
+      public-base-url: https://agent.example.com   # where tool servers reach this application
+    store:
+      dir: /var/lib/agent/rap                 # optional: survive restarts (FileRapStore)
+```
+
+- **Callbacks on the servlet container (default).** The starter mounts a `RapCallbackEndpoint` at
+  `/rap/callback/*`. Callback requests carry no credentials (an unguessable per-call token in the
+  URL authenticates them), so its `InboundAuthFilter` uses
+  `RapCallbackEndpoint.exemptCallbacks(...)` around your authenticator. **With Spring Security,
+  permit `/rap/callback/**` and exempt it from CSRF.**
+- **Public URL.** Set `protoweft.rap.callback.public-base-url`, including any context path.
+  Without it, callbacks are addressed to `http://localhost:<port><context-path>` and a WARN is
+  logged; only tool servers on the same host can reach that.
+- **Built-in listener.** `protoweft.rap.callback.listener.enabled=true` starts a
+  `RapCallbackListener` (`host`, default `127.0.0.1`; `port`, default a free one) instead, with the
+  same public URL property. An application that isn't a servlet web application must enable it:
+  otherwise startup fails and names the property.
+- **Credentials** come from the `CredentialProvider` bean (branch on `ProtocolId.RAP`); the target
+  is the tool server's base URL.
+- **Prompts.** A `RapPromptHandler` bean shows OAuth and user-choice prompts for every RAP
+  connector. Without one, OAuth requests fail the call with `AUTHENTICATION` and choices get the
+  tool's default.
+- **Store.** One `RapStore` bean serves every connector and the RAP server: in memory, or a
+  `FileRapStore` in `protoweft.rap.store.dir`. Each connector's store key is its name, so stored
+  calls survive a URL change. After a restart, read late results and subscriptions from the
+  connector; results are held until a listener is set:
+
+```java
+@EventListener(ApplicationReadyEvent.class)
+public void recover() {
+    RapClientConnector repos = connectors.connector("repos", RapClientConnector.class);
+    repos.onRecoveredResult(r -> log.info("{} finished: {}", r.call().operation(), r.outcome().text()));
+    repos.recoveredSubscriptions().forEach(s -> s.subscription().events().subscribe(subscriber));
+}
+```
+
+RAP connectors join `ProtoweftConnectors` like the others: same lifecycle and failure policy, and
+they appear in health and info. They have no observation hook, so they record no Micrometer
+observations.
+
+### Serving tools over RAP
+
+```yaml
+protoweft:
+  server:
+    rap:
+      enabled: true                 # GET /rap/.well-known/rap-toolset, POST /rap/invoke, ...
+      name: repos
+      description: Repository tools
+      base-url: https://tools.example.com/rap   # optional; derived from each request otherwise
+      allowed-callback-hosts: [runtime.internal]
+```
+
+The five RAP routes are mounted under `base-path` (default `/rap`) behind the normal
+`InboundAuthFilter`, which also protects `/close_thread` and `/cancel_tool_call` as RAP requires.
+`expose` works as for the other servers; the toolset is built per request, so `registry` is always
+current. Tools use RAP features through an injected
+[`RapCallContext`](../protocols/rap.md#tools-that-use-rap-rapcallcontext) parameter.
+
+Callback URLs follow `RapCallbackPolicy.DEFAULT` (https, or http to loopback);
+`allowed-callback-hosts` adds hosts. For another policy, a callback authorizer or retry policy,
+define your own `RapToolServer` bean. Inject the `RapToolServer` bean to resume
+`recoveredSubscriptions()` after a restart.
+
 ## Serving tools and agents
 
 Every server is off until you enable it:
@@ -201,6 +292,8 @@ protoweft:
       enabled: true                 # GET /utcp, POST /utcp/tools/<tool>
       api-key-header: Authorization # announce the header UTCP clients must send...
       api-key-variable: WEATHER_TOKEN   # ...from their WEATHER_TOKEN variable
+    rap:
+      enabled: true                 # RAP routes under /rap
     a2a:
       enabled: true                 # card at /.well-known/agent-card.json, JSON-RPC at /a2a
       public-url: https://weather.example.com
@@ -226,7 +319,8 @@ an `AgentDescriptor` bean.
   turns the application into a proxy that spends its connectors' credentials on behalf of its own
   callers, so this must be an explicit choice.
 
-With UTCP, `expose=registry` is always current, because the manual is built per request. MCP reads
+With UTCP and RAP, `expose=registry` is always current, because the manual or toolset is built per
+request. MCP reads
 its tool list once, so with `expose=registry` the MCP endpoint is deferred: until the connectors
 have started it answers **503** with `Retry-After: 1`, and then it is built over the full registry.
 
@@ -262,13 +356,14 @@ protocol clients don't send CSRF tokens.
 ```java
 @Configuration
 public class SecurityConfig {
-    private static final String[] PROTOCOL_PATHS = {"/mcp", "/a2a", "/utcp", "/utcp/**"};
+    private static final String[] PROTOCOL_PATHS = {"/mcp", "/a2a", "/utcp", "/utcp/**", "/rap/**"};
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/.well-known/agent-card.json").permitAll()
+                        .requestMatchers("/rap/callback/**").permitAll()   // RAP callbacks: the URL token authenticates
                         .requestMatchers(PROTOCOL_PATHS).authenticated()
                         .anyRequest().permitAll())
                 .httpBasic(Customizer.withDefaults())
@@ -297,7 +392,8 @@ becomes a Micrometer observation:
 | Low-cardinality keys | `protoweft.protocol` (`mcp`, `a2a`, `utcp`), `protoweft.operation` (`tools/call`, `SendMessage`, …) |
 | High-cardinality key | `protoweft.target` (tool name, URL or task id) |
 
-The bridge covers the client connectors built from properties and the MCP and A2A servers. Every
+The bridge covers the client connectors built from properties (except RAP's, which have no
+observation hook) and the MCP and A2A servers. Every
 `ObservationHandler` bean receives every event, and one that fails doesn't affect the others. Turn
 the bridge off with `protoweft.observations.enabled=false`.
 
@@ -362,6 +458,26 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `timeout` | duration | 60 s (connector default) | Connect timeout and the longest a call waits for the task. |
 | `streaming` | boolean | `true` | Whether calls may stream when the agent supports it. |
 
+### RAP connectors: `protoweft.rap.servers.<name>.*`
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `url` | string | — (required) | Base URL of the tool server; its toolset is read from `<url>/.well-known/rap-toolset`. |
+| `additional-urls` | list | `[]` | More tool servers loaded by the same connector; tool names must be unique across them. |
+| `timeout` | duration | 10 min (connector default) | How long a blocking call waits for the result. |
+| `request-timeout` | duration | 30 s (connector default) | Timeout of each HTTP request to a tool server. |
+| `thread-id` | string | a random id (connector default) | The thread id (`group_id`) of calls made through the registry. |
+
+### RAP callbacks and store: `protoweft.rap.*`
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `protoweft.rap.callback.public-base-url` | string | `http://localhost:<port><context-path>` (endpoint), the bound address (listener) | The URL tool servers reach this application at, including any context path. |
+| `protoweft.rap.callback.listener.enabled` | boolean | `false` | Receive callbacks on a built-in listener instead of the servlet container. |
+| `protoweft.rap.callback.listener.host` | string | `127.0.0.1` | Interface the listener binds. |
+| `protoweft.rap.callback.listener.port` | int | `0` (a free port) | Port the listener binds. |
+| `protoweft.rap.store.dir` | path | — (in memory) | Directory of a `FileRapStore`, shared by the RAP connectors and server. |
+
 ### Servers: `protoweft.server.*`
 
 | Property | Type | Default | Description |
@@ -391,6 +507,14 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `protoweft.server.a2a.push-notifications` | boolean | `true` | Offer push notifications. |
 | `protoweft.server.a2a.agent-timeout` | duration | 30 s (server default) | How long a blocking `SendMessage` waits for the handler. |
 | `protoweft.server.a2a.from-chat-client` | boolean | `false` | With `protoweft-spring-ai` and no `AgentHandler` bean, serve the application's Spring AI `ChatClient` as the agent. See [Spring AI](spring-ai.md#spring-boot). |
+| `protoweft.server.rap.enabled` | boolean | `false` | Serve tools over RAP. |
+| `protoweft.server.rap.base-path` | string | `/rap` | Path the RAP routes are mounted under; `/` mounts them at the root. |
+| `protoweft.server.rap.base-url` | string | from each request | Public base URL (where `.well-known/rap-toolset` lives, base path included). |
+| `protoweft.server.rap.expose` | `local` \| `registry` | `local` | Which tools to serve. |
+| `protoweft.server.rap.name` | string | `protoweft` | Toolset name (1 to 128 characters); also the server's key in the RAP store. |
+| `protoweft.server.rap.description` | string | — | Toolset description. |
+| `protoweft.server.rap.allowed-callback-hosts` | list | `[]` | Hosts the server may also post callbacks to over http or https, beyond the default policy. |
+| `protoweft.server.rap.choice-timeout` | duration | 10 min (server default) | How long a tool's user-choice prompt waits before using the default. |
 
 ### Tool discovery: `protoweft.discovery.*`
 
@@ -420,6 +544,11 @@ Needs `protoweft-spring-ai` on the classpath; everything is off by default. See
 - An MCP client sets exactly one of `command` and `url`, and never options of the other kind.
 - A UTCP manual sets exactly one of `url` and `file`.
 - An A2A agent has a `url`.
+- A RAP connector has a `url`; it, its `additional-urls` and `protoweft.rap.callback.public-base-url`
+  are absolute `http(s)` URLs.
+- RAP connectors outside a servlet web application need `protoweft.rap.callback.listener.enabled`.
+- The RAP server's `base-path` is `/` or an exact path not under `/rap/callback`; its `name` has 1 to
+  128 characters.
 - Names match `[A-Za-z0-9_-]+` and are unique across protocols and the local tools.
 - A configured protocol has its module on the classpath.
 - Server paths are exact and don't collide.
@@ -436,3 +565,5 @@ Needs `protoweft-spring-ai` on the classpath; everything is off by default. See
 - A2A extended cards, input/output modes and custom executors through properties. Define an
   `A2aAgentServer` bean for those.
 - Server compliance reports in Actuator info.
+- RAP static headers (use the `CredentialProvider` bean), per-connector prompt handlers, a
+  configurable callback path, and Micrometer observations for RAP.

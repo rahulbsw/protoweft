@@ -1,8 +1,8 @@
 # Tools and the registry
 
 A **tool** is a named, callable function with a JSON Schema describing its input. Tools look the
-same whether they come from a remote MCP server, a UTCP manual, a remote A2A agent, or a method in
-your own JVM.
+same whether they come from a remote MCP server, a UTCP manual, a RAP tool server, a remote A2A
+agent, or a method in your own JVM.
 
 ## The tool model
 
@@ -10,10 +10,12 @@ your own JVM.
 |---|---|
 | `ToolSpec` | Name, description, JSON input schema (a plain `Map`), and protocol-neutral metadata. |
 | `ToolInvocation` | A tool name plus an argument map. Arguments may contain `null` values. |
-| `ToolOutcome` | Ordered `Content` parts, an `error` flag, and an optional structured payload. |
+| `ToolOutcome` | Ordered `Content` parts, an `error` flag, an optional structured payload, and an optional [subscription](#subscriptions). |
 | `Content` | `Text`, `Data` (base64 with a MIME type and an optional file name), `Json`, `Link` (by URI), `Resource` (a URI delivered with its text or bytes, such as an MCP embedded resource), or `Unmapped`. |
 | `ToolSource` | Anything that can `listTools()` and `invoke(...)`. |
 | `ToolConnector` | A `ToolSource` that is also a `ProtocolConnector`: a connection to one remote peer. |
+| `ToolSubscription`, `ToolEvent` | Events a tool keeps sending after its first result (see [Subscriptions](#subscriptions)). |
+| `ToolContext`, `ToolContexts` | Protocol-specific per-call contexts handed to tools (see [Per-call tool contexts](#per-call-tool-contexts)). |
 
 `ToolOutcome.text()` joins all text parts with newlines, and `structuredContent()` returns the
 structured payload if there is one. `ToolOutcome.text("…")` and `ToolOutcome.failure("…")` build
@@ -114,8 +116,10 @@ other type is rejected with `IllegalArgumentException` when you call `scan`, as 
 records.
 
 A parameter of type `CallerIdentity` receives the authenticated caller when the tool is served over
-a protected endpoint, and a parameter of type `ToolProgress` receives a
-[progress reporter](#progress-and-log-messages). Neither appears in the schema.
+a protected endpoint, a parameter of type `ToolProgress` receives a
+[progress reporter](#progress-and-log-messages), and a parameter whose type is an interface
+extending `ToolContext` receives that [per-call context](#per-call-tool-contexts). None of them
+appears in the schema.
 
 !!! tip "Parameter names"
     Compile with `-parameters` so Protoweft can read parameter names, or name every parameter with
@@ -171,8 +175,8 @@ Calls are cheap and never throw. Where the reports go depends on how the tool is
 - **Served over MCP:** the [MCP server](../protocols/mcp.md#progress-and-logging-in-tools) sends
   them to the client as `notifications/progress` (only when the client asked for progress) and
   `notifications/message`.
-- **Published as a UTCP manual:** they're dropped; UTCP has no progress channel, and the provider
-  passes no reporter (the tool gets `ToolProgress.NOOP`).
+- **Published as a UTCP manual or served over RAP:** they're dropped; neither protocol has a
+  progress channel, and the server passes no reporter (the tool gets `ToolProgress.NOOP`).
 - **Called directly:** pass your own reporter with
   `ToolSource.invoke(invocation, caller, progress)`. `LocalTools`, `ToolRegistry` and the
   MCP client connector forward it; sources that can't report progress inherit a default that
@@ -191,13 +195,79 @@ LocalTools tools = LocalTools.builder()
 
 The `ToolHandler` receives the raw argument map and the caller. A `ProgressAwareToolHandler`
 `(arguments, caller, progress) -> ...` also receives the call's
-[`ToolProgress`](#progress-and-log-messages); `tool(...)` accepts either. As with annotated methods,
+[`ToolProgress`](#progress-and-log-messages), and a `ContextualToolHandler`
+`(arguments, caller, progress, contexts) -> ...` also its [`ToolContexts`](#per-call-tool-contexts);
+`tool(...)` accepts any of them. As with annotated methods,
 an exception becomes a failure outcome unless it is an `ProtoweftException`. `add(LocalTool)` and
 `addAll(List<LocalTool>)` add prepared tools, for example
 [LangChain4j `@Tool` methods](../integrations/langchain4j.md#tool-methods-out).
 
 `LocalTools` is immutable and thread-safe once built. Your tool methods must be thread-safe too:
 servers call them concurrently.
+
+## Per-call tool contexts
+
+Some protocols give a tool more than its arguments, the caller and progress reporting. RAP, for
+example, lets a running tool start a subscription or ask the user to choose. Such a protocol defines
+a **tool context**: an interface extending `ToolContext`, such as RAP's
+[`RapCallContext`](../protocols/rap.md#tools-that-use-rap-rapcallcontext). The core knows only the
+SPI:
+
+| Type | Role |
+|---|---|
+| `ToolContext` | Marker interface for a protocol's per-call context. `available()` is `true` for a real context. |
+| `ToolContexts` | The immutable set of contexts for one call, keyed by interface type: `of(type, value)`, `with(type, value)`, `get(type)` (an `Optional`), `resolve(type)` (never `null`), and `EMPTY`. |
+| `ContextualToolHandler` | A programmatic tool's handler that receives the call's `ToolContexts`. |
+
+- An `@AgentTool` method receives a context by declaring a parameter of its interface type. The
+  parameter type must be an interface; `scan` rejects a class.
+- A programmatic tool uses a `ContextualToolHandler` and `contexts.resolve(Type.class)` (RAP also
+  offers `RapCallContext.from(contexts)`).
+- When the protocol serving the call doesn't provide the context (another protocol, or a direct
+  call), the tool gets a **stand-in** whose `available()` is `false` and whose other methods throw
+  `ProtoweftException` with `UNSUPPORTED`. Check `available()` to behave sensibly everywhere.
+- Servers pass contexts with `ToolSource.invoke(invocation, caller, progress, contexts)`.
+  `LocalTools`, `ToolRegistry` and the discovery catalog pass them on; other sources inherit a
+  default that drops them.
+
+## Subscriptions
+
+A tool call can keep delivering **events** after its first result, for example notifications from
+a watched repository. The first result is an ordinary `ToolOutcome`; its `subscription()` returns
+an `Optional<ToolSubscription>`:
+
+| Member | Meaning |
+|---|---|
+| `id()` | The protocol's id for the subscription (for RAP, the tool call id). |
+| `events()` | A `java.util.concurrent.Flow.Publisher<ToolEvent>`. It accepts **one** subscriber (a second gets `onError`), buffers events until it subscribes, completes after a last event or `cancel()`, and fails if the subscription is lost. Cancelling the `Flow.Subscription` cancels the subscription. |
+| `cancel()` | Stops the subscription: tells the tool (best effort) and completes `events()`. Idempotent. |
+| `isActive()` | `true` until a last event, a cancel or a failure. |
+
+A `ToolEvent(content, last, metadata)` carries `Content` parts (`text()` joins the text parts), a
+`last` flag for the final event, and protocol facts as metadata (RAP adds `associative` and
+`final`). `ToolEvent.text("…")` builds a one-part event.
+
+```java
+ToolOutcome out = registry.invoke(ToolInvocation.of("repos.watch", Map.of("repo", "acme/app")));
+out.subscription().ifPresent(subscription -> subscription.events().subscribe(new Flow.Subscriber<ToolEvent>() {
+    @Override public void onSubscribe(Flow.Subscription s) { s.request(Long.MAX_VALUE); }
+    @Override public void onNext(ToolEvent event) { System.out.println(event.text()); }
+    @Override public void onError(Throwable error) { }
+    @Override public void onComplete() { }
+}));
+```
+
+- **Producing:** `BufferedToolSubscription(id, onCancel)` is the producer side: `emit(event)`,
+  `complete()` and `fail(error)`, delivering in order on the emitting or requesting thread. Attach it
+  with `outcome.withSubscription(subscription)`; the three-argument `ToolOutcome` constructor and
+  the factories create outcomes without one.
+- **Who fills it in:** only [RAP](../protocols/rap.md#subscriptions) today, on the client
+  (`RapClientConnector`), and on the server, where a tool subscribes through `RapCallContext`.
+  `LocalTools`, `ToolRegistry` and the discovery catalog return the source's outcome object, so the
+  subscription passes through, and `RapToolServer` re-serves one as RAP subscription events.
+- **Everywhere else** (the MCP, UTCP and A2A servers, and the LangChain4j, Spring AI and ARGI
+  adapters) only the first result is used and events don't reach a model. Nothing cancels the
+  subscription for you there, so cancel subscriptions you don't consume.
 
 ## The tool registry
 
@@ -209,6 +279,7 @@ ToolRegistry registry = new ToolRegistry()
         .register("local", tools)            // LocalTools
         .register("files", mcpConnector)     // an MCP server
         .register("weather", utcpConnector)  // a UTCP manual
+        .register("repos", rapConnector)     // a RAP tool server
         .register("travel", a2aConnector);   // a remote A2A agent, as one "ask" tool
 
 registry.listTools();   // local.forecast, files.read_file, weather.get_forecast, travel.ask, ...
@@ -225,13 +296,16 @@ ToolOutcome out = registry.invoke(ToolInvocation.of("local.forecast",
   listing fails.
 - `unregister(name)` removes a source without closing it. `close()` closes every registered
   source that is `AutoCloseable`.
-- `invoke(invocation, caller)` passes a `CallerIdentity` through to the source, and
-  `invoke(invocation, caller, progress)` also passes a `ToolProgress`.
+- `invoke(invocation, caller)` passes a `CallerIdentity` through to the source,
+  `invoke(invocation, caller, progress)` also passes a `ToolProgress`, and
+  `invoke(invocation, caller, progress, contexts)` also the [tool contexts](#per-call-tool-contexts).
+- Outcomes come back as the source returned them, [subscription](#subscriptions) included.
 
 A registry is itself a `ToolSource`, so you can hand it to the
 [LangChain4j](../integrations/langchain4j.md), [Spring AI](../integrations/spring-ai.md) or
-[ARGI](../integrations/argi.md) adapters, serve it over [MCP](../protocols/mcp.md), or publish it
-as a [UTCP manual](../protocols/utcp.md#serving-tools-as-a-utcp-manual).
+[ARGI](../integrations/argi.md) adapters, serve it over [MCP](../protocols/mcp.md) or
+[RAP](../protocols/rap.md#server), or publish it as a
+[UTCP manual](../protocols/utcp.md#serving-tools-as-a-utcp-manual).
 
 !!! warning "Re-serving remote tools"
     Serving a registry that contains remote connectors turns your application into a proxy that
