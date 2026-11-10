@@ -2,8 +2,9 @@
 
 ## Reporting a vulnerability
 
-Please report vulnerabilities privately using the repository's **Security → Report a
-vulnerability** form (GitHub private vulnerability reporting). Don't open a public issue.
+Please report vulnerabilities privately through GitHub's private vulnerability reporting:
+<https://github.com/rahulbsw/protoweft/security/advisories/new> (the repository's **Security →
+Report a vulnerability** form). Don't open a public issue.
 Include the affected module and version, a reproduction if you have one, and the impact you
 expect.
 
