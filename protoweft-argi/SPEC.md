@@ -147,6 +147,13 @@ AgentHandler handler = ArgiAgents.handler(agent);   // serve with A2aAgentServer
   compiled without one fails at build time with `IllegalArgumentException` naming `MemorySaver`,
   instead of failing at the first approval.
 
+- **Dependency overrides.** ARGI 2.1.0-RC1 pulls `org.jsoup:jsoup` 1.15.4 through
+  `flexmark-html2md-converter` 0.64.8; that version has two advisories (GHSA-65r4-943x-97jj, memory
+  exhaustion on deeply nested namespaces; GHSA-pmhh-3w7g-xqp8, Cleaner bypass), fixed in 1.23.2.
+  This module declares jsoup `jsoupVersion` (1.24.1) as a runtime dependency, so Gradle resolves
+  the newer version and Maven's nearest-wins does too. `JsoupOverrideTest` checks the converter
+  still works on it. Drop the override once ARGI ships a fixed jsoup.
+
 ## Coverage and limitations
 
 - **Release candidate.** This targets the published RC1 only. ARGI main has moved to Spring-free

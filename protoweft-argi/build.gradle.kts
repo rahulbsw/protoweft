@@ -16,6 +16,8 @@ dependencies {
     // Jackson 3 (edited tool arguments in human feedback); unversioned, so Spring AI's governs.
     implementation("tools.jackson.core:jackson-databind")
     implementation("org.slf4j:slf4j-api:${project.property("slf4jVersion")}")
+    // Security floor for ARGI's HTML-to-Markdown converter; see SPEC.md "Dependency overrides".
+    runtimeOnly("org.jsoup:jsoup:${project.property("jsoupVersion")}")
 
     // Optional: only CatalogToolSelectionInterceptor needs it.
     compileOnly(project(":protoweft-discovery"))
