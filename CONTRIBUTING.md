@@ -32,6 +32,9 @@ rm -rf ~/.m2/repository/io/github/rahulbsw/protoweft/*/0.0.0-verify
 A new trusted key or an unexpected checksum change in the diff deserves a look at who signed the
 artifact.
 
+Dependabot opens weekly Gradle update PRs (`.github/dependabot.yml`). They fail CI until the
+metadata is regenerated: check out the PR branch, run the command above, and push the result.
+
 ## Project layout
 
 | Path | What lives there |

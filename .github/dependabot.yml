@@ -1,0 +1,28 @@
+# Weekly dependency updates. Gradle PRs need the dependency verification metadata regenerated
+# before CI passes (see CONTRIBUTING.md, "Changing dependencies").
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /interop/rap/rust-client
+    schedule:
+      interval: weekly
+    groups:
+      interop-crates:
+        patterns: ['*']
