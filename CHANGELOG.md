@@ -20,6 +20,13 @@ All notable changes to Protoweft are documented here. The format follows
   - Cross-cutting: `ComplianceReport`, `CredentialProvider`, `HttpAuthorizer`,
     `InboundAuthenticator` with `CallerIdentity` and `WWW-Authenticate` challenges,
     `ObservationHandler`, and `ProtoweftException` with `ErrorCategory`.
+- **AG-UI (`protoweft-agui`, Agent–User Interaction protocol, implemented from spec 1.0).**
+  `AgUiAgentServer` serves an agent to AG-UI frontends over HTTP + SSE: all 31 event types,
+  interrupts, frontend tool calls, version negotiation, opt-in CORS and a capabilities document
+  at `GET <path>/capabilities`. Every event is checked against the spec's sequence rules before it
+  is sent. `AgUi.agent(handler)` serves any core `AgentHandler`. No runtime dependency beyond
+  Jackson 3; tests validate against the official JSON Schema, and the run-input, event and JSON
+  Patch parsers are fuzzed.
 - **Hosting.** `protoweft-server` (servlet endpoints plus an inbound-auth filter) and
   `protoweft-server-jetty` (an embedded Jetty 12 host).
 - **MCP (`protoweft-mcp`, MCP Java SDK 2.1.0).** A client over stdio and Streamable HTTP. A tool
@@ -95,6 +102,9 @@ All notable changes to Protoweft are documented here. The format follows
   LangChain4j streaming handlers send them with `textDelta`, which the A2A server streams as
   chunks of one appended `response` artifact, replaced by the whole text as the last chunk; they
   no longer add a separate final `response` artifact.
+- `InboundAuthFilter` lets CORS preflight requests (`OPTIONS` with `Origin` and
+  `Access-Control-Request-Method`) through as anonymous, because browsers never attach credentials
+  to them. Servlets answer preflights without running anything.
 
 ### Fixed
 - The discovery search meta-tool offers models only `query` and `limit`. Its former `protocols`,

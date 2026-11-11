@@ -18,8 +18,8 @@ Some tests start real servers on free local ports. None of them need network acc
 
 The parsers of untrusted input have [Jazzer](https://github.com/CodeIntelligenceTesting/jazzer)
 fuzz tests (`@FuzzTest`, classes named `*FuzzTest`): RAP callbacks and toolset manifests, UTCP
-manuals and URL checks, OAuth `WWW-Authenticate` challenges and protected-resource metadata, and
-the WordPiece tokenizer. They live in their own source set, `src/fuzz/java` (seeds in
+manuals and URL checks, OAuth `WWW-Authenticate` challenges and protected-resource metadata, the
+WordPiece tokenizer, and AG-UI run input, events and JSON Patch. They live in their own source set, `src/fuzz/java` (seeds in
 `src/fuzz/resources/<package>/<TestClass>Inputs/<method>/`), run by each module's `fuzzTest` task.
 `./gradlew build` (through `check`) runs them in regression mode, once per seed input, which is fast
 and deterministic.

@@ -78,7 +78,7 @@ jobs:
       - name: Compile the fuzz tests
         run: >-
           ./gradlew --console=plain :protoweft-rap:fuzzClasses :protoweft-utcp:fuzzClasses
-          :protoweft-oauth:fuzzClasses :protoweft-discovery-embeddings:fuzzClasses
+          :protoweft-oauth:fuzzClasses :protoweft-discovery-embeddings:fuzzClasses :protoweft-agui:fuzzClasses
       # One fuzz test per Gradle run (Jazzer fuzzes a single test per JVM), each for
       # JAZZER_MAX_DURATION. --rerun keeps the build cache from replaying an earlier result.
       - name: Fuzz each target
@@ -90,6 +90,9 @@ jobs:
           for target in \
             protoweft-rap:io.github.rahulbsw.protoweft.rap.ClientCallbacksFuzzTest.callbackBodies \
             protoweft-rap:io.github.rahulbsw.protoweft.rap.ToolsetFuzzTest.manifest \
+            protoweft-agui:io.github.rahulbsw.protoweft.agui.WireFuzzTest.runInput \
+            protoweft-agui:io.github.rahulbsw.protoweft.agui.WireFuzzTest.event \
+            protoweft-agui:io.github.rahulbsw.protoweft.agui.JsonPatchFuzzTest.patch \
             protoweft-utcp:io.github.rahulbsw.protoweft.utcp.ManualFuzzTest.manual \
             protoweft-utcp:io.github.rahulbsw.protoweft.utcp.UrlSecurityFuzzTest.urls \
             protoweft-oauth:io.github.rahulbsw.protoweft.oauth.ChallengeFuzzTest.wwwAuthenticate \

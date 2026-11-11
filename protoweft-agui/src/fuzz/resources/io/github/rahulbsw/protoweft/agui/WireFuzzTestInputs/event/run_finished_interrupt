@@ -1,0 +1,1 @@
+{"type":"RUN_FINISHED","threadId":"t","runId":"r","outcome":{"type":"interrupt","interrupts":[{"id":"i","reason":"approval"}]}}

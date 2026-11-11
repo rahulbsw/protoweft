@@ -1,0 +1,1 @@
+{"type":"TOOL_CALL_RESULT","messageId":"m","toolCallId":"c","content":[{"type":"text","text":"ok"}],"role":"tool"}

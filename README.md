@@ -56,6 +56,7 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
 | A2A | `A2aAgentConnector` | `A2aAgentServer` | JSON-RPC, SSE streaming | `1.0` | a2a-java `1.5.0.Final` |
 | UTCP | `UtcpClientConnector` | `UtcpManualProvider` | HTTP, text and file manuals; `http` and `text` tools | `1.1` (accepts `1.0`) | implemented from the spec |
 | RAP (Hydro Infinity) | `RapClientConnector` | `RapToolServer` | HTTP + JSON with callbacks; subscriptions, OAuth and choice prompts, cancellation, thread closure, durable store | unversioned; Infinity `e1a3e4b` | implemented from the spec |
+| AG-UI | (next) | `AgUiAgentServer` | HTTP + SSE; all event families, interrupts, frontend tools, opt-in CORS | `1.0` | implemented from the spec |
 
 Coverage and limitations are documented per protocol in the [user guide](docs/index.md).
 
@@ -72,6 +73,7 @@ Protoweft is not an LLM framework: it has no model clients, chains, memory or RA
 | `protoweft-a2a` | A2A client and agent server (JSON-RPC). |
 | `protoweft-utcp` | UTCP client and manual provider. |
 | `protoweft-rap` | RAP (Reactive Agent Protocol) client and tool server, with subscriptions, prompts and a durable store. |
+| `protoweft-agui` | AG-UI (Agent–User Interaction) agent server: Java agents behind any AG-UI frontend. |
 | `protoweft-server`, `protoweft-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
 | `protoweft-oauth` | OAuth 2.1 for MCP authorization: client and resource-server pieces (Nimbus). |
 | `protoweft-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
@@ -121,7 +123,7 @@ Run an example:
   [errors and observability](docs/concepts/errors-and-observability.md),
   [versions and compliance](docs/concepts/compliance.md)
 - Protocols: [MCP](docs/protocols/mcp.md), [A2A](docs/protocols/a2a.md), [UTCP](docs/protocols/utcp.md),
-  [RAP](docs/protocols/rap.md)
+  [RAP](docs/protocols/rap.md), [AG-UI](docs/protocols/agui.md)
 - Integrations: [Spring Boot](docs/integrations/spring-boot.md),
   [LangChain4j](docs/integrations/langchain4j.md), [Spring AI](docs/integrations/spring-ai.md),
   [ARGI](docs/integrations/argi.md), [OAuth](docs/integrations/oauth.md),

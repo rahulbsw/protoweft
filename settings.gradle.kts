@@ -11,6 +11,7 @@ val modules = listOf(
     "protoweft-a2a",
     "protoweft-utcp",
     "protoweft-rap",
+    "protoweft-agui",
     "protoweft-discovery",
     "protoweft-discovery-embeddings",
     "protoweft-model-bge-small-en-v15",
