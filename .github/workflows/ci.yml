@@ -109,8 +109,13 @@ jobs:
         with:
           name: fuzz-findings
           path: |
-            **/src/fuzz/resources/**/crash-*
-            **/src/fuzz/resources/**/timeout-*
-            **/src/fuzz/resources/**/oom-*
+            # Jazzer 0.30.0 writes findings to src/test/resources/<package>/<Class>Inputs/<method>/
+            # when the module has src/test/resources, else to the module root (FuzzTestExecutor).
+            protoweft-*/src/test/resources/**/crash-*
+            protoweft-*/src/test/resources/**/timeout-*
+            protoweft-*/src/test/resources/**/oom-*
+            protoweft-*/crash-*
+            protoweft-*/timeout-*
+            protoweft-*/oom-*
             **/build/test-results/fuzzTest/*FuzzTest.xml
             **/build/reports/tests/

@@ -33,9 +33,12 @@ JAZZER_FUZZ=1 JAZZER_MAX_DURATION=10m ./gradlew :protoweft-utcp:fuzzTest --tests
 ```
 
 `--rerun` stops Gradle from answering from its build cache. Coverage-increasing inputs collect in
-`<module>/.cifuzz-corpus/` (local only, don't commit it). A crashing input is written next to the
-seeds as `crash-<sha1>`, so the next regression run reproduces it; once the bug is fixed, rename it
-to describe the case and keep it. `JAZZER_KEEP_GOING=<n>` continues past findings to collect
+`<module>/.cifuzz-corpus/` (local only, don't commit it). A crashing input is written as
+`crash-<sha1>`, but not next to the seeds: Jazzer hard-codes Maven's `src/test/resources`, so it
+lands in `<module>/src/test/resources/<package>/<TestClass>Inputs/<method>/` (or the module root
+if a module has no `src/test/resources`). Move it into the seed directory under
+`src/fuzz/resources/` so regression runs replay it; once the bug is fixed, rename it to describe
+the case and keep it. Delete the stray `…Inputs` directory Jazzer created under `src/test/resources`. `JAZZER_KEEP_GOING=<n>` continues past findings to collect
 several, but then the test reports success, so look for new `crash-*` files. Inputs that crash
 because of a known, still-open bug live in a sibling `<method>KnownCrashes/` directory, run by a
 `@Disabled` fuzz test until the fix lands. CI's `fuzz` job fuzzes every target for 40 seconds and
