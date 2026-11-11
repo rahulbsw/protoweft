@@ -150,8 +150,11 @@ AgentHandler handler = ArgiAgents.handler(agent);   // serve with A2aAgentServer
 - **Dependency overrides.** ARGI 2.1.0-RC1 pulls `org.jsoup:jsoup` 1.15.4 through
   `flexmark-html2md-converter` 0.64.8; that version has two advisories (GHSA-65r4-943x-97jj, memory
   exhaustion on deeply nested namespaces; GHSA-pmhh-3w7g-xqp8, Cleaner bypass), fixed in 1.23.2.
-  This module declares jsoup `jsoupVersion` (1.24.1) as a runtime dependency, so Gradle resolves
-  the newer version and Maven's nearest-wins does too. `JsoupOverrideTest` checks the converter
+  This module declares jsoup `jsoupVersion` (1.24.1) as a runtime dependency, so Maven's
+  nearest-wins resolves the newer version for consumers; inside this build a dependency
+  substitution in the root `build.gradle.kts` replaces 1.15.4 before resolution, so its metadata is
+  never downloaded and dependency verification records only 1.24.1 (the OpenSSF Scorecard
+  vulnerability scan reads that file and had flagged the unused 1.15.4 POM). `JsoupOverrideTest` checks the converter
   still works on it. Drop the override once ARGI ships a fixed jsoup.
 
 ## Coverage and limitations

@@ -1,0 +1,1 @@
+{"utcp_version":"1.1.0","manual_version":"1.0.0","tools":[{"name":"echo","description":"Echoes","inputs":{"type":"object","properties":{"msg":{"type":"string","default":null}},"required":["msg"]},"outputs":{"type":"string"},"tags":["text","echo"],"average_response_size":10,"tool_call_template":{"call_template_type":"text","content":"hi ${NAME} $USER"}}]}

@@ -1,0 +1,1 @@
+{"tools":[{"name":"r","description":"$ref ${X}","inputs":{"$ref":"#/defs/a"},"tool_call_template":{"call_template_type":"cli","command":"rm"}}]}

@@ -6,3 +6,6 @@ build/
 out/
 .DS_Store
 site/
+
+# Jazzer fuzzing corpora (local runs)
+.cifuzz-corpus/

@@ -1,0 +1,6 @@
+# Accepted findings for the RAP interop harness (test-only; never built into a Protoweft artifact).
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0249"
+ignoreUntil = 2027-05-01
+reason = "smartstring is unmaintained (an informational advisory with no fixed version). It comes from Hydro's infinity-agent-core via rhai, pinned at the Infinity commit under test; revisit when Hydro moves off it."

@@ -182,3 +182,15 @@ project(":protoweft-bom") {
     description = "Protoweft bill of materials: aligns the versions of every Protoweft module"
     pluginManager.withPlugin("java-platform") { publishToCentral(JavaPlatform()) }
 }
+
+// Security floor: ARGI pulls jsoup 1.15.4 transitively. Substituting before resolution means its
+// metadata is never even downloaded (see protoweft-argi/SPEC.md "Dependency overrides").
+allprojects {
+    val jsoupVersion = rootProject.property("jsoupVersion")
+    configurations.configureEach {
+        resolutionStrategy.dependencySubstitution {
+            substitute(module("org.jsoup:jsoup")).using(module("org.jsoup:jsoup:$jsoupVersion"))
+                .because("jsoup < 1.23.2 has GHSA-65r4-943x-97jj and GHSA-pmhh-3w7g-xqp8")
+        }
+    }
+}

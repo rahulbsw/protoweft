@@ -100,25 +100,41 @@ public final class ProtectedResourceMetadata {
         return JSONObjectUtils.toJSONString(json);
     }
 
+    /** A string array member; a {@code null} entry is malformed (RFC 9728 §2 lists strings). */
+    private static String[] strings(Map<String, Object> json, String key) throws ParseException {
+        String[] values = JSONObjectUtils.getStringArray(json, key);
+        if (values != null) {
+            for (String v : values) {
+                if (v == null) {
+                    throw new ParseException("'" + key + "' contains null", 0);
+                }
+            }
+        }
+        return values;
+    }
+
     /** Parses a fetched document; requires {@code resource} (RFC 9728 §2). */
     static ProtectedResourceMetadata fromJson(Map<String, Object> json) {
+        if (json == null) {
+            throw new ProtoweftException(ErrorCategory.PROTOCOL, null, "protected resource metadata is not a JSON object");
+        }
         try {
             String resource = JSONObjectUtils.getString(json, "resource");
             if (resource == null) {
                 throw new ProtoweftException(ErrorCategory.PROTOCOL, null, "protected resource metadata lacks 'resource'");
             }
             Builder b = builder(URI.create(resource));
-            String[] servers = JSONObjectUtils.getStringArray(json, "authorization_servers");
+            String[] servers = strings(json, "authorization_servers");
             if (servers != null) {
                 for (String s : servers) {
                     b.authorizationServer(URI.create(s));
                 }
             }
-            String[] scopes = JSONObjectUtils.getStringArray(json, "scopes_supported");
+            String[] scopes = strings(json, "scopes_supported");
             if (scopes != null) {
                 b.scopesSupported(List.of(scopes));
             }
-            String[] methods = JSONObjectUtils.getStringArray(json, "bearer_methods_supported");
+            String[] methods = strings(json, "bearer_methods_supported");
             if (methods != null) {
                 b.bearerMethods = List.of(methods);
             }
