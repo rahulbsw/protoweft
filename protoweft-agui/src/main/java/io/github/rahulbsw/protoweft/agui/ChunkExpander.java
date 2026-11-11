@@ -5,6 +5,7 @@ import io.github.rahulbsw.protoweft.agui.AgUiEvent.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -88,7 +89,7 @@ final class ChunkExpander {
             return;
         }
         if (id == null) {
-            fail("the first " + kind.name().toLowerCase() + " chunk of an item must carry its id");
+            fail("the first " + kind.name().toLowerCase(Locale.ROOT) + " chunk of an item must carry its id");
         }
         if (kind == Kind.TOOL && name == null) {
             fail("the first TOOL_CALL_CHUNK of a call must carry toolCallName");

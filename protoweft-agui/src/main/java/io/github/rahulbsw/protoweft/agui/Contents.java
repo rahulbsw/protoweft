@@ -5,6 +5,7 @@ import io.github.rahulbsw.protoweft.core.tool.Content;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /** Maps between core {@link Content} and AG-UI content (a {@code String} or {@code List<ContentPart>}). */
@@ -84,7 +85,7 @@ public final class Contents {
         if (mimeType == null) {
             return "document";
         }
-        String m = mimeType.toLowerCase();
+        String m = mimeType.toLowerCase(Locale.ROOT);
         if (m.startsWith("image/")) {
             return "image";
         }

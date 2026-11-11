@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -327,7 +328,7 @@ public final class AgUiClient {
     }
 
     private static String mediaType(HttpResponse<?> resp) {
-        return resp.headers().firstValue("Content-Type").orElse("").split(";")[0].trim().toLowerCase();
+        return resp.headers().firstValue("Content-Type").orElse("").split(";")[0].trim().toLowerCase(Locale.ROOT);
     }
 
     private static boolean protobufResponse(HttpResponse<?> resp) {

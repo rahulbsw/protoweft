@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -157,7 +158,7 @@ public final class AgUiConformance {
                     "request failed: " + e.getMessage()));
             return;
         }
-        boolean stream = resp.status == 200 && resp.contentType.toLowerCase().startsWith(AgUiProtocol.EVENT_STREAM);
+        boolean stream = resp.status == 200 && resp.contentType.toLowerCase(Locale.ROOT).startsWith(AgUiProtocol.EVENT_STREAM);
         results.add(check("binding/run-starts", "a run that starts answers 200 with text/event-stream", stream,
                 "HTTP " + resp.status + ", Content-Type '" + resp.contentType + "'"));
         if (!stream) {
@@ -232,7 +233,7 @@ public final class AgUiConformance {
             results.add(fail("binding/protobuf-content-type", CONTENT_TYPE_RULE, "request failed: " + e.getMessage()));
             return;
         }
-        String mediaType = resp.contentType.split(";")[0].trim().toLowerCase();
+        String mediaType = resp.contentType.split(";")[0].trim().toLowerCase(Locale.ROOT);
         if (resp.status == 200 && mediaType.equals(AgUiProtocol.EVENT_STREAM)) {
             ids.forEach(id -> results.add(new Result(id, "HTTP + Protobuf binding", Status.SKIP,
                     "the agent answered text/event-stream: it does not offer the binary binding")));
@@ -272,7 +273,7 @@ public final class AgUiConformance {
         try {
             Response resp = post(body);
             String text = new String(resp.body, StandardCharsets.UTF_8);
-            boolean ok = resp.status == 200 && resp.contentType.toLowerCase().startsWith(AgUiProtocol.EVENT_STREAM)
+            boolean ok = resp.status == 200 && resp.contentType.toLowerCase(Locale.ROOT).startsWith(AgUiProtocol.EVENT_STREAM)
                     && (text.contains("\"RUN_STARTED\"") || text.contains("\"RUN_ERROR\""));
             results.add(check(id, rule, ok, "HTTP " + resp.status + ": " + abbreviate(text)));
         } catch (IOException e) {
@@ -284,7 +285,7 @@ public final class AgUiConformance {
         try {
             Response resp = post(body);
             boolean ok = resp.status >= 400 && resp.status < 500
-                    && !resp.contentType.toLowerCase().startsWith(AgUiProtocol.EVENT_STREAM);
+                    && !resp.contentType.toLowerCase(Locale.ROOT).startsWith(AgUiProtocol.EVENT_STREAM);
             results.add(check(id, rule, ok, "HTTP " + resp.status + ", Content-Type '" + resp.contentType + "'"));
         } catch (IOException e) {
             results.add(fail(id, rule, "request failed: " + e.getMessage()));

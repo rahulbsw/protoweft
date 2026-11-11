@@ -18,6 +18,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -77,7 +78,7 @@ final class AgUiServlet extends HttpServlet {
         }
         cors.apply(req, resp);
         String contentType = req.getContentType();
-        if (contentType == null || !contentType.toLowerCase().startsWith("application/json")) {
+        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("application/json")) {
             error(resp, 415, "the run input must be sent as application/json");
             return;
         }
@@ -202,7 +203,7 @@ final class AgUiServlet extends HttpServlet {
         double quality = 0;
         for (String range : accept.split(",")) {
             String[] parts = range.split(";");
-            String type = parts[0].trim().toLowerCase();
+            String type = parts[0].trim().toLowerCase(Locale.ROOT);
             int specificity = type.equals(mediaType) ? 3 : type.equals(main + "/*") ? 2 : type.equals("*/*") ? 1 : 0;
             if (specificity == 0 || specificity < best) {
                 continue;

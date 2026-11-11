@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -77,7 +78,7 @@ final class ProtoWire {
                 }
                 return fill(parent.newBuilderForField(f), m).build();
             case ENUM:
-                EnumValueDescriptor ev = f.getEnumType().findValueByName(String.valueOf(v).toUpperCase());
+                EnumValueDescriptor ev = f.getEnumType().findValueByName(String.valueOf(v).toUpperCase(Locale.ROOT));
                 if (ev == null) {
                     throw new IllegalArgumentException(f.getFullName() + " has no value '" + v + "'");
                 }
@@ -173,7 +174,7 @@ final class ProtoWire {
                     // A value this build has no name for travels as its number, for the decoder to judge.
                     return String.valueOf(ev.getNumber());
                 }
-                return ev.getType().getFullName().equals(PATCH_OP) ? ev.getName().toLowerCase() : ev.getName();
+                return ev.getType().getFullName().equals(PATCH_OP) ? ev.getName().toLowerCase(Locale.ROOT) : ev.getName();
             default:
                 return v;
         }

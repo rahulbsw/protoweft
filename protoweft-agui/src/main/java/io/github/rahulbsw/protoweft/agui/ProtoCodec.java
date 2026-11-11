@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -76,7 +77,7 @@ final class ProtoCodec {
             }
         }
         Events.Event.Builder envelope = Events.Event.newBuilder();
-        FieldDescriptor arm = Events.Event.getDescriptor().findFieldByName(type.toLowerCase());
+        FieldDescriptor arm = Events.Event.getDescriptor().findFieldByName(type.toLowerCase(Locale.ROOT));
         if (arm == null) {
             throw new IllegalArgumentException("no wire form for event type " + type);
         }
@@ -162,7 +163,7 @@ final class ProtoCodec {
             throw new AgUiFormatException("a protobuf frame carries no event");
         }
         FieldDescriptor arm = Events.Event.getDescriptor().findFieldByNumber(envelope.getEventCase().getNumber());
-        String type = arm.getName().toUpperCase();
+        String type = arm.getName().toUpperCase(Locale.ROOT);
         Map<String, Object> event = ProtoWire.json((Message) envelope.getField(arm), 0);
         if (!(event.remove("baseEvent") instanceof Map<?, ?> b)) {
             throw new AgUiFormatException("the protobuf " + type + " event has no baseEvent");

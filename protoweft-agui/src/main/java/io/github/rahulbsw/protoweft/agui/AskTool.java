@@ -14,6 +14,7 @@ import io.github.rahulbsw.protoweft.core.tool.ToolSpec;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** The {@code ask} tool through which a registry or a model talks to a remote AG-UI agent. */
@@ -61,7 +62,7 @@ final class AskTool {
         }
         Map<String, Object> structured = new LinkedHashMap<>();
         structured.put("conversation_id", reply.contextId());
-        structured.put("state", reply.state().name().toLowerCase());
+        structured.put("state", reply.state().name().toLowerCase(Locale.ROOT));
         boolean error = reply.state() == TaskState.FAILED || reply.state() == TaskState.CANCELED
                 || reply.state() == TaskState.UNKNOWN;
         return new ToolOutcome(text.isEmpty() ? List.of() : List.of(new Content.Text(text)), error, structured);

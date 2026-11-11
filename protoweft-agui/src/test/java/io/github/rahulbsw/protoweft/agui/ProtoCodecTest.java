@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -151,6 +152,21 @@ class ProtoCodecTest {
         byte[] payload = ProtoCodec.encode(EventCodec.encode(new StateSnapshot(tooDeep, Envelope.NONE)));
         assertThatThrownBy(() -> ProtoBinding.decode(payload, new ArrayList<>()))
                 .isInstanceOf(AgUiFormatException.class);
+    }
+
+    @Test
+    void theWireDoesNotDependOnTheDefaultLocale() {
+        // In Turkish, "I".toLowerCase() is a dotless "ı": RUN_FINISHED must still find its envelope arm.
+        Locale saved = Locale.getDefault();
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+        try {
+            AgUiEvent.RunFinished finished = new AgUiEvent.RunFinished("t", "r", null, null, null, Envelope.NONE);
+            byte[] f = frame(finished);
+            assertThat(decode(Arrays.copyOfRange(f, 4, f.length), new ArrayList<>())).isEqualTo(finished);
+            assertThat(AgUiServlet.binding("APPLICATION/VND.AG-UI.EVENT+PROTO", true)).isEqualTo(AgUiProtocol.EVENT_PROTOBUF);
+        } finally {
+            Locale.setDefault(saved);
+        }
     }
 
     @Test
