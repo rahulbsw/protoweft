@@ -136,7 +136,8 @@ final class Uris {
     static URI parse(String value) {
         try {
             return new URI(value);
-        } catch (URISyntaxException | NullPointerException e) {
+        } catch (URISyntaxException | IllegalArgumentException | NullPointerException e) {
+            // IllegalArgumentException: JDK 17 throws NumberFormatException for some bracketed hosts.
             return null;
         }
     }

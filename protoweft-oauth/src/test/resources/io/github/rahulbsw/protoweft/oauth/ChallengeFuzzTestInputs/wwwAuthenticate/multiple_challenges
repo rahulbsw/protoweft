@@ -1,0 +1,1 @@
+Basic realm="x", Bearer error="insufficient_scope", scope="files:read files:write", resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp", error_description="needs \"write\""

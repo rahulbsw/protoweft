@@ -1,0 +1,1 @@
+{"utcp_version":"1.1.0","tools":[{"name":"local","tool_call_template":{"call_template_type":"http","url":"http://127.0.0.1:8080/x","auth":{"auth_type":"basic","username":"u","password":"${BASIC_PASSWORD}"}}}]}

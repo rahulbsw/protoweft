@@ -1,0 +1,1 @@
+{"type":"user_choice","group_id":"thread-1","id":"call-1","prompt":"Pick one","choices":["a","b"],"default":1,"response_url":"https://runtime.example.com/choice/1"}

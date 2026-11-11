@@ -129,6 +129,20 @@ challenge strings / custom verifier audience / ES256 / remote JWKS; PRM JSON; an
 Jetty test (`ProtoweftServer` + `InboundAuthFilter`) where `OAuthClient` discovers, authorizes and
 steps up against the real filter.
 
+- Fuzzing (Jazzer `@FuzzTest`, regression inputs in a normal build; CONTRIBUTING.md "Fuzzing"):
+  `ChallengeFuzzTest` (`Challenge.parse` never throws, keeps only an absolute `resource_metadata`
+  and a trimmed non-blank `scope`; `handleUnauthorized` answers any header with a `TokenResult` over
+  an offline HTTP client) and `ProtectedResourceMetadataFuzzTest` (`ProtectedResourceMetadata.parse`
+  returns or throws `PROTOCOL`/`CONFIGURATION`; accepted documents are canonical and round-trip).
+  *Fixed findings* (seeds kept in the regular corpora): a `resource_metadata` URL the HTTP client
+  can't send to (no host, non-ASCII host) escaped `handleUnauthorized` as
+  `IllegalArgumentException` — `Http` now reports it as `AUTHENTICATION`; an IPv6 literal with an
+  over-long IPv4 part escaped `Challenge.parse` as JDK 17's `NumberFormatException` — `Uris.parse`
+  treats it as unparseable; a `scope` of control characters became `""` instead of absent (blank is
+  now judged after `trim()`, so selection falls back to `scopes_supported`); a `null` PRM document
+  or `null` array entry threw `NullPointerException` from `fromJson` — now `PROTOCOL`, surfaced by
+  discovery as `AUTHENTICATION`.
+
 ## Sources
 
 - MCP authorization 2025-11-25: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization

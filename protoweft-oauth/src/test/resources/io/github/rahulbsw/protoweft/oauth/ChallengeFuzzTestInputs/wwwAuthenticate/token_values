@@ -1,0 +1,1 @@
+bearer scope=read, resource_metadata=https://a.example/prm

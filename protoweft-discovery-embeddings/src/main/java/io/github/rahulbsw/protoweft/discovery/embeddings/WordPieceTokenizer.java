@@ -108,14 +108,23 @@ public final class WordPieceTokenizer {
         Objects.requireNonNull(text, "text");
         IntList out = new IntList(text.length() / 3 + 4);
         int start = 0;
+        // Next occurrence of each special token, searched again only once `start` passes it, so
+        // each candidate scans the text once in total (linear, however many matches).
+        int[] next = new int[specialTokens.size()];
+        for (int c = 0; c < next.length; c++) {
+            next[c] = text.indexOf(specialTokens.get(c));
+        }
         while (start < text.length()) {
             int at = -1;
             String special = null;
-            for (String candidate : specialTokens) {
-                int i = text.indexOf(candidate, start);
+            for (int c = 0; c < next.length; c++) {
+                if (next[c] >= 0 && next[c] < start) {
+                    next[c] = text.indexOf(specialTokens.get(c), start);
+                }
+                int i = next[c];
                 if (i >= 0 && (at < 0 || i < at)) {
                     at = i;
-                    special = candidate;
+                    special = specialTokens.get(c);
                 }
             }
             int end = at < 0 ? text.length() : at;

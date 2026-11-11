@@ -10,6 +10,7 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:${project.property("junitVersion")}"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:${project.property("assertjVersion")}")
+    testImplementation("com.code-intelligence:jazzer-junit:${project.property("jazzerVersion")}")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.slf4j:slf4j-simple:${project.property("slf4jVersion")}")
 }

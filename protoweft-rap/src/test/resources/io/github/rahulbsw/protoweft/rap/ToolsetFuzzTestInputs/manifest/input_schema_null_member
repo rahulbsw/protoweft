@@ -1,0 +1,1 @@
+{"name":"weather","endpoint":"https://tools.example.com/invoke","tools":[{"name":"get_forecast","description":"Forecast","inputSchema":{"type":"object","default":null}}]}

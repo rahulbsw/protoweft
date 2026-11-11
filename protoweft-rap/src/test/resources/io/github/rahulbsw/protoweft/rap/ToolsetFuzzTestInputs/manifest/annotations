@@ -1,0 +1,1 @@
+{"name":"t","endpoint":"http://127.0.0.1:8080/invoke","needsMigration":false,"tools":[{"name":"a-b_1","description":"","inputSchema":{},"annotations":{"x-protoweft-readOnly":true,"x-protoweft-title":"A","x-protoweft-tags":["x","y"],"custom":{"k":[1,2.5,null]}}},{"name":"b","description":"d","inputSchema":{"type":"object"},"annotations":{}}]}

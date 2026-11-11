@@ -41,7 +41,7 @@ final class Http {
 
     /** Sends a Nimbus request (token, registration) and adapts the reply back to a Nimbus response. */
     HTTPResponse send(HTTPRequest request) {
-        HttpRequest.Builder b = HttpRequest.newBuilder(request.getURI()).timeout(timeout);
+        HttpRequest.Builder b = builder(request.getURI());
         for (Map.Entry<String, List<String>> h : request.getHeaderMap().entrySet()) {
             if (RESTRICTED.contains(h.getKey().toLowerCase(Locale.ROOT))) {
                 continue;
@@ -80,13 +80,21 @@ final class Http {
 
     /** GETs a JSON document as text; empty on a non-2xx status. */
     Optional<String> getText(URI uri) {
-        HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout)
-                .header("Accept", "application/json").GET().build();
+        HttpRequest request = builder(uri).header("Accept", "application/json").GET().build();
         HttpResponse<String> reply = exchange(request);
         if (reply.statusCode() < 200 || reply.statusCode() >= 300) {
             return Optional.empty();
         }
         return Optional.of(reply.body());
+    }
+
+    /** A request builder; a URL the HTTP client can't send to (no host, opaque) is an auth-flow failure. */
+    private HttpRequest.Builder builder(URI uri) {
+        try {
+            return HttpRequest.newBuilder(uri).timeout(timeout);
+        } catch (IllegalArgumentException e) {
+            throw Uris.auth("cannot request " + uri + ": " + e.getMessage(), e);
+        }
     }
 
     private HttpResponse<String> exchange(HttpRequest request) {
