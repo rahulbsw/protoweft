@@ -213,6 +213,16 @@ tokenizer over the same `tokenizer.json`.
 - `WordPieceTokenizerTest`: vocabulary ids, normalization and splitting examples, the
   100-character rule, `encode`/`encodePair` layout, the longest-first cases, greedy matching on a
   toy vocabulary.
+- `WordPieceTokenizerFuzzTest` (Jazzer `@FuzzTest`, regression inputs in a normal build;
+  CONTRIBUTING.md "Fuzzing"): any text, lone surrogates included, tokenizes without an exception
+  to ids inside the bge vocabulary; `encode` and `encodePair` keep the `[CLS]`/`[SEP]` layout and
+  token types, never exceed `maxLength`, keep each part's first pieces and follow the documented
+  longest-first rule.
+- `WordPieceTokenizerLinearTest`: special-token matching is linear. *Fixed finding (code review
+  while fuzzing):* every match re-scanned each special token from the current position, so text
+  of many literal `[SEP]`s took quadratic time (400K characters: 21.6 s; a hostile tool
+  description could burn CPU). Each token's next occurrence is now cached and re-searched only
+  once passed; ids are unchanged on the whole parity corpus (102,087 texts, 0 mismatches).
 - `HybridCatalogTest`: hybrid search finds a paraphrase that keyword search misses.
 
 Latency (Apple M4 Pro, 14 cores, JDK 21, a fresh JVM per run, three runs each, the same 100

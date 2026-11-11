@@ -14,6 +14,40 @@ Requirements: JDK 17 or newer. The Gradle wrapper is included.
 
 Some tests start real servers on free local ports. None of them need network access or API keys.
 
+## Fuzzing
+
+The parsers of untrusted input have [Jazzer](https://github.com/CodeIntelligenceTesting/jazzer)
+fuzz tests (`@FuzzTest`, classes named `*FuzzTest`): RAP callbacks and toolset manifests, UTCP
+manuals and URL checks, OAuth `WWW-Authenticate` challenges and protected-resource metadata, and
+the WordPiece tokenizer. A normal `./gradlew build` runs them in regression mode: once per input
+in `src/test/resources/<package>/<TestClass>Inputs/<method>/`, which is fast and deterministic.
+
+To fuzz, set `JAZZER_FUZZ=1` and select exactly one fuzz test per run (Jazzer fuzzes a single test
+per JVM). It stops after the test's `maxDuration` (2 minutes) or `JAZZER_MAX_DURATION`:
+
+```bash
+JAZZER_FUZZ=1 ./gradlew :protoweft-rap:test --tests '*ToolsetFuzzTest.manifest' --rerun
+JAZZER_FUZZ=1 JAZZER_MAX_DURATION=10m ./gradlew :protoweft-utcp:test --tests '*ManualFuzzTest.manual' --rerun
+```
+
+`--rerun` stops Gradle from answering from its build cache. Coverage-increasing inputs collect in
+`<module>/.cifuzz-corpus/` (local only, don't commit it). A crashing input is written next to the
+seeds as `crash-<sha1>`, so the next regression run reproduces it; once the bug is fixed, rename it
+to describe the case and keep it. `JAZZER_KEEP_GOING=<n>` continues past findings to collect
+several, but then the test reports success, so look for new `crash-*` files. Inputs that crash
+because of a known, still-open bug live in a sibling `<method>KnownCrashes/` directory, run by a
+`@Disabled` fuzz test until the fix lands. CI's `fuzz` job fuzzes every target for 40 seconds and
+uploads crashing inputs when it fails.
+
+JSON targets accept two input forms (see the test's `FuzzJson`): plain JSON, as in the seed files,
+or a leading NUL byte followed by bytes that select and edit a valid template, which reaches
+type and null confusions inside otherwise valid documents.
+
+A module with fuzz tests runs them after its other test classes (`FuzzTestsLast`, configured in
+`src/test/resources/junit-platform.properties`): the first `@FuzzTest` installs Jazzer's agent,
+which drops parameter names from classes loaded afterwards, and `LocalTools` needs them. Copy both
+files when adding fuzz tests to another module.
+
 ## Changing dependencies
 
 The build verifies every dependency and plugin against `gradle/verification-metadata.xml`
@@ -26,7 +60,7 @@ scripts/install-argi-snapshot.sh
 ./gradlew --write-verification-metadata sha256,pgp --export-keys -PargiSnapshot \
     build cyclonedxBom publishToMavenLocal -Pversion=0.0.0-verify
 rm gradle/verification-keyring.gpg
-rm -rf ~/.m2/repository/io/github/rahulbsw/protoweft/*/0.0.0-verify
+rm -rf ~/.m2/repository/io/github/rahulbsw/protoweft-*/0.0.0-verify
 ```
 
 A new trusted key or an unexpected checksum change in the diff deserves a look at who signed the

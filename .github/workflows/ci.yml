@@ -65,3 +65,53 @@ jobs:
         run: scripts/install-argi-snapshot.sh
       - name: Build protoweft-argi-neutral
         run: ./gradlew -PargiSnapshot :protoweft-argi-neutral:build --console=plain
+
+  fuzz:
+    name: Fuzz untrusted-input parsers (Jazzer)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Compile the fuzz tests
+        run: >-
+          ./gradlew --console=plain :protoweft-rap:testClasses :protoweft-utcp:testClasses
+          :protoweft-oauth:testClasses :protoweft-discovery-embeddings:testClasses
+      # One fuzz test per Gradle run (Jazzer fuzzes a single test per JVM), each for
+      # JAZZER_MAX_DURATION. --rerun keeps the build cache from replaying an earlier result.
+      - name: Fuzz each target
+        env:
+          JAZZER_FUZZ: '1'
+          JAZZER_MAX_DURATION: 40s
+        run: |
+          status=0
+          for target in \
+            protoweft-rap:io.github.rahulbsw.protoweft.rap.ClientCallbacksFuzzTest.callbackBodies \
+            protoweft-rap:io.github.rahulbsw.protoweft.rap.ToolsetFuzzTest.manifest \
+            protoweft-utcp:io.github.rahulbsw.protoweft.utcp.ManualFuzzTest.manual \
+            protoweft-utcp:io.github.rahulbsw.protoweft.utcp.UrlSecurityFuzzTest.urls \
+            protoweft-oauth:io.github.rahulbsw.protoweft.oauth.ChallengeFuzzTest.wwwAuthenticate \
+            protoweft-oauth:io.github.rahulbsw.protoweft.oauth.ProtectedResourceMetadataFuzzTest.document \
+            protoweft-discovery-embeddings:io.github.rahulbsw.protoweft.discovery.embeddings.WordPieceTokenizerFuzzTest.encode \
+            protoweft-discovery-embeddings:io.github.rahulbsw.protoweft.discovery.embeddings.WordPieceTokenizerFuzzTest.encodePair
+          do
+            echo "::group::${target#*:}"
+            ./gradlew --console=plain ":${target%%:*}:test" --tests "${target#*:}" --rerun || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+      - name: Upload crashing inputs and reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-findings
+          path: |
+            **/src/test/resources/**/crash-*
+            **/src/test/resources/**/timeout-*
+            **/src/test/resources/**/oom-*
+            **/build/test-results/test/*FuzzTest.xml
+            **/build/reports/tests/

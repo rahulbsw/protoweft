@@ -1,0 +1,1 @@
+{"name":"weather","description":"Weather tools","endpoint":"https://tools.example.com/rap/invoke","tools":[{"name":"get_forecast","description":"Forecast for a city","inputSchema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}]}

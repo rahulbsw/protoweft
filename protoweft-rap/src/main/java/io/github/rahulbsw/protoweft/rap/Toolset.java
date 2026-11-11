@@ -59,11 +59,11 @@ record Toolset(String serverUrl, String name, URI endpoint, Map<String, ToolSpec
                         + toolName);
             }
             String description = Json.requireText(t, "description");
-            Map<String, Object> schema = Json.object(t.get("inputSchema"));
+            Map<String, Object> schema = Json.object(withoutNulls(t.get("inputSchema")));
             if (schema == null) {
                 throw new IllegalArgumentException("tool '" + toolName + "': 'inputSchema' must be a JSON object");
             }
-            Object annotations = t.get("annotations");
+            Object annotations = withoutNulls(t.get("annotations"));
             if (annotations != null && Json.object(annotations) == null) {
                 throw new IllegalArgumentException("tool '" + toolName + "': 'annotations' must be an object");
             }
@@ -73,6 +73,25 @@ record Toolset(String serverUrl, String name, URI endpoint, Map<String, ToolSpec
             }
         }
         return new Toolset(serverUrl, name, endpoint, Map.copyOf(specs));
+    }
+
+    /** Drops null-valued object members at any depth (core {@code ToolSpec} maps can't hold nulls). */
+    static Object withoutNulls(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            map.forEach((k, v) -> {
+                if (v != null) {
+                    out.put(String.valueOf(k), withoutNulls(v));
+                }
+            });
+            return out;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> out = new java.util.ArrayList<>(list.size());
+            list.forEach(v -> out.add(withoutNulls(v)));
+            return out;
+        }
+        return value;
     }
 
     /** Annotations kept whole under the RAP key, and namespaced neutral keys mapped back. */

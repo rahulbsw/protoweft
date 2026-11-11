@@ -85,7 +85,8 @@ final class ClientRequests implements ClientCallbacks.Hooks {
         }
         try {
             return Toolset.parse(server, r.body());
-        } catch (IllegalArgumentException e) {
+        } catch (RuntimeException e) {
+            // A remote document must never escape as an unchecked exception.
             throw new ProtoweftException(ErrorCategory.PROTOCOL, ProtocolId.RAP,
                     "invalid toolset from " + server + ": " + e.getMessage(), e);
         }

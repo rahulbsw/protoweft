@@ -1,0 +1,98 @@
+{
+ "utcp_version": "1.2.0",
+ "manual_version": "1.2.3",
+ "tools": [
+  {
+   "name": "get_user",
+   "description": "Fetch a user",
+   "inputs": {
+    "$schema": null,
+    "$id": null,
+    "title": null,
+    "description": null,
+    "type": "object",
+    "properties": {
+     "id": {
+      "$schema": null,
+      "$id": null,
+      "title": null,
+      "description": null,
+      "type": "string",
+      "properties": null,
+      "items": null,
+      "required": null,
+      "enum": null,
+      "const": null,
+      "default": null,
+      "examples": null,
+      "format": null,
+      "additionalProperties": null,
+      "pattern": null,
+      "minimum": null,
+      "maximum": null,
+      "minLength": null,
+      "maxLength": null
+     }
+    },
+    "items": null,
+    "required": [
+     "id"
+    ],
+    "enum": null,
+    "const": null,
+    "default": null,
+    "examples": null,
+    "format": null,
+    "additionalProperties": null,
+    "pattern": null,
+    "minimum": null,
+    "maximum": null,
+    "minLength": null,
+    "maxLength": null
+   },
+   "outputs": {
+    "$schema": null,
+    "$id": null,
+    "title": null,
+    "description": null,
+    "type": null,
+    "properties": null,
+    "items": null,
+    "required": null,
+    "enum": null,
+    "const": null,
+    "default": null,
+    "examples": null,
+    "format": null,
+    "additionalProperties": null,
+    "pattern": null,
+    "minimum": null,
+    "maximum": null,
+    "minLength": null,
+    "maxLength": null
+   },
+   "tags": [
+    "users"
+   ],
+   "average_response_size": null,
+   "tool_call_template": {
+    "name": "users_api",
+    "call_template_type": "http",
+    "auth": {
+     "auth_type": "api_key",
+     "api_key": "${API_KEY}",
+     "var_name": "X-Api-Key",
+     "location": "header"
+    },
+    "allowed_communication_protocols": null,
+    "http_method": "GET",
+    "url": "https://api.example.com/users/{id}",
+    "content_type": "application/json",
+    "auth_tools": null,
+    "headers": null,
+    "body_field": "body",
+    "header_fields": null
+   }
+  }
+ ]
+}
