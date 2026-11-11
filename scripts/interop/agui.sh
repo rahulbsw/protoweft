@@ -6,17 +6,21 @@
 #
 # Direction A (official TypeScript client -> Protoweft server): starts conformance/agui-sut and
 # runs interop/agui/ts/client.mjs, which drives it with @ag-ui/client (whose enforcement stage
-# validates every stream): every event family, a frontend tool round trip, interrupt and resume.
+# validates every stream): every event family, a frontend tool round trip, interrupt and resume,
+# and the same run over the HTTP + Protobuf binding.
 # Direction B (Protoweft client -> official Python SDK): starts interop/agui/python/server.py (an
 # agent on ag-ui-protocol, streaming chunk events) and runs the env-gated JUnit test
-# OfficialPythonAgentInteropTest against it: AgUiThread, AgUiClientConnector, and the
-# AgUiConformance checker.
+# OfficialPythonAgentInteropTest against it: AgUiThread, AgUiClientConnector, the AgUiConformance
+# checker, and a client asking for Protobuf getting SSE (the Python SDK has no binary binding).
+# Direction B, binary (Protoweft client -> official TypeScript encoder): starts
+# interop/agui/ts/encoder-agent.mjs (wire output by @ag-ui/encoder and @ag-ui/proto) and runs
+# OfficialTypeScriptEncoderInteropTest: the client and checker reading the official frames.
 #
 # Needs a JDK, node (>= 20) with npm, and uv; network for npm and PyPI on the first run. Versions
 # are pinned with integrity hashes (interop/agui/ts/package-lock.json, interop/agui/python/requirements.txt).
 #
 # Env (all optional):
-#   AGUI_INTEROP_PORT_BASE   first of two consecutive local ports (default 9996)
+#   AGUI_INTEROP_PORT_BASE   first of three consecutive local ports (default 9996)
 #   AGUI_INTEROP_PYTHON      Python version for uv (default 3.12)
 #   AGUI_INTEROP_GRADLE_ARGS extra Gradle args (default --no-daemon)
 # Results: build/interop/agui/ (summary.txt and logs). Exit code 0 only if every step passed.
@@ -28,6 +32,7 @@ OUT="$ROOT/build/interop/agui"
 PORT_BASE="${AGUI_INTEROP_PORT_BASE:-9996}"
 SUT_PORT=$PORT_BASE
 PY_PORT=$((PORT_BASE + 1))
+TS_PORT=$((PORT_BASE + 2))
 GRADLE_ARGS=(${AGUI_INTEROP_GRADLE_ARGS:---no-daemon})
 PIDS=()
 rm -rf "$OUT"
@@ -54,7 +59,7 @@ wait_for() {
   return 1
 }
 
-for port in "$SUT_PORT" "$PY_PORT"; do
+for port in "$SUT_PORT" "$PY_PORT" "$TS_PORT"; do
   if curl -s -o /dev/null --max-time 2 "http://localhost:${port}/"; then
     log "port ${port} is in use; set AGUI_INTEROP_PORT_BASE"
     exit 2
@@ -87,14 +92,19 @@ PIDS+=($!)
 
 log "installing the official TypeScript client (pinned by package-lock.json)"
 (cd "$ROOT/interop/agui/ts" && npm ci --ignore-scripts --no-audit --no-fund --silent)
+node "$ROOT/interop/agui/ts/encoder-agent.mjs" "$TS_PORT" >"$OUT/ts-encoder-agent.log" 2>&1 &
+PIDS+=($!)
 
 wait_for "http://localhost:${SUT_PORT}/agui" "${PIDS[0]}"
 wait_for "http://localhost:${PY_PORT}/agent" "${PIDS[1]}"
+wait_for "http://localhost:${TS_PORT}/agent" "${PIDS[2]}"
 
 step direction-a-typescript-client env AGUI_URL="http://localhost:${SUT_PORT}/agui" \
   node "$ROOT/interop/agui/ts/client.mjs"
 step direction-b-protoweft-client env AGUI_INTEROP_PYTHON_URL="http://localhost:${PY_PORT}/agent" \
   bash -c "cd '$ROOT' && ./gradlew ${GRADLE_ARGS[*]} :protoweft-agui:test --tests '*OfficialPythonAgentInteropTest' --rerun"
+step direction-b-protoweft-client-protobuf env AGUI_INTEROP_TS_ENCODER_URL="http://127.0.0.1:${TS_PORT}/agent" \
+  bash -c "cd '$ROOT' && ./gradlew ${GRADLE_ARGS[*]} :protoweft-agui:test --tests '*OfficialTypeScriptEncoderInteropTest' --rerun"
 
 log "summary:"
 cat "$SUMMARY" >&2

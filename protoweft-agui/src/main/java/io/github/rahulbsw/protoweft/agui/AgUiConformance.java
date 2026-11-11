@@ -1,8 +1,5 @@
 package io.github.rahulbsw.protoweft.agui;
 
-import io.github.rahulbsw.protoweft.agui.AgUiEvent.RunError;
-import io.github.rahulbsw.protoweft.agui.AgUiEvent.RunFinished;
-import io.github.rahulbsw.protoweft.agui.AgUiEvent.RunStarted;
 import io.github.rahulbsw.protoweft.agui.AgUiMessage.UserMessage;
 
 import java.io.ByteArrayInputStream;
@@ -129,6 +126,7 @@ public final class AgUiConformance {
         Map<String, Object> input = Codec.input(RunAgentInput.of(threadId, runId,
                 List.of(UserMessage.text(UUID.randomUUID().toString(), message))));
         checkRun(results, input, threadId, runId);
+        checkProtobuf(results);
 
         Map<String, Object> newer = Codec.input(RunAgentInput.of(threadId, UUID.randomUUID().toString(),
                 List.of(UserMessage.text(UUID.randomUUID().toString(), message))));
@@ -170,11 +168,7 @@ public final class AgUiConformance {
                 !body.contains("\r"), "the stream contains CR characters"));
 
         List<String> framing = new ArrayList<>();
-        List<String> shape = new ArrayList<>();
-        List<String> sequence = new ArrayList<>();
-        List<AgUiEvent> events = new ArrayList<>();
-        ChunkExpander expander = new ChunkExpander();
-        StreamVerifier verifier = new StreamVerifier();
+        ConformanceStream judged = new ConformanceStream();
         boolean framingOk = true;
         SseReader reader = new SseReader(new ByteArrayInputStream(resp.body), Integer.MAX_VALUE);
         try {
@@ -195,27 +189,7 @@ public final class AgUiConformance {
                     framing.add("frame " + n + " is not a JSON object");
                     continue;
                 }
-                List<String> warnings = new ArrayList<>();
-                AgUiEvent event;
-                try {
-                    event = EventCodec.decode(new Decoder(warnings), json);
-                } catch (AgUiFormatException e) {
-                    shape.add("frame " + n + ": " + e.getMessage());
-                    continue;
-                }
-                int frame = n;
-                warnings.forEach(w -> shape.add("frame " + frame + ": " + w));
-                if (event == null) {
-                    continue;
-                }
-                events.add(event);
-                try {
-                    for (AgUiEvent e : expander.expand(event)) {
-                        verifier.accept(e);
-                    }
-                } catch (AgUiFormatException e) {
-                    sequence.add("frame " + n + " (" + event.type() + "): " + e.getMessage());
-                }
+                judged.accept("frame " + n, json, List.of());
             }
         } catch (IOException e) {
             framingOk = false;
@@ -223,68 +197,75 @@ public final class AgUiConformance {
         }
         results.add(check("binding/one-event-per-frame", "each SSE data payload is exactly one event object",
                 framingOk, String.join("\n", framing)));
-        results.add(check("events/described-shapes",
-                "every event matches the schema: known types, no undescribed members, absent fields omitted not null",
-                shape.isEmpty(), String.join("\n", shape)));
-        results.add(check("lifecycle/sequence",
-                "the stream follows the ordering rules (starts with RUN_STARTED or RUN_ERROR, items opened before "
-                        + "continued, closed before RUN_FINISHED, attribution agrees)", sequence.isEmpty(),
-                String.join("\n", sequence)));
-        AgUiEvent last = events.isEmpty() ? null : events.get(events.size() - 1);
-        results.add(check("lifecycle/terminal", "the stream ends with the run's terminal event (RUN_FINISHED or RUN_ERROR)",
-                last instanceof RunFinished || last instanceof RunError,
-                last == null ? "no events" : "last event is " + last.type()));
-        List<AgUiEvent> boundaries = events.stream()
-                .filter(e -> e instanceof RunStarted || e instanceof RunFinished).toList();
-        RunStarted requested = events.stream().filter(RunStarted.class::isInstance).map(RunStarted.class::cast)
-                .reduce((a, b) -> b).orElse(null);
-        if (requested == null && last instanceof RunError error) {
-            // A valid stream: the run failed before it started (RUN_ERROR carries no identity or version).
-            String why = "the agent reported RUN_ERROR before starting the run: " + error.message();
-            results.add(new Result("lifecycle/identity", IDENTITY_RULE, Status.SKIP, why));
-            results.add(new Result("version/declared", VERSION_RULE, Status.SKIP, why));
-            return;
-        }
-        results.add(identity(boundaries, threadId, runId));
-        String declared = requested == null ? null : requested.protocolVersion();
-        results.add(check("version/declared", VERSION_RULE, declared != null && declared.matches("\\d+\\.\\d+"),
-                declared == null ? "no protocolVersion on RUN_STARTED" : "declared '" + declared + "'"));
+        results.addAll(judged.results("", threadId, runId));
     }
 
-    private static final String IDENTITY_RULE = "every run boundary carries the input's threadId; the last run is the "
-            + "requested one (its runId) and earlier, replayed runs use other runIds";
-    private static final String VERSION_RULE = "RUN_STARTED declares the producer's protocolVersion as MAJOR.MINOR";
+    private static final String PROTOBUF_ACCEPT = AgUiProtocol.EVENT_PROTOBUF + ", " + AgUiProtocol.EVENT_STREAM;
+    private static final String CONTENT_TYPE_RULE = "a run answered in the binary binding has Content-Type exactly "
+            + AgUiProtocol.EVENT_PROTOBUF;
+    private static final String FRAMES_RULE = "the binary body is 4-byte big-endian length-prefixed frames, each one "
+            + "well-formed event envelope, ending on a frame boundary";
 
     /**
-     * Spec "Run Input", identity: every run on the stream carries the input's {@code threadId} on its
-     * boundary events; the requested run (the last) echoes the input's {@code runId}; a replayed run
-     * carries its own, and a {@code runId} is never reused on a thread.
+     * The HTTP + Protobuf binding, when the agent offers it: asked for with an {@code Accept} naming
+     * both bindings, the run must come back as SSE (the agent does not offer the binary binding; its
+     * checks are skipped) or as frames, which then get the same event and lifecycle checks as SSE,
+     * prefixed {@code protobuf/}.
      */
-    private static Result identity(List<AgUiEvent> boundaries, String threadId, String runId) {
-        List<String> problems = new ArrayList<>();
-        for (AgUiEvent e : boundaries) {
-            String thread = e instanceof RunStarted s ? s.threadId() : ((RunFinished) e).threadId();
-            if (!threadId.equals(thread)) {
-                problems.add(e.type() + " for thread '" + thread + "' (expected '" + threadId + "')");
+    private void checkProtobuf(List<Result> results) {
+        List<String> ids = List.of("binding/protobuf-content-type", "binding/protobuf-frames",
+                "protobuf/events/described-shapes", "protobuf/lifecycle/sequence", "protobuf/lifecycle/terminal",
+                "protobuf/lifecycle/identity", "protobuf/version/declared");
+        if (!ProtoBinding.available()) {
+            ids.forEach(id -> results.add(new Result(id, "HTTP + Protobuf binding", Status.SKIP,
+                    "the checker cannot read the binding: protobuf-java (4.36.2+) is not on its classpath")));
+            return;
+        }
+        String threadId = "conformance-" + UUID.randomUUID();
+        String runId = UUID.randomUUID().toString();
+        Map<String, Object> input = Codec.input(RunAgentInput.of(threadId, runId,
+                List.of(UserMessage.text(UUID.randomUUID().toString(), message))));
+        Response resp;
+        try {
+            resp = post(Json.write(input), PROTOBUF_ACCEPT);
+        } catch (IOException e) {
+            results.add(fail("binding/protobuf-content-type", CONTENT_TYPE_RULE, "request failed: " + e.getMessage()));
+            return;
+        }
+        String mediaType = resp.contentType.split(";")[0].trim().toLowerCase();
+        if (resp.status == 200 && mediaType.equals(AgUiProtocol.EVENT_STREAM)) {
+            ids.forEach(id -> results.add(new Result(id, "HTTP + Protobuf binding", Status.SKIP,
+                    "the agent answered text/event-stream: it does not offer the binary binding")));
+            return;
+        }
+        boolean exact = resp.status == 200 && resp.contentType.equals(AgUiProtocol.EVENT_PROTOBUF);
+        results.add(check("binding/protobuf-content-type", CONTENT_TYPE_RULE, exact,
+                "HTTP " + resp.status + ", Content-Type '" + resp.contentType + "'"));
+        if (resp.status != 200 || !mediaType.equals(AgUiProtocol.EVENT_PROTOBUF)) {
+            return;
+        }
+        List<String> framing = new ArrayList<>();
+        ConformanceStream judged = new ConformanceStream();
+        java.nio.ByteBuffer body = java.nio.ByteBuffer.wrap(resp.body);
+        for (int n = 1; body.hasRemaining(); n++) {
+            if (body.remaining() < 4 || body.remaining() - 4 < Integer.toUnsignedLong(body.getInt(body.position()))) {
+                framing.add("the body ends inside frame " + n + " (" + body.remaining() + " bytes left)");
+                break;
             }
-        }
-        List<RunStarted> starts = boundaries.stream().filter(RunStarted.class::isInstance).map(RunStarted.class::cast)
-                .toList();
-        if (starts.isEmpty()) {
-            problems.add("no RUN_STARTED");
-        } else {
-            RunStarted lastStart = starts.get(starts.size() - 1);
-            if (!runId.equals(lastStart.runId())) {
-                problems.add("the last run is '" + lastStart.runId() + "', not the requested '" + runId + "'");
+            byte[] frame = new byte[body.getInt()];
+            body.get(frame);
+            List<String> warnings = new ArrayList<>();
+            Map<String, Object> json;
+            try {
+                json = ProtoBinding.decode(frame, warnings);
+            } catch (AgUiFormatException e) {
+                framing.add("frame " + n + ": " + e.getMessage());
+                continue;
             }
-            starts.subList(0, starts.size() - 1).stream().filter(s -> runId.equals(s.runId())).findFirst()
-                    .ifPresent(s -> problems.add("an earlier run reuses the requested runId '" + runId + "'"));
+            judged.accept("frame " + n, json, warnings);
         }
-        if (!boundaries.isEmpty() && boundaries.get(boundaries.size() - 1) instanceof RunFinished f
-                && !runId.equals(f.runId())) {
-            problems.add("the final RUN_FINISHED is for run '" + f.runId() + "'");
-        }
-        return check("lifecycle/identity", IDENTITY_RULE, problems.isEmpty(), String.join("\n", problems));
+        results.add(check("binding/protobuf-frames", FRAMES_RULE, framing.isEmpty(), String.join("\n", framing)));
+        results.addAll(judged.results("protobuf/", threadId, runId));
     }
 
     private void served(List<Result> results, String id, String rule, String body) {
@@ -313,10 +294,14 @@ public final class AgUiConformance {
     private record Response(int status, String contentType, byte[] body) {
     }
 
-    /** One POST, read to the end of the stream or until the timeout. */
+    /** One POST asking for SSE, read to the end of the stream or until the timeout. */
     private Response post(String body) throws IOException {
+        return post(body, AgUiProtocol.EVENT_STREAM);
+    }
+
+    private Response post(String body, String accept) throws IOException {
         HttpRequest.Builder b = HttpRequest.newBuilder(endpoint).timeout(timeout)
-                .header("Content-Type", "application/json").header("Accept", AgUiProtocol.EVENT_STREAM)
+                .header("Content-Type", "application/json").header("Accept", accept)
                 .POST(HttpRequest.BodyPublishers.ofString(body));
         headers.forEach(b::setHeader);
         HttpResponse<InputStream> resp;
@@ -349,7 +334,7 @@ public final class AgUiConformance {
     }
 
     private static Result check(String id, String rule, boolean ok, String detail) {
-        return new Result(id, rule, ok ? Status.PASS : Status.FAIL, ok ? null : detail);
+        return ConformanceStream.check(id, rule, ok, detail);
     }
 
     private static Result fail(String id, String rule, String detail) {

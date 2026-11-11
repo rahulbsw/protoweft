@@ -25,6 +25,9 @@ class AgUiConformanceTest {
     /** A producer that answers every POST with whatever {@code script} makes of the request body. */
     static final class Producer extends HttpServlet {
         volatile Function<Map<?, ?>, String> script = in -> "";
+        /** When set, a request whose Accept names the binary binding gets these bytes with this type. */
+        volatile Function<Map<?, ?>, byte[]> binary;
+        volatile String binaryType = AgUiProtocol.EVENT_PROTOBUF;
 
         @Override
         protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -40,6 +43,12 @@ class AgUiConformanceTest {
                 return;
             }
             resp.setStatus(200);
+            String accept = req.getHeader("Accept");
+            if (binary != null && accept != null && accept.contains(AgUiProtocol.EVENT_PROTOBUF)) {
+                resp.setHeader("Content-Type", binaryType);
+                resp.getOutputStream().write(binary.apply(in));
+                return;
+            }
             resp.setContentType("text/event-stream");
             resp.getOutputStream().write(script.apply(in).getBytes(StandardCharsets.UTF_8));
         }
@@ -92,8 +101,43 @@ class AgUiConformanceTest {
     void aProtoweftServerPassesEveryCheck() {
         AgUiConformance.Report report = check("/agui");
         assertThat(report.passed()).as(report.text()).isTrue();
-        assertThat(report.results()).hasSize(12);
+        assertThat(report.results()).hasSize(19);
+        assertThat(report.results()).allSatisfy(r -> assertThat(r.status()).as(r.id()).isEqualTo(AgUiConformance.Status.PASS));
+        assertThat(report.results()).extracting(AgUiConformance.Result::id)
+                .contains("binding/protobuf-content-type", "binding/protobuf-frames", "protobuf/lifecycle/identity");
         assertThat(report.json()).contains("\"status\":\"PASS\"");
+    }
+
+    @Test
+    void anAgentWithoutTheBinaryBindingSkipsItsChecksAndStillPasses() {
+        AgUiAgentServer sseOnly = AgUiAgentServer.builder(AgUiThreadTest.AGENT).path("/sse-only").protobuf(false).build();
+        try (ProtoweftServer other = ProtoweftServer.builder().port(0).endpoints(sseOnly).start()) {
+            AgUiConformance.Report report = AgUiConformance.builder(URI.create(other.baseUrl() + "/sse-only"))
+                    .timeout(Duration.ofSeconds(10)).build().run();
+            assertThat(report.passed()).as(report.text()).isTrue();
+            assertThat(status(report, "binding/protobuf-frames")).isEqualTo(AgUiConformance.Status.SKIP);
+            assertThat(report.results().stream().filter(r -> r.status() == AgUiConformance.Status.SKIP)).hasSize(7);
+        } finally {
+            sseOnly.close();
+        }
+    }
+
+    @Test
+    void binaryViolationsAreCaught() {
+        producer.script = in -> frames(started(in, "1.0"), finished(in));
+        producer.binary = in -> {
+            byte[] good = ProtoBinding.frame(Map.of("type", "RUN_STARTED", "threadId", in.get("threadId"),
+                    "runId", in.get("runId"), "protocolVersion", "1.0"));
+            return java.util.Arrays.copyOf(good, good.length + 3);   // then a cut-off frame header
+        };
+        producer.binaryType = AgUiProtocol.EVENT_PROTOBUF + "; charset=utf-8";
+        assertThat(failed(check("/producer"))).contains("binding/protobuf-content-type", "binding/protobuf-frames",
+                "protobuf/lifecycle/terminal").doesNotContain("lifecycle/terminal");
+
+        producer.binaryType = AgUiProtocol.EVENT_PROTOBUF;
+        producer.binary = in -> new byte[] {0, 0, 0, 2, (byte) 0xff, (byte) 0xff};
+        AgUiConformance.Report garbage = check("/producer");
+        assertThat(failed(garbage)).contains("binding/protobuf-frames").doesNotContain("binding/protobuf-content-type");
     }
 
     @Test

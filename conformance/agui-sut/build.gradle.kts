@@ -8,6 +8,9 @@ plugins {
 dependencies {
     implementation(project(":protoweft-server-jetty"))
     implementation(project(":protoweft-agui"))
+    // The optional dependency of the HTTP + Protobuf binding, so the SUT (and the checker run from its
+    // classpath) speak both bindings.
+    runtimeOnly("com.google.protobuf:protobuf-java:${project.property("protobufVersion")}")
 }
 
 application {

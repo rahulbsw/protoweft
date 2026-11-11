@@ -68,3 +68,31 @@ async function run(agent, parameters) {
   assert.equal(lastAssistantText(agent), "resumed: go", "the resume entry reached the agent");
   console.log("ok - interrupt and resume");
 }
+
+// 3. The HTTP + Protobuf binding: the same run asked for in binary, decoded by the official client.
+{
+  // HttpAgent always sends Accept: text/event-stream; requestInit is its documented override point.
+  class ProtobufHttpAgent extends HttpAgent {
+    requestInit(input) {
+      const init = super.requestInit(input);
+      return { ...init, headers: { ...init.headers, Accept: "application/vnd.ag-ui.event+proto, text/event-stream" } };
+    }
+  }
+  const contentTypes = [];
+  const recordingFetch = async (...args) => {
+    const response = await fetch(...args);
+    contentTypes.push(response.headers.get("content-type"));
+    return response;
+  };
+  const agent = new ProtobufHttpAgent({ url, threadId: `ts-proto-${Date.now()}`, fetch: recordingFetch });
+  agent.addMessage({ id: "u1", role: "user", content: "hello" });
+  const seen = await run(agent, { tools: [confirm] });
+  assert.deepEqual(contentTypes, ["application/vnd.ag-ui.event+proto"], "the server answered in the binary binding");
+  for (const type of ["RUN_STARTED", "REASONING_MESSAGE_CONTENT", "TOOL_CALL_RESULT", "STATE_DELTA",
+    "ACTIVITY_DELTA", "SUBAGENT_STARTED", "TEXT_MESSAGE_CONTENT", "CUSTOM", "RUN_FINISHED"]) {
+    assert.ok(seen.types.includes(type), `expected a ${type} event over protobuf, got ${seen.types.join(",")}`);
+  }
+  assert.ok(agent.messages.some((m) => m.role === "assistant" && m.content === "you said: hello"), "streamed reply");
+  assert.deepEqual(agent.state, { turns: 2 }, "state snapshot + delta applied");
+  console.log("ok - the same run over the HTTP + Protobuf binding");
+}
