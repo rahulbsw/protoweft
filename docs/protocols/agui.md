@@ -300,12 +300,15 @@ It sends a few runs and checks:
 - **The binding:** 200 with `text/event-stream`, LF framing, one event per `data:` frame.
 - **Event shapes:** only shapes the specification describes, with absent fields omitted rather
   than `null`. A producer must not rely on consumers stripping extras, so extras fail here.
-- **The run lifecycle:** ordering, a terminal event, and the input's thread and run ids.
+- **The run lifecycle:** ordering, a terminal event, and the input's thread and run ids on every
+  run boundary (a stream may replay earlier runs of the thread).
 - **The version:** declared on `RUN_STARTED`, and a newer minor still served.
 - **Input:** unknown input members served; malformed or incomplete input rejected before the
   stream starts.
 
-`--json` prints a machine-readable report; the exit code is 0 only when every check passes.
+`--json` prints a machine-readable report; the exit code is 0 only when no check fails. Checks
+that don't apply report `SKIP`, for example identity and version when the agent answered with only
+`RUN_ERROR`.
 Protoweft's own server is checked on every pull request, and so is an agent built on the official
 Python SDK; see [Conformance testing](../operations/conformance.md).
 

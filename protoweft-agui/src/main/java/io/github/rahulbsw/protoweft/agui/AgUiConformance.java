@@ -43,7 +43,8 @@ import java.util.concurrent.TimeoutException;
  */
 public final class AgUiConformance {
 
-    public enum Status { PASS, FAIL }
+    /** {@code SKIP}: the check does not apply to what the agent sent (for example a run that failed before it started). */
+    public enum Status { PASS, FAIL, SKIP }
 
     /**
      * One check.
@@ -60,8 +61,9 @@ public final class AgUiConformance {
             results = List.copyOf(results);
         }
 
+        /** No check failed (skipped checks do not count against the agent). */
         public boolean passed() {
-            return results.stream().allMatch(r -> r.status() == Status.PASS);
+            return results.stream().noneMatch(r -> r.status() == Status.FAIL);
         }
 
         public List<Result> failures() {
@@ -72,14 +74,16 @@ public final class AgUiConformance {
         public String text() {
             StringBuilder sb = new StringBuilder("AG-UI " + AgUiProtocol.VERSION + " conformance: " + endpoint + "\n");
             for (Result r : results) {
-                sb.append(r.status() == Status.PASS ? "  PASS  " : "  FAIL  ").append(r.id()).append(" — ").append(r.rule());
+                sb.append("  ").append(r.status()).append("  ").append(r.id()).append(" — ").append(r.rule());
                 if (r.detail() != null) {
                     sb.append("\n          ").append(r.detail().replace("\n", "\n          "));
                 }
                 sb.append('\n');
             }
             long failed = failures().size();
-            return sb.append(results.size() - failed).append(" passed, ").append(failed).append(" failed\n").toString();
+            long skipped = results.stream().filter(r -> r.status() == Status.SKIP).count();
+            return sb.append(results.size() - failed - skipped).append(" passed, ").append(failed).append(" failed, ")
+                    .append(skipped).append(" skipped\n").toString();
         }
 
         /** The report as JSON: {@code {"endpoint":…,"results":[{"id","rule","status","detail"}]}}. */
@@ -230,19 +234,57 @@ public final class AgUiConformance {
         results.add(check("lifecycle/terminal", "the stream ends with the run's terminal event (RUN_FINISHED or RUN_ERROR)",
                 last instanceof RunFinished || last instanceof RunError,
                 last == null ? "no events" : "last event is " + last.type()));
-        RunStarted started = events.stream().filter(RunStarted.class::isInstance).map(RunStarted.class::cast)
+        List<AgUiEvent> boundaries = events.stream()
+                .filter(e -> e instanceof RunStarted || e instanceof RunFinished).toList();
+        RunStarted requested = events.stream().filter(RunStarted.class::isInstance).map(RunStarted.class::cast)
                 .reduce((a, b) -> b).orElse(null);
-        RunFinished finished = last instanceof RunFinished f ? f : null;
-        boolean identity = started != null && threadId.equals(started.threadId()) && runId.equals(started.runId())
-                && (finished == null || (threadId.equals(finished.threadId()) && runId.equals(finished.runId())));
-        results.add(check("lifecycle/identity",
-                "the requested run's boundary events carry the input's threadId and runId", identity,
-                started == null ? "no RUN_STARTED" : "RUN_STARTED " + started.threadId() + "/" + started.runId()
-                        + (finished == null ? "" : ", RUN_FINISHED " + finished.threadId() + "/" + finished.runId())));
-        String declared = started == null ? null : started.protocolVersion();
-        results.add(check("version/declared", "RUN_STARTED declares the producer's protocolVersion as MAJOR.MINOR",
-                declared != null && declared.matches("\\d+\\.\\d+"),
+        if (requested == null && last instanceof RunError error) {
+            // A valid stream: the run failed before it started (RUN_ERROR carries no identity or version).
+            String why = "the agent reported RUN_ERROR before starting the run: " + error.message();
+            results.add(new Result("lifecycle/identity", IDENTITY_RULE, Status.SKIP, why));
+            results.add(new Result("version/declared", VERSION_RULE, Status.SKIP, why));
+            return;
+        }
+        results.add(identity(boundaries, threadId, runId));
+        String declared = requested == null ? null : requested.protocolVersion();
+        results.add(check("version/declared", VERSION_RULE, declared != null && declared.matches("\\d+\\.\\d+"),
                 declared == null ? "no protocolVersion on RUN_STARTED" : "declared '" + declared + "'"));
+    }
+
+    private static final String IDENTITY_RULE = "every run boundary carries the input's threadId; the last run is the "
+            + "requested one (its runId) and earlier, replayed runs use other runIds";
+    private static final String VERSION_RULE = "RUN_STARTED declares the producer's protocolVersion as MAJOR.MINOR";
+
+    /**
+     * Spec "Run Input", identity: every run on the stream carries the input's {@code threadId} on its
+     * boundary events; the requested run (the last) echoes the input's {@code runId}; a replayed run
+     * carries its own, and a {@code runId} is never reused on a thread.
+     */
+    private static Result identity(List<AgUiEvent> boundaries, String threadId, String runId) {
+        List<String> problems = new ArrayList<>();
+        for (AgUiEvent e : boundaries) {
+            String thread = e instanceof RunStarted s ? s.threadId() : ((RunFinished) e).threadId();
+            if (!threadId.equals(thread)) {
+                problems.add(e.type() + " for thread '" + thread + "' (expected '" + threadId + "')");
+            }
+        }
+        List<RunStarted> starts = boundaries.stream().filter(RunStarted.class::isInstance).map(RunStarted.class::cast)
+                .toList();
+        if (starts.isEmpty()) {
+            problems.add("no RUN_STARTED");
+        } else {
+            RunStarted lastStart = starts.get(starts.size() - 1);
+            if (!runId.equals(lastStart.runId())) {
+                problems.add("the last run is '" + lastStart.runId() + "', not the requested '" + runId + "'");
+            }
+            starts.subList(0, starts.size() - 1).stream().filter(s -> runId.equals(s.runId())).findFirst()
+                    .ifPresent(s -> problems.add("an earlier run reuses the requested runId '" + runId + "'"));
+        }
+        if (!boundaries.isEmpty() && boundaries.get(boundaries.size() - 1) instanceof RunFinished f
+                && !runId.equals(f.runId())) {
+            problems.add("the final RUN_FINISHED is for run '" + f.runId() + "'");
+        }
+        return check("lifecycle/identity", IDENTITY_RULE, problems.isEmpty(), String.join("\n", problems));
     }
 
     private void served(List<Result> results, String id, String rule, String body) {

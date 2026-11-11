@@ -115,6 +115,46 @@ class AgUiConformanceTest {
                 "lifecycle/sequence", "lifecycle/terminal", "version/declared");
     }
 
+    private static AgUiConformance.Status status(AgUiConformance.Report report, String id) {
+        return report.results().stream().filter(r -> r.id().equals(id)).findFirst().orElseThrow().status();
+    }
+
+    @Test
+    void aRunThatFailsBeforeItStartsIsNotAViolation() {
+        producer.script = in -> frames("{\"type\":\"RUN_ERROR\",\"message\":\"model unavailable\"}");
+        AgUiConformance.Report report = check("/producer");
+        assertThat(status(report, "lifecycle/identity")).isEqualTo(AgUiConformance.Status.SKIP);
+        assertThat(status(report, "version/declared")).isEqualTo(AgUiConformance.Status.SKIP);
+        assertThat(status(report, "lifecycle/sequence")).isEqualTo(AgUiConformance.Status.PASS);
+        assertThat(status(report, "lifecycle/terminal")).isEqualTo(AgUiConformance.Status.PASS);
+        assertThat(report.text()).contains("SKIP  lifecycle/identity", "skipped");
+    }
+
+    @Test
+    void everyRunBoundaryIsChecked() {
+        // A whole run for another conversation, then the requested one: not acceptable.
+        producer.script = in -> frames(
+                "{\"type\":\"RUN_STARTED\",\"threadId\":\"someone-else\",\"runId\":\"x\",\"protocolVersion\":\"1.0\"}",
+                "{\"type\":\"RUN_FINISHED\",\"threadId\":\"someone-else\",\"runId\":\"x\"}",
+                started(in, "1.0"), finished(in));
+        AgUiConformance.Report foreign = check("/producer");
+        assertThat(failed(foreign)).contains("lifecycle/identity");
+        assertThat(foreign.failures().stream().filter(r -> r.id().equals("lifecycle/identity")).findFirst().orElseThrow()
+                .detail()).contains("someone-else");
+
+        // A replayed earlier run of the same thread, then the requested one: what the spec allows.
+        producer.script = in -> frames(
+                "{\"type\":\"RUN_STARTED\",\"threadId\":\"" + in.get("threadId") + "\",\"runId\":\"earlier\","
+                        + "\"protocolVersion\":\"1.0\"}",
+                "{\"type\":\"RUN_FINISHED\",\"threadId\":\"" + in.get("threadId") + "\",\"runId\":\"earlier\"}",
+                started(in, "1.0"), finished(in));
+        assertThat(status(check("/producer"), "lifecycle/identity")).isEqualTo(AgUiConformance.Status.PASS);
+
+        // An earlier run reusing the requested runId is refused.
+        producer.script = in -> frames(started(in, "1.0"), finished(in), started(in, "1.0"), finished(in));
+        assertThat(failed(check("/producer"))).contains("lifecycle/identity");
+    }
+
     @Test
     void wrongIdentityAndBadFramesAreCaught() {
         producer.script = in -> frames("{\"type\":\"RUN_STARTED\",\"threadId\":\"elsewhere\",\"runId\":\"r\","

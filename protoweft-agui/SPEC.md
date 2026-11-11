@@ -197,12 +197,17 @@ dependency beyond Jackson 3). It sends runs to any agent URL and reports 12 chec
   warning is a failure, because a producer may emit only described shapes and must omit absent
   fields rather than send `null`.
 - **Run lifecycle:** `lifecycle/sequence` (chunk expansion, then the verifier), `lifecycle/terminal`,
-  `lifecycle/identity`.
+  `lifecycle/identity`. The identity check covers every run boundary, because a stream may replay
+  earlier runs: every boundary carries the input's thread id, the last run is the requested one,
+  and no earlier run reuses its run id.
 - **Version:** `version/declared`, `version/newer-minor-served`.
 - **Input:** `input/unknown-member-served`, `input/malformed-rejected`,
   `input/missing-required-rejected`.
 
-Rejecting another major version is left unchecked, because the spec makes it optional (MAY). The
+Rejecting another major version is left unchecked, because the spec makes it optional (MAY). A
+stream that is only `RUN_ERROR` (the run failed before it started) is valid, so the identity and
+version checks report `SKIP` (not applicable) rather than `FAIL`. Skips don't fail the report. Both
+rules came from the review of #13. The
 JSON report and the exit code feed a baseline (`conformance/agui-baseline.yml`, empty) in CI.
 
 ## Spec rules implemented
