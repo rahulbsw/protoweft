@@ -71,6 +71,8 @@ class ProtoweftHttpTest {
                 "protoweft.server.agui.allowed-origins=https://app.test",
                 "protoweft.server.agui.name=Echo",
                 "protoweft.agui.agents.ui.url=" + base + "/agui",
+                // protobuf-java is on this classpath (through a2a-java), so ui.ask runs over Protobuf.
+                "protoweft.agui.agents.ui.protobuf=true",
                 "protoweft.utcp.manuals.self.url=" + base + "/utcp",
                 "protoweft.utcp.manuals.self.variables.TOKEN=Bearer secret",
                 "protoweft.a2a.agents.me.url=" + base).run();
@@ -129,7 +131,7 @@ class ProtoweftHttpTest {
         assertThat(preflight.headers().firstValue("Access-Control-Allow-Origin")).hasValue("https://app.test");
         HttpResponse<String> capabilities = http.send(HttpRequest.newBuilder(URI.create(base + "/agui/capabilities"))
                 .header("Authorization", "Bearer secret").build(), HttpResponse.BodyHandlers.ofString());
-        assertThat(capabilities.body()).contains("\"name\":\"Echo\"");
+        assertThat(capabilities.body()).contains("\"name\":\"Echo\"").contains("\"httpBinary\":true");
     }
 
     @Test

@@ -74,3 +74,21 @@ protobuf {
 tasks.jar {
     exclude("*.proto")
 }
+
+// Most applications won't add protobuf-java: NoProtobufTest runs on a classpath without it (the
+// generated classes stay, as in the published jar) and checks that everything still works over SSE.
+val testWithoutProtobuf = tasks.register<Test>("testWithoutProtobuf") {
+    description = "Runs NoProtobufTest with protobuf-java removed from the classpath."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath.filter { !it.name.startsWith("protobuf-java") }
+    useJUnitPlatform()
+    // Only this class file is scanned: discovering the others would load protobuf types.
+    include("**/NoProtobufTest.class")
+}
+tasks.test {
+    filter { excludeTestsMatching("*.NoProtobufTest") }
+}
+tasks.check {
+    dependsOn(testWithoutProtobuf)
+}

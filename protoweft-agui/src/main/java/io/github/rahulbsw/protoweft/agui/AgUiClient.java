@@ -60,8 +60,13 @@ public final class AgUiClient {
     private final Duration responseTimeout;
     private final int maxEventBytes;
     private final Consumer<String> warnings;
+    private final boolean preferProtobuf;
 
     private AgUiClient(Builder b) {
+        if (b.preferProtobuf) {
+            ProtoBinding.require("AgUiClient.preferProtobuf");
+        }
+        this.preferProtobuf = b.preferProtobuf;
         this.endpoint = b.endpoint;
         this.http = b.http != null ? b.http : HttpClient.newBuilder().connectTimeout(b.connectTimeout)
                 .followRedirects(HttpClient.Redirect.NEVER).build();
@@ -115,7 +120,7 @@ public final class AgUiClient {
     }
 
     public ComplianceReport compliance() {
-        return AgUiFeatures.clientReport();
+        return AgUiFeatures.clientReport(ProtoBinding.available());
     }
 
     /**
@@ -236,7 +241,7 @@ public final class AgUiClient {
             }
             try (InputStream in = resp.body()) {
                 checkResponse(resp, in);
-                return read(new SseReader(new BufferedInputStream(in), maxEventBytes), listener, found);
+                return read(source(resp, new BufferedInputStream(in)), listener, found);
             } catch (IOException e) {
                 if (cancelled) {
                     return truncated(found);
@@ -246,18 +251,20 @@ public final class AgUiClient {
             }
         }
 
-        private RunResult read(SseReader reader, Consumer<AgUiEvent> listener, List<String> found) throws IOException {
+        private RunResult read(Source source, Consumer<AgUiEvent> listener, List<String> found) throws IOException {
             ConsumerPipeline pipeline = new ConsumerPipeline(found);
             RunFinished finished = null;
             RunError error = null;
             List<String> unanswered = List.of();
             boolean closed = false;
             int reported = 0;
-            String data;
-            while ((data = reader.next()) != null) {
+            while (true) {
                 List<AgUiEvent> events;
                 try {
-                    events = pipeline.accept(data);
+                    events = source.next(pipeline);
+                    if (events == null) {
+                        break;
+                    }
                 } catch (AgUiFormatException e) {
                     throw new ProtoweftException(ErrorCategory.PROTOCOL, ProtocolId.AGUI,
                             "the agent sent a malformed stream: " + e.getMessage(), e);
@@ -297,6 +304,36 @@ public final class AgUiClient {
         }
     }
 
+    /** One binding's reader: the events of its next frame, or {@code null} at the end of the stream. */
+    private interface Source {
+        List<AgUiEvent> next(ConsumerPipeline pipeline) throws IOException;
+    }
+
+    /** The reader for the binding the response declares: the consumer selects its parser by Content-Type. */
+    private Source source(HttpResponse<InputStream> resp, InputStream in) {
+        if (protobufResponse(resp)) {
+            ProtoBinding.require("Reading the agent's " + AgUiProtocol.EVENT_PROTOBUF + " response");
+            ProtoBinding.FrameReader frames = new ProtoBinding.FrameReader(in, maxEventBytes);
+            return pipeline -> {
+                byte[] frame = frames.next();
+                return frame == null ? null : pipeline.acceptFrame(frame);
+            };
+        }
+        SseReader sse = new SseReader(in, maxEventBytes);
+        return pipeline -> {
+            String data = sse.next();
+            return data == null ? null : pipeline.accept(data);
+        };
+    }
+
+    private static String mediaType(HttpResponse<?> resp) {
+        return resp.headers().firstValue("Content-Type").orElse("").split(";")[0].trim().toLowerCase();
+    }
+
+    private static boolean protobufResponse(HttpResponse<?> resp) {
+        return mediaType(resp).equals(AgUiProtocol.EVENT_PROTOBUF);
+    }
+
     /** Applies the outgoing rules: activity messages stripped, the protocol version declared. */
     private static RunAgentInput outgoing(RunAgentInput in, List<String> found) {
         List<AgUiMessage> messages = in.messages().stream().filter(m -> !(m instanceof ActivityMessage)).toList();
@@ -307,8 +344,7 @@ public final class AgUiClient {
 
     private void checkResponse(HttpResponse<InputStream> resp, InputStream in) throws IOException {
         int status = resp.statusCode();
-        if (status == 200 && resp.headers().firstValue("Content-Type").orElse("").toLowerCase()
-                .startsWith(AgUiProtocol.EVENT_STREAM)) {
+        if (status == 200 && (mediaType(resp).equals(AgUiProtocol.EVENT_STREAM) || protobufResponse(resp))) {
             return;
         }
         String detail = new String(in.readNBytes(2048), StandardCharsets.UTF_8);
@@ -326,7 +362,8 @@ public final class AgUiClient {
             if (body == null) {
                 b.header("Accept", "application/json").GET();
             } else {
-                b.header("Content-Type", "application/json").header("Accept", AgUiProtocol.EVENT_STREAM)
+                b.header("Content-Type", "application/json").header("Accept", preferProtobuf
+                                ? AgUiProtocol.EVENT_PROTOBUF + ", " + AgUiProtocol.EVENT_STREAM : AgUiProtocol.EVENT_STREAM)
                         .POST(HttpRequest.BodyPublishers.ofByteArray(body));
             }
             for (Credential credential : credentials.credentialsFor(ProtocolId.AGUI, endpoint.toString())) {
@@ -368,6 +405,7 @@ public final class AgUiClient {
         private Duration responseTimeout = Duration.ofSeconds(60);
         private int maxEventBytes = 8 * 1024 * 1024;
         private Consumer<String> warnings = w -> LOG.log(System.Logger.Level.WARNING, "AG-UI: " + w);
+        private boolean preferProtobuf;
 
         private static final System.Logger LOG = System.getLogger(AgUiClient.class.getName());
 
@@ -418,6 +456,19 @@ public final class AgUiClient {
         /** Receives each warning (dropped or stripped material); default the JDK logger. */
         public Builder warnings(Consumer<String> warnings) {
             this.warnings = Objects.requireNonNull(warnings, "warnings");
+            return this;
+        }
+
+        /**
+         * Asks agents for the HTTP + Protobuf binding (smaller frames) by listing
+         * {@value AgUiProtocol#EVENT_PROTOBUF} before {@code text/event-stream} in {@code Accept}.
+         * Default off: SSE is lossless, while the binary wire drops what its schema does not model
+         * (unknown fields, JSON Patch extension members) and carries numbers inside open JSON as
+         * doubles. Either way the client reads whichever binding the agent answers with. Needs
+         * protobuf-java 4.36.2 or newer on the classpath; {@link #build()} fails without it.
+         */
+        public Builder preferProtobuf(boolean prefer) {
+            this.preferProtobuf = prefer;
             return this;
         }
 

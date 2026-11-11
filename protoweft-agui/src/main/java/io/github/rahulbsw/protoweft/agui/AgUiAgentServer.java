@@ -46,15 +46,17 @@ public final class AgUiAgentServer implements ServerEndpointProvider, AutoClosea
     private final ServletEndpoint endpoint;
     private final ExecutorService executor;
     private final boolean ownsExecutor;
+    private final boolean protobuf;
 
     private AgUiAgentServer(Builder b) {
+        this.protobuf = b.protobuf && ProtoBinding.available();
         this.ownsExecutor = b.executor == null;
         this.executor = ownsExecutor ? Executors.newCachedThreadPool(daemonThreads()) : b.executor;
         Map<String, Object> capabilities = new LinkedHashMap<>();
-        capabilities.put("transport", Map.of("streaming", true, "httpBinary", false));
+        capabilities.put("transport", Map.of("streaming", true, "httpBinary", protobuf));
         capabilities.putAll(b.capabilities);
         AgUiServlet servlet = new AgUiServlet(b.agent, executor, b.observations, new Cors(b.allowedOrigins),
-                b.maxRequestBytes, capabilities);
+                b.maxRequestBytes, capabilities, protobuf);
         this.endpoint = new ServletEndpoint(b.endpointName, ProtocolId.AGUI,
                 List.of(b.path, b.path + CAPABILITIES_SUFFIX), servlet, true);
     }
@@ -70,7 +72,7 @@ public final class AgUiAgentServer implements ServerEndpointProvider, AutoClosea
     }
 
     public ComplianceReport compliance() {
-        return AgUiFeatures.serverReport();
+        return AgUiFeatures.serverReport(protobuf);
     }
 
     /** Stops the worker pool if the server created it; runs in progress are interrupted. */
@@ -99,6 +101,7 @@ public final class AgUiAgentServer implements ServerEndpointProvider, AutoClosea
         private ObservationHandler observations = ObservationHandler.NOOP;
         private ExecutorService executor;
         private int maxRequestBytes = 4 * 1024 * 1024;
+        private boolean protobuf = true;
 
         private Builder(AgUiAgent agent) {
             this.agent = agent;
@@ -165,6 +168,17 @@ public final class AgUiAgentServer implements ServerEndpointProvider, AutoClosea
                 throw new IllegalArgumentException("maxRequestBytes must be positive");
             }
             this.maxRequestBytes = bytes;
+            return this;
+        }
+
+        /**
+         * Whether to answer in the HTTP + Protobuf binding when a client's {@code Accept} admits
+         * {@value AgUiProtocol#EVENT_PROTOBUF} (a wildcard does too, as the spec says). Default on;
+         * it takes effect only with protobuf-java (4.36.2 or newer) on the classpath. Off, every
+         * run is answered with SSE.
+         */
+        public Builder protobuf(boolean enabled) {
+            this.protobuf = enabled;
             return this;
         }
 

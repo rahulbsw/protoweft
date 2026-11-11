@@ -38,10 +38,12 @@ final class AgUiServlet extends HttpServlet {
     private final transient ObservationHandler observations;
     private final transient Cors cors;
     private final int maxRequestBytes;
+    private final boolean protobuf;
     private final byte[] capabilities;
 
     AgUiServlet(AgUiAgent agent, ExecutorService executor, ObservationHandler observations, Cors cors,
-                int maxRequestBytes, Map<String, Object> capabilities) {
+                int maxRequestBytes, Map<String, Object> capabilities, boolean protobuf) {
+        this.protobuf = protobuf;
         this.agent = agent;
         this.executor = executor;
         this.observations = observations;
@@ -79,8 +81,10 @@ final class AgUiServlet extends HttpServlet {
             error(resp, 415, "the run input must be sent as application/json");
             return;
         }
-        if (!acceptsEventStream(req.getHeader("Accept"))) {
-            error(resp, 406, "this endpoint answers text/event-stream");
+        String binding = binding(req.getHeader("Accept"), protobuf);
+        if (binding == null) {
+            error(resp, 406, "this endpoint answers " + AgUiProtocol.EVENT_STREAM
+                    + (protobuf ? " or " + AgUiProtocol.EVENT_PROTOBUF : ""));
             return;
         }
         byte[] body = readLimited(req.getInputStream());
@@ -110,24 +114,29 @@ final class AgUiServlet extends HttpServlet {
         AsyncContext async = req.startAsync();
         async.setTimeout(0);
         try {
-            executor.execute(() -> run(input, caller, async));
+            executor.execute(() -> run(input, caller, async, binding));
         } catch (RejectedExecutionException e) {
             error(resp, 503, "the server is shutting down");
             async.complete();
         }
     }
 
-    private void run(RunAgentInput input, CallerIdentity caller, AsyncContext async) {
+    private void run(RunAgentInput input, CallerIdentity caller, AsyncContext async, String binding) {
         HttpServletResponse resp = (HttpServletResponse) async.getResponse();
         try {
             resp.setStatus(200);
-            resp.setContentType(AgUiProtocol.EVENT_STREAM);
-            resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            boolean binary = binding.equals(AgUiProtocol.EVENT_PROTOBUF);
+            // Exactly the media type for the binary binding: consumers select their parser by it.
+            resp.setContentType(binding);
+            if (!binary) {
+                resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            }
             resp.setHeader("Cache-Control", "no-cache");
             resp.setHeader("X-Accel-Buffering", "no");
+            resp.setHeader("Vary", "Accept");
             OutputStream out = resp.getOutputStream();
             RunEmitter emitter = new RunEmitter(input, caller, event -> {
-                out.write(Sse.frame(EventCodec.encode(event)));
+                out.write(binary ? ProtoBinding.frame(EventCodec.encode(event)) : Sse.frame(EventCodec.encode(event)));
                 resp.flushBuffer();
             });
             async.addListener(new Disconnect(emitter));
@@ -167,17 +176,52 @@ final class AgUiServlet extends HttpServlet {
         return body.length > maxRequestBytes ? null : body;
     }
 
-    static boolean acceptsEventStream(String accept) {
+    /**
+     * The binding to answer in, or {@code null} for 406. Per the spec: Protobuf whenever
+     * {@code Accept} admits its media type with a positive quality (wildcards included) and the
+     * binding is on; else SSE if admitted. Relative qualities of the two are not compared. No
+     * {@code Accept} gets SSE, as from the official encoder.
+     */
+    static String binding(String accept, boolean protobuf) {
         if (accept == null || accept.isBlank()) {
-            return true;
+            return AgUiProtocol.EVENT_STREAM;
         }
+        if (protobuf && admits(accept, AgUiProtocol.EVENT_PROTOBUF)) {
+            return AgUiProtocol.EVENT_PROTOBUF;
+        }
+        return admits(accept, AgUiProtocol.EVENT_STREAM) ? AgUiProtocol.EVENT_STREAM : null;
+    }
+
+    /**
+     * Whether {@code accept} admits {@code mediaType}: the most specific matching range (exact, then
+     * {@code type/*}, then {@code *}{@code /*}, as RFC 9110 orders them) has {@code q > 0}.
+     */
+    static boolean admits(String accept, String mediaType) {
+        String main = mediaType.substring(0, mediaType.indexOf('/'));
+        int best = 0;
+        double quality = 0;
         for (String range : accept.split(",")) {
-            String type = range.split(";")[0].trim().toLowerCase();
-            if (type.equals(AgUiProtocol.EVENT_STREAM) || type.equals("text/*") || type.equals("*/*")) {
-                return true;
+            String[] parts = range.split(";");
+            String type = parts[0].trim().toLowerCase();
+            int specificity = type.equals(mediaType) ? 3 : type.equals(main + "/*") ? 2 : type.equals("*/*") ? 1 : 0;
+            if (specificity == 0 || specificity < best) {
+                continue;
             }
+            double q = 1;
+            for (int i = 1; i < parts.length; i++) {
+                String[] kv = parts[i].trim().split("=", 2);
+                if (kv.length == 2 && kv[0].trim().equalsIgnoreCase("q")) {
+                    try {
+                        q = Double.parseDouble(kv[1].trim());
+                    } catch (NumberFormatException e) {
+                        q = 0;
+                    }
+                }
+            }
+            quality = specificity > best ? q : Math.max(quality, q);
+            best = specificity;
         }
-        return false;
+        return quality > 0;
     }
 
     private static void error(HttpServletResponse resp, int status, String message) throws IOException {

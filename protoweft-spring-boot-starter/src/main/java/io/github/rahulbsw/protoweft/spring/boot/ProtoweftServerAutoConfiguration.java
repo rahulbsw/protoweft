@@ -229,6 +229,7 @@ public class ProtoweftServerAutoConfiguration {
             return io.github.rahulbsw.protoweft.agui.AgUiAgentServer.builder(agent)
                     .path(agui.getPath())
                     .allowedOrigins(agui.getAllowedOrigins().toArray(String[]::new))
+                    .protobuf(agui.isProtobuf())
                     .capabilities(identity.isEmpty() ? java.util.Map.of() : java.util.Map.of("identity", identity))
                     .observations(ProtoweftAutoConfiguration.observations(observations))
                     .build();
