@@ -1,15 +1,17 @@
 # Protoweft
 
-**The protocol backbone for Java agents.** Protoweft connects Java applications to the agent and
-tool interoperability protocols —
+**The protocol backbone for Java agents.** Protoweft connects Java applications to the agent
+interoperability protocols —
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io),
 [Agent2Agent (A2A)](https://a2a-protocol.org), the
-[Universal Tool Calling Protocol (UTCP)](https://www.utcp.io) and the Hydro project's
-[Reactive Agent Protocol (RAP)](protocols/rap.md) — behind one protocol-neutral Java 17 API, in both
-the client and the server role.
+[Universal Tool Calling Protocol (UTCP)](https://www.utcp.io), the Hydro project's
+[Reactive Agent Protocol (RAP)](protocols/rap.md) and the
+[Agent–User Interaction protocol (AG-UI)](protocols/agui.md) — behind one protocol-neutral Java 17
+API, in both the client and the server role.
 
 Write a tool once and serve it over MCP, UTCP and RAP. Consume MCP servers, UTCP manuals, RAP tool
-servers and remote A2A agents through a single tool registry. Publish your own agent over A2A. Use all of it from plain
+servers and remote A2A and AG-UI agents through a single tool registry. Publish your own agent over
+A2A, or to web frontends over AG-UI. Use all of it from plain
 Java, Spring Boot 4, or the [LangChain4j](integrations/langchain4j.md),
 [Spring AI](integrations/spring-ai.md) and [ARGI](integrations/argi.md) agent frameworks.
 
@@ -37,7 +39,7 @@ System.out.println(out.text());   // 21.5
 
 <div class="grid cards" markdown>
 
-- **One API, four protocols**
+- **One API, five protocols**
 
     ---
 

@@ -14,3 +14,6 @@ site/
 
 # Jazzer fuzzing corpora (local runs)
 .cifuzz-corpus/
+
+# AG-UI interop: npm installs
+interop/agui/ts/node_modules/

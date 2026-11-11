@@ -458,6 +458,13 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `timeout` | duration | 60 s (connector default) | Connect timeout and the longest a call waits for the task. |
 | `streaming` | boolean | `true` | Whether calls may stream when the agent supports it. |
 
+### AG-UI agents: `protoweft.agui.agents.<name>.*`
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `url` | string | — (required) | The agent's endpoint URL (where runs are POSTed). Offered as the tool `<name>.ask`. |
+| `response-timeout` | duration | 60 s | How long to wait for a run's response to start; the stream itself may run longer. |
+
 ### RAP connectors: `protoweft.rap.servers.<name>.*`
 
 | Key | Type | Default | Description |
@@ -507,6 +514,12 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `protoweft.server.a2a.push-notifications` | boolean | `true` | Offer push notifications. |
 | `protoweft.server.a2a.agent-timeout` | duration | 30 s (server default) | How long a blocking `SendMessage` waits for the handler. |
 | `protoweft.server.a2a.from-chat-client` | boolean | `false` | With `protoweft-spring-ai` and no `AgentHandler` bean, serve the application's Spring AI `ChatClient` as the agent. See [Spring AI](spring-ai.md#spring-boot). |
+| `protoweft.server.agui.enabled` | boolean | `false` | Serve the `AgUiAgent` or `AgentHandler` bean over AG-UI. See [AG-UI](../protocols/agui.md). |
+| `protoweft.server.agui.path` | string | `/agui` | Path of the agent; its capabilities document is at `<path>/capabilities`. |
+| `protoweft.server.agui.allowed-origins` | list | `[]` | Browser origins allowed to call the agent cross-origin (`*` for any); empty means no CORS. |
+| `protoweft.server.agui.name` | string | — | Agent name in the capabilities document. |
+| `protoweft.server.agui.description` | string | — | Agent description in the capabilities document. |
+| `protoweft.server.agui.from-chat-client` | boolean | `false` | With `protoweft-spring-ai` and no `AgentHandler` bean, serve the application's `ChatClient` over AG-UI (streaming). |
 | `protoweft.server.rap.enabled` | boolean | `false` | Serve tools over RAP. |
 | `protoweft.server.rap.base-path` | string | `/rap` | Path the RAP routes are mounted under; `/` mounts them at the root. |
 | `protoweft.server.rap.base-url` | string | from each request | Public base URL (where `.well-known/rap-toolset` lives, base path included). |

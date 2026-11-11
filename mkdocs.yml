@@ -1,5 +1,5 @@
 site_name: Protoweft
-site_description: The protocol backbone for Java agents. MCP, A2A, UTCP and RAP behind one protocol-neutral API.
+site_description: The protocol backbone for Java agents. MCP, A2A, UTCP, RAP and AG-UI behind one protocol-neutral API.
 copyright: Copyright &copy; 2026 The Protoweft Authors. MIT License.
 
 site_url: https://rahulbsw.github.io/github/rahulbsw/protoweft/
@@ -79,6 +79,7 @@ nav:
       - A2A: protocols/a2a.md
       - UTCP: protocols/utcp.md
       - RAP: protocols/rap.md
+      - AG-UI: protocols/agui.md
   - Tool discovery:
       - Overview: discovery/index.md
       - Evaluation: discovery/evaluation.md

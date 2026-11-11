@@ -5,6 +5,7 @@ import io.github.rahulbsw.protoweft.core.ErrorCategory;
 import io.github.rahulbsw.protoweft.core.server.CallerIdentity;
 import io.github.rahulbsw.protoweft.core.tool.Content;
 import io.github.rahulbsw.protoweft.core.tool.ToolInvocation;
+import io.github.rahulbsw.protoweft.core.agent.AgentTaskContext;
 import io.github.rahulbsw.protoweft.core.tool.ToolOutcome;
 import io.github.rahulbsw.protoweft.core.tool.ToolProgress;
 import io.github.rahulbsw.protoweft.core.tool.ToolSource;
@@ -59,12 +60,23 @@ final class ProtoweftToolCallback implements ToolCallback {
                     "arguments for tool '" + definition.name() + "' are not a JSON object: " + e.getMessage(), e));
         }
         CallerIdentity who = caller.apply(toolContext);
+        AgentTaskContext task = task(toolContext);
+        String callId = java.util.UUID.randomUUID().toString();
+        if (task != null) {
+            task.toolCall(callId, definition.name(), toolInput);
+        }
         ToolOutcome outcome;
         try {
             outcome = source.invoke(new ToolInvocation(toolName, arguments),
                     who == null ? CallerIdentity.ANONYMOUS : who, progress(toolContext)).dropSubscription();
         } catch (ProtoweftException e) {
+            if (task != null) {
+                task.toolResult(callId, ToolOutcome.failure(e.getMessage() == null ? "the tool failed" : e.getMessage()));
+            }
             throw new ToolExecutionException(definition, e);
+        }
+        if (task != null) {
+            task.toolResult(callId, outcome);
         }
         String text = textFor(outcome);
         if (outcome.error()) {
@@ -72,6 +84,11 @@ final class ProtoweftToolCallback implements ToolCallback {
                     text.isBlank() ? "tool '" + definition.name() + "' failed without details" : text, outcome));
         }
         return text;
+    }
+
+    private static AgentTaskContext task(ToolContext context) {
+        Object value = context == null ? null : context.getContext().get(ProtoweftToolCallbacks.TASK_KEY);
+        return value instanceof AgentTaskContext t ? t : null;
     }
 
     private static ToolProgress progress(ToolContext context) {

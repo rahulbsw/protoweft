@@ -200,6 +200,49 @@ public class ProtoweftServerAutoConfiguration {
     }
 
     @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = PropertiesValidator.AGUI_SERVER_CLASS)
+    @ConditionalOnProperty(prefix = "protoweft.server.agui", name = "enabled", havingValue = "true")
+    static class AgUi {
+
+        @Bean
+        @ConditionalOnMissingBean
+        io.github.rahulbsw.protoweft.agui.AgUiAgentServer protoweftAgUiServer(
+                ProtoweftServerProperties properties,
+                ObjectProvider<io.github.rahulbsw.protoweft.agui.AgUiAgent> agUiAgent,
+                ObjectProvider<AgentHandler> handler, ObjectProvider<ObservationHandler> observations) {
+            ProtoweftServerProperties.AgUiServer agui = properties.getAgui();
+            io.github.rahulbsw.protoweft.agui.AgUiAgent agent = agUiAgent.getIfAvailable();
+            if (agent == null && handler.getIfAvailable() != null) {
+                agent = io.github.rahulbsw.protoweft.agui.AgUi.agent(handler.getObject());
+            }
+            if (agent == null) {
+                throw new InvalidConfigurationPropertyValueException("protoweft.server.agui.enabled", true,
+                        "serving AG-UI needs an AgUiAgent or AgentHandler bean (or protoweft.server.agui.from-chat-client=true)");
+            }
+            java.util.Map<String, Object> identity = new java.util.LinkedHashMap<>();
+            if (agui.getName() != null) {
+                identity.put("name", agui.getName());
+            }
+            if (agui.getDescription() != null) {
+                identity.put("description", agui.getDescription());
+            }
+            return io.github.rahulbsw.protoweft.agui.AgUiAgentServer.builder(agent)
+                    .path(agui.getPath())
+                    .allowedOrigins(agui.getAllowedOrigins().toArray(String[]::new))
+                    .capabilities(identity.isEmpty() ? java.util.Map.of() : java.util.Map.of("identity", identity))
+                    .observations(ProtoweftAutoConfiguration.observations(observations))
+                    .build();
+        }
+
+        @Bean
+        ProtoweftEndpointRegistrar protoweftAgUiEndpoints(io.github.rahulbsw.protoweft.agui.AgUiAgentServer server,
+                                                          ProtoweftServerProperties properties,
+                                                          ObjectProvider<InboundAuthenticator> authenticator) {
+            return registrar(server.endpoints(), properties, authenticator);
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(name = PropertiesValidator.RAP_SERVER_CLASS)
     @ConditionalOnProperty(prefix = "protoweft.server.rap", name = "enabled", havingValue = "true")
     static class Rap {

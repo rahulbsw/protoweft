@@ -62,6 +62,47 @@ final class ToolApprovals {
         return q.toString();
     }
 
+    /**
+     * Metadata key under which a request resumed over AG-UI carries its resume entries
+     * ({@code interruptId}, {@code status}, {@code payload}); see {@code protoweft-agui}'s {@code AgUi}.
+     */
+    static final String RESUME_METADATA = "agui/resume";
+
+    /**
+     * A reply resumed over AG-UI, rewritten as one JSON decision per resume entry (the interrupt id
+     * is the tool call id): an object payload is the decision itself, a text payload is read like a
+     * text reply ("approve", "reject because ..."), an abandoned interrupt is a rejection. Other
+     * replies are returned unchanged.
+     */
+    static AgentMessage fromResumeEntries(AgentMessage reply) {
+        if (!(reply.metadata().get(RESUME_METADATA) instanceof List<?> entries)) {
+            return reply;
+        }
+        List<Content> parts = new ArrayList<>();
+        for (Object entry : entries) {
+            if (!(entry instanceof Map<?, ?> e) || !(e.get("interruptId") instanceof String id)) {
+                continue;
+            }
+            Map<String, Object> decision = new LinkedHashMap<>();
+            if ("cancelled".equals(e.get("status"))) {
+                decision.put("decision", "rejected");
+                decision.put("reason", "The user abandoned this approval.");
+            } else if (e.get("payload") instanceof Map<?, ?> payload) {
+                payload.forEach((k, v) -> decision.put(String.valueOf(k), v));
+            } else if (e.get("payload") instanceof String text && !text.isBlank()) {
+                String[] words = text.strip().split("\\s+", 2);
+                String word = words[0].toLowerCase(java.util.Locale.ROOT);
+                decision.put("decision", APPROVE.contains(word) ? "approved" : REJECT.contains(word) ? "rejected" : word);
+                if (words.length > 1 && REJECT.contains(word)) {
+                    decision.put("reason", words[1]);
+                }
+            }
+            decision.put("id", id);
+            parts.add(new Content.Json(decision));
+        }
+        return new AgentMessage(reply.role(), parts, reply.messageId(), reply.taskId(), reply.contextId(), null);
+    }
+
     /** Reads the caller's reply into decisions for the pending calls, on top of earlier ones. */
     static Parsed parse(AgentMessage reply, List<ToolFeedback> pending, Map<String, ToolFeedback> earlier) {
         Map<String, ToolFeedback> decided = new LinkedHashMap<>(earlier);

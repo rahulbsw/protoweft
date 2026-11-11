@@ -110,10 +110,21 @@ AgentHandler handler = ArgiAgents.handler(agent);   // serve with A2aAgentServer
     thread. `threadId(r -> r.contextId())` keeps one ARGI conversation per A2A context instead.
   - **Input.** The message text is the user message.
   - **Blocking and streaming.** Blocking runs use `invokeAndGetOutput`. Streaming uses `stream`,
-    and `AGENT_MODEL_STREAMING` text chunks become `working` statuses. Events are queued and handled
+    and `AGENT_MODEL_STREAMING` text chunks are sent with `textDelta`. Events are queued and handled
     on the handler thread, as in `SpringAiAgents`, and cancellation disposes the subscription.
   - **Answer.** The answer is the agent's `outputKey` value, else the last `AssistantMessage`, as
-    a `response` artifact. Then the task completes.
+    a `response` artifact, unless it equals the text streamed in the final model turn. Text streamed
+    before a tool call does not count, otherwise the answer would be repeated. Then the task
+    completes.
+  - **Over AG-UI** (decided with the user; `ArgiAgUi` is the only class touching `protoweft-agui`,
+    `compileOnly`, loaded after a class-presence check): approvals end the run with one interrupt
+    per undecided call (id = tool call id, reason `tool_approval`, message with name, description
+    and arguments, metadata `toolName`/`arguments`, a response schema for `decision`, `arguments`,
+    `reason`); no tool-call events are sent for those calls, so they are not left pending. A
+    resumed run's entries (message metadata `agui/resume`) become JSON decisions with the
+    interrupt id as `id`: an object payload as-is, text read like a text reply, an abandoned
+    entry as a rejection. **Deferred:** the application's own tools (ARGI 2.1.0-RC1 interruption
+    internals).
   - **Errors.** Exceptions fail the task with the root cause's message. ARGI's default
     `throwOnModelError(false)` turns a model error into an `"Exception: ..."` assistant answer, so
     set `throwOnModelError(true)` if model errors should fail the task.
@@ -206,8 +217,10 @@ Spring AI `ChatModel` returns tool-call `AssistantMessage`s and then text, and d
   - **Edit.** A JSON data part with edited arguments runs the tool with the new arguments.
   - **Several calls.** Two calls in one message are decided one by one with JSON, with an
     unparsable reply in between that asks again. Only the approved call runs.
-  - **Streaming.** The streaming handler resumes an approval and reports text chunks as
-    `working`.
+  - **Streaming.** The streaming handler resumes an approval and streams text chunks with
+    `textDelta`.
+  - **AG-UI.** Over a real AG-UI server: an approval is an interrupt; an approved resume runs the
+    tool and completes; an abandoned one rejects it; a text answer works too.
   - **Catalog over A2A.** The A2A caller's scopes reach catalog selection and the tool.
   - **Model errors.** They fail the task with `throwOnModelError(true)` and complete with the
     `Exception:` answer by default.

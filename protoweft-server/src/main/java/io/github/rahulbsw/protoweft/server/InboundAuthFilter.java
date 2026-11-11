@@ -28,6 +28,10 @@ import java.util.Objects;
  *
  * <p>Hosts install one instance per {@link ServletEndpoint}, with async support enabled
  * whenever the endpoint's servlet is async.
+ *
+ * <p>CORS preflight requests ({@code OPTIONS} with {@code Origin} and
+ * {@code Access-Control-Request-Method}) pass as anonymous: browsers never attach credentials to
+ * a preflight, and a preflight only asks which methods and headers the endpoint accepts.
  */
 public final class InboundAuthFilter implements Filter {
 
@@ -52,6 +56,11 @@ public final class InboundAuthFilter implements Filter {
             throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
+        if (isCorsPreflight(request)) {
+            request.setAttribute(CALLER_ATTRIBUTE, CallerIdentity.ANONYMOUS);
+            chain.doFilter(request, response);
+            return;
+        }
         AuthDecision decision;
         try {
             decision = authenticator.authenticate(toInbound(request));
@@ -72,6 +81,11 @@ public final class InboundAuthFilter implements Filter {
         }
         request.setAttribute(CALLER_ATTRIBUTE, ((AuthDecision.Allow) decision).caller());
         chain.doFilter(request, response);
+    }
+
+    static boolean isCorsPreflight(HttpServletRequest request) {
+        return "OPTIONS".equals(request.getMethod()) && request.getHeader("Origin") != null
+                && request.getHeader("Access-Control-Request-Method") != null;
     }
 
     private InboundRequest toInbound(HttpServletRequest request) {

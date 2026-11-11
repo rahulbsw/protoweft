@@ -1,0 +1,8 @@
+data: {"type":"RUN_STARTED","threadId":"t","runId":"r"}
+
+data: {"type":"TEXT_MESSAGE_CHUNK","messageId":"m","delta":"hi"}
+
+data: {"type":"TOOL_CALL_CHUNK","toolCallId":"c","toolCallName":"f","delta":"{}"}
+
+data: {"type":"RUN_FINISHED","threadId":"t","runId":"r"}
+

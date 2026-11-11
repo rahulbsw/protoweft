@@ -1,0 +1,16 @@
+{
+  "name": "protoweft-agui-web-page",
+  "private": true,
+  "description": "The browser page of examples/agui-web: AG-UI from the browser with the official @ag-ui/client.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@ag-ui/client": "1.0.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "build": "esbuild src/app.js --bundle --format=esm --target=es2022 --minify --sourcemap --outfile=../src/main/resources/static/app.js"
+  }
+}

@@ -69,8 +69,10 @@ stdio (never its arguments), and a URL without user info, query or fragment for 
 
 Every Protoweft server endpoint runs one `InboundAuthenticator` before handling a request. That
 covers MCP over HTTP, **both** A2A endpoints (the agent card and JSON-RPC), the UTCP manual and
-tool routes, and every RAP tool-server route, so one implementation protects all four protocols.
-The one exception is the RAP *client's* callback endpoint, which tool servers call without
+tool routes, every RAP tool-server route, and the AG-UI agent and its capabilities, so one
+implementation protects all five protocols. CORS preflight requests pass as anonymous, because
+browsers never attach credentials to them; they only ask which methods and headers an endpoint
+accepts. The one exception is the RAP *client's* callback endpoint, which tool servers call without
 credentials: wrap your authenticator with `RapCallbackEndpoint.exemptCallbacks(..)` (see
 [RAP](../protocols/rap.md#callbacks-on-the-applications-server)).
 

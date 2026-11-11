@@ -67,6 +67,10 @@ class ProtoweftHttpTest {
                 "protoweft.server.utcp.api-key-header=Authorization",
                 "protoweft.server.utcp.api-key-variable=TOKEN",
                 "protoweft.server.a2a.enabled=true",
+                "protoweft.server.agui.enabled=true",
+                "protoweft.server.agui.allowed-origins=https://app.test",
+                "protoweft.server.agui.name=Echo",
+                "protoweft.agui.agents.ui.url=" + base + "/agui",
                 "protoweft.utcp.manuals.self.url=" + base + "/utcp",
                 "protoweft.utcp.manuals.self.variables.TOKEN=Bearer secret",
                 "protoweft.a2a.agents.me.url=" + base).run();
@@ -103,10 +107,29 @@ class ProtoweftHttpTest {
         ToolRegistry registry = context.getBean(ToolRegistry.class);
         // The UTCP provider's call template sends the whole argument object as the "body" field.
         assertThat(registry.listTools()).extracting(ToolSpec::name)
-                .contains("local.add", "local.whoami", "self.add", "self.whoami", "me.ask");
+                .contains("local.add", "local.whoami", "self.add", "self.whoami", "me.ask", "ui.ask");
         assertThat(registry.invoke(ToolInvocation.of("self.add", Map.of("body", Map.of("a", 2, "b", 40)))).text()).isEqualTo("42");
         assertThat(registry.invoke(ToolInvocation.of("self.whoami", Map.of("body", Map.of()))).text()).isEqualTo("tester");
         assertThat(registry.invoke(ToolInvocation.of("me.ask", Map.of("message", "hi"))).text()).contains("echo: hi");
+        assertThat(registry.invoke(ToolInvocation.of("ui.ask", Map.of("message", "hi"))).text()).contains("echo: hi");
+    }
+
+    @Test
+    void aguiServesTheAgentBehindTheAuthenticatorWithCors() throws Exception {
+        HttpClient http = HttpClient.newHttpClient();
+        HttpResponse<String> anonymous = http.send(HttpRequest.newBuilder(URI.create(base + "/agui"))
+                .header("Content-Type", "application/json").header("Accept", "text/event-stream")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"threadId\":\"t\",\"runId\":\"r\",\"messages\":[]}")).build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(anonymous.statusCode()).isEqualTo(401);
+        HttpResponse<String> preflight = http.send(HttpRequest.newBuilder(URI.create(base + "/agui"))
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody()).header("Origin", "https://app.test")
+                .header("Access-Control-Request-Method", "POST").build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(preflight.statusCode()).isEqualTo(204);
+        assertThat(preflight.headers().firstValue("Access-Control-Allow-Origin")).hasValue("https://app.test");
+        HttpResponse<String> capabilities = http.send(HttpRequest.newBuilder(URI.create(base + "/agui/capabilities"))
+                .header("Authorization", "Bearer secret").build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(capabilities.body()).contains("\"name\":\"Echo\"");
     }
 
     @Test

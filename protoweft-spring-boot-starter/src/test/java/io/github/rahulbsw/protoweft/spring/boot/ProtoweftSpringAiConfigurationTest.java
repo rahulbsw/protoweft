@@ -78,6 +78,16 @@ class ProtoweftSpringAiConfigurationTest {
     }
 
     @Test
+    void chatClientIsServedAsTheAgUiAgentWhenAsked() {
+        runner.withBean(ChatClient.class, () -> ChatClient.builder(ECHO_MODEL).build())
+                .withPropertyValues("protoweft.server.agui.from-chat-client=true")
+                .run(context -> assertThat(context).hasSingleBean(AgentHandler.class));
+        runner.withBean(ChatClient.class, () -> ChatClient.builder(ECHO_MODEL).build())
+                .withPropertyValues("protoweft.server.agui.from-chat-client=true", "protoweft.server.a2a.from-chat-client=true")
+                .run(context -> assertThat(context).hasSingleBean(AgentHandler.class));
+    }
+
+    @Test
     void anApplicationAgentHandlerWins() {
         AgentHandler mine = (request, task) -> task.reply("mine");
         runner.withBean(ChatClient.class, () -> ChatClient.builder(ECHO_MODEL).build())

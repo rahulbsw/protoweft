@@ -135,6 +135,21 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
   if the model streamed nothing, the complete response's text becomes the `response` artifact. Stream
   callbacks are queued and replayed on the handler's thread, so `AgentTaskContext` is only called
   from one thread. Cancellation stops listening, but LangChain4j's stream isn't aborted.
+- **Tool calls reported.** The streaming handler hooks `beforeToolExecution`/`onToolExecuted` and
+  reports `toolCall`/`toolResult` (matched by request equality; the request id, else a new one).
+- **Over AG-UI** (decided with the user): AI Services cache one `ChatMemory` per id, so
+  `LangChain4jAgents.chatMemory(fallback)` returns a `FrontendHistory` provider. The AI Service is
+  built with it, and the same instance goes to `handler(…, memory)` / `streamingHandler(…, memory)`.
+  Its in-flight runs are scoped to that instance, not global, so two services sharing a
+  conversation id never read or write each other's runs. A second overlapping run of one
+  conversation fails the task rather than overwrite the first (review finding on #12). While a run
+  is in flight for an id, its memories serve that run's conversation (`AgUiHistory`: messages before
+  the last user message, context entries as a leading system message, assistant tool calls and
+  tool results kept) and otherwise delegate to `fallback`, which AG-UI runs never write. If an
+  AG-UI run never read it, a warning is logged once (the AI Service was built without the
+  wrapper). `protoweft-agui` is `compileOnly`; `AgUiHistory` loads only after a class-presence
+  check. **Deferred:** the application's own tools; an AI Service needs a new user message to
+  continue after a tool result, and driving the model in Protoweft would break goal principle 11.
 
 - **Tool search maps onto LangChain4j's own mechanism, not onto `DiscoveryTools`.** LangChain4j
   1.23.0 (`dev.langchain4j.service.tool.search`, since 1.12.0) works like this:

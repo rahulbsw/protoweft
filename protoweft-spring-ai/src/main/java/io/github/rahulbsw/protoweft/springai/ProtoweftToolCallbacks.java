@@ -50,6 +50,13 @@ public final class ProtoweftToolCallbacks implements ToolCallbackProvider {
     /** {@link ToolContext} key holding an {@code io.github.rahulbsw.protoweft.core.tool.ToolProgress} for the tool's progress. */
     public static final String PROGRESS_KEY = "protoweft.progress";
 
+    /**
+     * Tool-context key for the {@link io.github.rahulbsw.protoweft.core.agent.AgentTaskContext} of the
+     * agent run calling the tool: each call is reported with {@code toolCall} and {@code toolResult},
+     * so protocols that can show tool calls (AG-UI) do. {@link SpringAiAgents} sets it.
+     */
+    public static final String TASK_KEY = "protoweft.task";
+
     private static final Map<String, Object> EMPTY_OBJECT_SCHEMA = emptyObjectSchema();
 
     private final ToolSource source;

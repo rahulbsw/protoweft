@@ -1,11 +1,18 @@
 # Conformance testing
 
-Protoweft runs two official conformance suites against small apps built only on its public API:
+Protoweft runs two official conformance suites, plus its own AG-UI checker, against small apps built
+only on its public API:
 
 | Suite | Version | Tests | App under test |
 |---|---|---|---|
 | [MCP conformance suite](https://github.com/modelcontextprotocol/conformance) | `@modelcontextprotocol/conformance@0.2.0-alpha.12` (the version the MCP Java SDK pins), spec `2025-11-25` | server scenarios (`--suite active`) and the 18 client scenarios required for 2025-11-25 (4 non-auth, 14 `auth/*`) | `conformance/mcp-server` (`McpToolServer.http` on `ProtoweftServer`), `conformance/mcp-client` (`McpClientConnector`, with protoweft-oauth's `OAuthClient` for `auth/*`) |
 | [A2A TCK](https://github.com/a2aproject/a2a-tck) | tag `1.0.0.alpha3` (A2A spec 1.0, as pinned by a2a-java 1.5.0.Final), `--level must` | the TCK's MUST requirements for the transports the card declares | `conformance/a2a-sut` (`A2aAgentServer` on `ProtoweftServer`) |
+| AG-UI checker (`AgUiConformance` in `protoweft-agui`; AG-UI has no official suite) | AG-UI spec `1.0` | 12 producer checks: the SSE binding, event shapes, run lifecycle and identity, version declaration and negotiation, input handling | `conformance/agui-sut` (`AgUiAgentServer` with a scripted agent using every event family) |
+
+AG-UI is also checked against the official SDKs in both directions (`scripts/interop/agui.sh`):
+the TypeScript `@ag-ui/client` 1.0.4 drives `conformance/agui-sut`, and Protoweft's client and the
+checker run against an agent built on the Python `ag-ui-protocol` 1.0.0. The official Python agent
+passes all 12 checks, which also cross-checks the checker against an independent implementation.
 
 The apps in `conformance/` are never published. Every failure that remains is listed in a
 baseline with its reason, and a run fails on any failure that isn't listed and on any listed
@@ -29,6 +36,8 @@ newer, and [uv](https://github.com/astral-sh/uv).
 scripts/conformance/mcp-server.sh     # MCP server scenarios
 scripts/conformance/mcp-client.sh     # MCP client scenarios (or name scenarios as arguments)
 scripts/conformance/a2a-tck.sh        # A2A TCK, MUST level
+scripts/conformance/agui.sh           # AG-UI checker against conformance/agui-sut
+scripts/interop/agui.sh               # AG-UI interop with the official TypeScript and Python SDKs
 ```
 
 Each script builds its app with Gradle (`installDist`), starts it in the background, waits until
@@ -45,16 +54,21 @@ and `tck_report.html`. The app log and the console output are saved there too.
 | `A2A_TCK_VERSION`, `A2A_TCK_LEVEL`, `A2A_TCK_PYTHON` | `1.0.0.alpha3`, `must`, `3.12` | `a2a-tck.sh` |
 | `A2A_TCK_DIR` | `build/conformance/a2a-tck-src` (cloned at the tag) | `a2a-tck.sh` |
 | `A2A_TCK_BASELINE` | `conformance/a2a-tck-baseline.yml`; `none` exits with the TCK's raw code | `a2a-tck.sh` |
+| `AGUI_SUT_PORT`, `AGUI_TARGET_URL`, `AGUI_BASELINE` | `9998`, — (start the SUT), `conformance/agui-baseline.yml` | `agui.sh` |
+| `AGUI_INTEROP_PORT_BASE`, `AGUI_INTEROP_PYTHON` | `9996`, `3.12` | `scripts/interop/agui.sh` |
 | `TCK_STREAMING_TIMEOUT` | `2.0` seconds (the resubscribe task runs for twice this) | TCK and SUT |
 
 A script refuses to start if its port already answers, so it never tests another server.
 
-In CI, `.github/workflows/conformance.yml` runs three jobs on every pull request and push to
+In CI, `.github/workflows/conformance.yml` runs five jobs on every pull request and push to
 `main`:
 
 - `mcp-server`;
 - `mcp-client`, with one matrix entry per scenario;
-- `a2a-tck`.
+- `a2a-tck`;
+- `agui-conformance` (the checker against `conformance/agui-sut`);
+- `agui-interop` (both directions against the official SDKs, pinned by hash in
+  `interop/agui/ts/package-lock.json` and `interop/agui/python/requirements.txt`).
 
 The jobs use Temurin 17, Node 22, Python 3.12 and uv, and upload `build/conformance/<suite>/` as
 artifacts.

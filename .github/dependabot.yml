@@ -26,3 +26,27 @@ updates:
     groups:
       interop-crates:
         patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /interop/agui/ts
+    schedule:
+      interval: weekly
+    groups:
+      interop-agui-npm:
+        patterns: ['*']
+
+  - package-ecosystem: pip
+    directory: /interop/agui/python
+    schedule:
+      interval: weekly
+    groups:
+      interop-agui-pip:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /examples/agui-web/frontend
+    schedule:
+      interval: weekly
+    groups:
+      example-agui-web-npm:
+        patterns: ['*']

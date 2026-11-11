@@ -111,7 +111,10 @@
          <trusted-key id="AA70C7C433D501636392EC02153E7A3C2B4E5118" group="org.eclipse.ee4j" name="project"/>
          <trusted-key id="AEB1E1AEC035C66FA39589D13EFC46EE83C40224" group="com.networknt" name="json-schema-validator"/>
          <trusted-key id="B02335AA54CCF21E52BBF9ABD9C565AA72BA2FDD" group="io.grpc" name="grpc-bom"/>
-         <trusted-key id="B18679A17A21DE79FF9DE8B0636D10E7975B6E6F" group="com.ethlo.time" name="itu" version="1.14.0"/>
+         <trusted-key id="B18679A17A21DE79FF9DE8B0636D10E7975B6E6F">
+            <trusting group="com.ethlo.time" name="itu" version="1.14.0"/>
+            <trusting group="com.ethlo.time" name="itu" version="1.17.0"/>
+         </trusted-key>
          <trusted-key id="B3D52B65C60B9E1905D5F62BA6D97ACDCD4D073E" group="^ai[.]djl($|([.].*))" regex="true"/>
          <trusted-key id="B83D15E72253ED1104EB4FBBDAB472F0E5B8A431" group="org.apache.opennlp"/>
          <trusted-key id="BB785E0400E71390977E4D1ADF3CC7C64D56297B" group="jakarta.interceptor" name="jakarta.interceptor-api" version="2.2.0"/>
@@ -143,9 +146,7 @@
          <trusted-key id="E85AED155021AF8A6C6B7A4A7C7D8456294423BA" group="org.objenesis"/>
          <trusted-key id="EAFC1F3B2FCED6AFD046C7D5734AEF3D43509290" group="org.osgi"/>
          <trusted-key id="EE0CA873074092F806F59B65D364ABAA39A47320" group="com.google.errorprone"/>
-         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9">
-            <trusting group="org.jsoup" name="jsoup" version="1.24.1"/>
-         </trusted-key>
+         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9" group="org.jsoup" name="jsoup" version="1.24.1"/>
          <trusted-key id="F3D15B8FF9902805DE4BE6B18DC6F3D0ABDBD017" group="org.codehaus.plexus" name="plexus-sec-dispatcher" version="2.0"/>
          <trusted-key id="F43BD1DCA7D5F5AFF5BBEC1EA4B9C195907CB45B" group="org.apache.cassandra" name="java-driver-bom" version="4.19.3"/>
          <trusted-key id="F4DD59C90148BDC52BEB90A4530AA5F25C25011F">

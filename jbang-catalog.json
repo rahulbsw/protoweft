@@ -4,6 +4,10 @@
     "protoweft-demo": {
       "script-ref": "jbang/ProtoweftDemo.java",
       "description": "Serve one Java method over MCP, UTCP and A2A, then call it back through all three"
+    },
+    "agui-conformance": {
+      "script-ref": "jbang/AgUiConformance.java",
+      "description": "Check an AG-UI agent against the producer rules of AG-UI spec 1.0"
     }
   },
   "templates": {}

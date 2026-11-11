@@ -1,0 +1,13 @@
+{
+  "name": "protoweft-agui-interop-ts",
+  "private": true,
+  "description": "Drives Protoweft's AG-UI server with the official TypeScript client (@ag-ui/client). Run by scripts/interop/agui.sh.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@ag-ui/client": "1.0.4"
+  },
+  "scripts": {
+    "interop": "node client.mjs"
+  }
+}

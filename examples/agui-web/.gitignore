@@ -1,0 +1,4 @@
+frontend/node_modules/
+# Built by `npm run build` in frontend/
+src/main/resources/static/app.js
+src/main/resources/static/app.js.map

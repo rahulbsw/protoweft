@@ -15,6 +15,8 @@ final class PropertiesValidator {
     static final String A2A_CLASS = "io.github.rahulbsw.protoweft.a2a.A2aAgentConnector";
     static final String RAP_CLASS = "io.github.rahulbsw.protoweft.rap.RapClientConnector";
     static final String RAP_SERVER_CLASS = "io.github.rahulbsw.protoweft.rap.RapToolServer";
+    static final String AGUI_CLASS = "io.github.rahulbsw.protoweft.agui.AgUiClientConnector";
+    static final String AGUI_SERVER_CLASS = "io.github.rahulbsw.protoweft.agui.AgUiAgentServer";
     /** Where {@code RapCallbackEndpoint} is mounted (fixed by protoweft-rap). */
     static final String RAP_CALLBACK_PATH = "/rap/callback";
 
@@ -85,6 +87,15 @@ final class PropertiesValidator {
                 throw invalid(key + ".thread-id", r.getThreadId(), "must not be empty");
             }
         });
+        props.getAgui().getAgents().forEach((name, a) -> {
+            String key = "protoweft.agui.agents." + name;
+            name(names, key, name);
+            requireModule(key, AGUI_CLASS, "protoweft-agui", classLoader);
+            if (!hasText(a.getUrl())) {
+                throw invalid(key + ".url", a.getUrl(), "the agent's endpoint URL is required");
+            }
+            httpUrl(key + ".url", a.getUrl());
+        });
         String callbackUrl = props.getRap().getCallback().getPublicBaseUrl();
         if (callbackUrl != null) {
             httpUrl("protoweft.rap.callback.public-base-url", callbackUrl);
@@ -123,6 +134,14 @@ final class PropertiesValidator {
                     throw invalid("protoweft.server.a2a.skills[" + i + "].id", null, "a skill needs an id");
                 }
             }
+        }
+        if (props.getAgui().isEnabled()) {
+            requireModule("protoweft.server.agui.enabled", AGUI_SERVER_CLASS, "protoweft-agui", classLoader);
+            String path = props.getAgui().getPath();
+            if (path == null || !path.startsWith("/") || path.endsWith("/") || path.contains("*")) {
+                throw invalid("protoweft.server.agui.path", path, "must start with '/', not end with '/', and have no '*'");
+            }
+            path(paths, "protoweft.server.agui.path", path);
         }
         if (props.getRap().isEnabled()) {
             requireModule("protoweft.server.rap.enabled", RAP_SERVER_CLASS, "protoweft-rap", classLoader);
