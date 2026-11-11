@@ -6,6 +6,7 @@ import io.github.rahulbsw.protoweft.evals.discovery.data.EvalCatalog;
 import io.github.rahulbsw.protoweft.evals.discovery.data.EvalTask;
 import io.github.rahulbsw.protoweft.evals.discovery.data.EvalTool;
 import io.github.rahulbsw.protoweft.evals.discovery.data.GoldCall;
+import io.github.rahulbsw.protoweft.evals.discovery.fixtures.NormalizedArgs;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -38,8 +39,10 @@ public final class CallScorer {
     /**
      * Per-task scores; see the class comment. State-based fields (for multi-step tasks):
      * <ul>
-     *   <li><b>re-fetches</b>: real calls to a tool already called earlier in the task — the cost a
-     *       result-shaping policy pays when the model re-asks for what was trimmed;</li>
+     *   <li><b>re-fetches</b>: real calls that repeat an earlier call's tool <em>and</em> normalized
+     *       arguments — the cost a result-shaping policy pays when the model re-asks for the same
+     *       result it was shown trimmed. Calling the same tool with different arguments (reading
+     *       three different files) is normal progress, not a re-fetch;</li>
      *   <li><b>gold tools covered</b>: every gold tool id appears among the real calls;</li>
      *   <li><b>required facts present</b>: the final answer contains every required fact
      *       (case-insensitive), or {@code null} when the task declares none;</li>
@@ -76,13 +79,13 @@ public final class CallScorer {
                 List.copyOf(mismatches), reFetches, covered, factsPresent, success);
     }
 
-    /** Real calls whose tool was already called earlier in the task. */
+    /** Real calls that repeat an earlier call's tool <em>and</em> normalized arguments. */
     private static int reFetches(List<SelectedCall> calls) {
         Set<String> seen = new LinkedHashSet<>();
         int repeats = 0;
         for (SelectedCall c : calls) {
-            String key = c.toolId() != null ? c.toolId() : c.name();
-            if (key != null && !seen.add(key)) {
+            String tool = c.toolId() != null ? c.toolId() : c.name();
+            if (tool != null && !seen.add(NormalizedArgs.key(tool, c.arguments()))) {
                 repeats++;
             }
         }

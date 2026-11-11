@@ -102,7 +102,8 @@ public final class GenericSearchArm implements Arm {
         ProviderToolNames names = new ProviderToolNames();
         DiscoveryArmSupport.SearchLog log = new DiscoveryArmSupport.SearchLog(built, task);
         List<String> described = new ArrayList<>();
-        ToolLoop.MockMode mock = multiTurn == null ? null : multiTurn.mode(task, resultPolicy, historyPolicy);
+        ToolLoop.MockMode mock = multiTurn == null ? null
+                : multiTurn.mode(task, resultPolicy, historyPolicy, c -> fixtureCall(c, built, names, catalog));
         // Discovery spends extra turns searching/describing, so budget two turns per selection.
         int turns = multiTurn == null ? maxTurns : Math.max(maxTurns, 2 * multiTurn.goldCalls(task) + 2);
         ToolLoop.Outcome o = ToolLoop.run(client, Prompts.SYSTEM + SYSTEM_SUFFIX, Prompts.user(task), tools.listTools(),
@@ -151,6 +152,19 @@ public final class GenericSearchArm implements Arm {
         } catch (RuntimeException e) {
             return ToolLoop.Decision.respond(new ToolResult(call.id(), DiscoveryArmSupport.message(e), true), List.of(), true);
         }
+    }
+
+    /**
+     * The logical call used for fixture lookup: the selected capability's bare tool name and its real
+     * arguments (unwrapping {@code call_capability} and resolving loaded provider names), keeping the
+     * original call id so the mocked result answers the right call. Without this, a discovery call
+     * looks up {@code call_capability} + wrapper args and misses fixtures that {@code all-tools} hits.
+     */
+    static ToolCall fixtureCall(ToolCall c, CatalogBridge.Built built, ProviderToolNames names, EvalCatalog catalog) {
+        SelectedCall s = selected(c, built, names, catalog);
+        var tool = s.toolId() == null ? null : catalog.tool(s.toolId());
+        String name = tool != null ? tool.spec().name() : s.name();
+        return ToolCall.of(c.id(), name, s.arguments());
     }
 
     /** {@code call_capability(name, arguments)} or a direct call, mapped back to an eval tool id. */

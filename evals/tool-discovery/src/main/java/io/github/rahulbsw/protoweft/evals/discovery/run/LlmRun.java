@@ -183,8 +183,24 @@ public final class LlmRun {
                                 }
                                 Map<String, Object> row = row(task, catalog, n, trial, m.getValue(), result,
                                         exactCount(clients.get(m.getKey())));
+                                // Judge after the agent row is built: if judging exhausts the budget,
+                                // keep the completed agent row and clean-stop like an agent call does.
+                                boolean budgetStop = false;
+                                if (judge != null && result.error() == null) {
+                                    try {
+                                        var verdict = judge.judge(task, result.finalText());
+                                        row.put("judgedSuccess", verdict.pass());
+                                        row.put("judgeReason", verdict.reason());
+                                    } catch (BudgetExceededException e) {
+                                        stopReason = e.getMessage();
+                                        budgetStop = true;
+                                    }
+                                }
                                 out.row(row);
                                 report.add(cell, row);
+                                if (budgetStop) {
+                                    break outer;
+                                }
                                 if (result.error() != null) {
                                     int errs = consecutiveErrors.merge(cell, 1, Integer::sum);
                                     if (errs >= config.maxConsecutiveErrors()) {
@@ -242,11 +258,6 @@ public final class LlmRun {
                                     ArmResult r, Long exactInput) {
         CallScorer.TaskScore s = CallScorer.score(task, catalog, r);
         Map<String, Object> row = new LinkedHashMap<>();
-        if (judge != null && r.error() == null) {
-            var verdict = judge.judge(task, r.finalText());
-            row.put("judgedSuccess", verdict.pass());
-            row.put("judgeReason", verdict.reason());
-        }
         row.put("model", client.key());
         row.put("arm", r.arm());
         row.put("catalogSize", n);

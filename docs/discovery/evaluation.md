@@ -187,7 +187,10 @@ Means over 24 runs per arm (8 tasks × 3 trials); every run made the full 8 tool
 - **On a small catalog, on-demand discovery costs *more*.** `generic-search` input is **+22%**
   (CI entirely above baseline): the discovery round-trips and their results outweigh the few hundred
   tokens of tool definitions all-tools would have sent. Discovery earns its keep at large catalogs
-  (the single-turn arms above), not here.
+  (the single-turn arms above), not here. (In this run, before a later fix, discovery calls received
+  distribution-sized *synthetic* results rather than the recorded fixtures; the +22% is driven by
+  the discovery round-trips, which the fix does not change, and the result sizes were matched, so
+  the conclusion holds. Re-run after the fix to replace the synthetic result content.)
 - **Completion is not separable at this scale.** Task-success Wilson intervals all overlap
   (0.00–0.21, intervals spanning ~0.02–0.40); no shaping arm is distinguishable from the baseline on
   success. `clear-stale` is the only directional signal (0.00, highest re-fetch at 3.2), consistent

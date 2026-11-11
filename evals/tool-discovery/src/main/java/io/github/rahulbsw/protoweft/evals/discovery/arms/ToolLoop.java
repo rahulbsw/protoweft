@@ -86,16 +86,26 @@ public final class ToolLoop {
      * @param maxRealCalls  the trajectory bound; at least 1
      * @param resultPolicy  shapes each mocked result before it is fed back
      * @param historyPolicy shapes the conversation re-sent on each turn
+     * @param fixtureCall   maps the transport-level call to the logical (tool, arguments) used for
+     *                      fixture lookup — identity for direct arms, an unwrapper for discovery
+     *                      arms whose selection is {@code call_capability(name, arguments)}; it
+     *                      preserves the call id so the mocked result answers the right call
      */
     public record MockMode(MockResultProvider provider, int maxRealCalls, ResultPolicy resultPolicy,
-                           HistoryPolicy historyPolicy) {
+                           HistoryPolicy historyPolicy, java.util.function.UnaryOperator<ToolCall> fixtureCall) {
         public MockMode {
             java.util.Objects.requireNonNull(provider, "provider");
             java.util.Objects.requireNonNull(resultPolicy, "resultPolicy");
             java.util.Objects.requireNonNull(historyPolicy, "historyPolicy");
+            java.util.Objects.requireNonNull(fixtureCall, "fixtureCall");
             if (maxRealCalls < 1) {
                 throw new IllegalArgumentException("maxRealCalls must be >= 1");
             }
+        }
+
+        public MockMode(MockResultProvider provider, int maxRealCalls, ResultPolicy resultPolicy,
+                        HistoryPolicy historyPolicy) {
+            this(provider, maxRealCalls, resultPolicy, historyPolicy, java.util.function.UnaryOperator.identity());
         }
 
         /** Raw results and full history (the default shaping). */
@@ -201,7 +211,7 @@ public final class ToolLoop {
                     if (mock == null) {
                         stop = true;
                     } else {
-                        ToolResult mocked = mock.provider().result(call);
+                        ToolResult mocked = mock.provider().result(mock.fixtureCall().apply(call));
                         results.add(estimator == null ? mocked : mock.resultPolicy().shape(mocked, estimator));
                         if (selected.size() >= mock.maxRealCalls()) {
                             stop = true;

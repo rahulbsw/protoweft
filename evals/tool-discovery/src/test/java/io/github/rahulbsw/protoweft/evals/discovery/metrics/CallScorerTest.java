@@ -96,11 +96,16 @@ class CallScorerTest {
     }
 
     @Test
-    void reFetchesCountRepeatedTools() {
+    void reFetchesCountOnlyRepeatedToolAndArguments() {
         EvalTask t = task(List.of(new GoldCall("t:gold", Map.of("address", "A"))));
+        // Same tool + same args repeated once = 1 re-fetch; the different-args call is normal progress.
         CallScorer.TaskScore s = CallScorer.score(t, CATALOG,
                 result(call("t:gold", "A"), call("t:gold", "A"), call("t:gold", "B")));
-        assertThat(s.reFetches()).isEqualTo(2);
+        assertThat(s.reFetches()).isEqualTo(1);
+        // Three different-argument calls to the same tool (reading three files) are not re-fetches.
+        CallScorer.TaskScore progress = CallScorer.score(t, CATALOG,
+                result(call("t:gold", "A"), call("t:gold", "B"), call("t:gold", "C")));
+        assertThat(progress.reFetches()).isZero();
     }
 
     @Test

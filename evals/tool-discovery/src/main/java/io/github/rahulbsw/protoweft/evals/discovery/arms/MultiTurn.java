@@ -2,10 +2,12 @@ package io.github.rahulbsw.protoweft.evals.discovery.arms;
 
 import io.github.rahulbsw.protoweft.evals.discovery.data.EvalTask;
 import io.github.rahulbsw.protoweft.evals.discovery.fixtures.MockResultProvider;
+import io.github.rahulbsw.protoweft.evals.discovery.llm.ToolCall;
 import io.github.rahulbsw.protoweft.evals.discovery.shaping.HistoryPolicy;
 import io.github.rahulbsw.protoweft.evals.discovery.shaping.ResultPolicy;
 
 import java.util.Objects;
+import java.util.function.UnaryOperator;
 
 /**
  * The run-wide multi-turn context passed to arms when {@code --multiturn} is set: one shared
@@ -36,8 +38,18 @@ public record MultiTurn(MockResultProvider provider, int maxTurns) {
         return Math.max(maxTurns, goldCalls(task) + 1);
     }
 
-    /** The mock mode for a task with the arm's shaping policies. */
+    /** The mock mode for a task with the arm's shaping policies (direct calls, identity lookup). */
     public ToolLoop.MockMode mode(EvalTask task, ResultPolicy resultPolicy, HistoryPolicy historyPolicy) {
-        return new ToolLoop.MockMode(provider, goldCalls(task), resultPolicy, historyPolicy);
+        return mode(task, resultPolicy, historyPolicy, UnaryOperator.identity());
+    }
+
+    /**
+     * As {@link #mode(EvalTask, ResultPolicy, HistoryPolicy)}, with a {@code fixtureCall} that maps
+     * the transport call to the logical (tool, arguments) used for fixture lookup — for discovery
+     * arms whose selection wraps the real call in {@code call_capability}.
+     */
+    public ToolLoop.MockMode mode(EvalTask task, ResultPolicy resultPolicy, HistoryPolicy historyPolicy,
+                                  UnaryOperator<ToolCall> fixtureCall) {
+        return new ToolLoop.MockMode(provider, goldCalls(task), resultPolicy, historyPolicy, fixtureCall);
     }
 }
