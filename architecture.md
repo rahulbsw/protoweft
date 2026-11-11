@@ -47,7 +47,7 @@ compatibility matrix. Each module's own decisions live in its `SPEC.md`, linked 
 | | `protoweft-spring-boot-starter` | Spring Boot 4 auto-configuration; every protocol optional | `protoweft-spring-boot-starter` |
 | Packaging | `protoweft-bom` | Version alignment (`java-platform`) | — |
 | Not published | `examples/*`, `evals/tool-discovery` | Runnable examples; the discovery evaluation harness | `evals-tool-discovery` |
-| | `conformance/*` | Apps under test for the official MCP conformance suite and the A2A TCK | (this spec) |
+| | `conformance/*` | Apps under test for the official MCP conformance suite, the A2A TCK and Protoweft's AG-UI checker | (this spec) |
 | | `templates/*`, `jbang/` | Copyable starter projects (separate Gradle builds) and a JBang demo | — |
 
 Dependency rules, enforced by module boundaries:
@@ -168,7 +168,11 @@ Dependency rules, enforced by module boundaries:
   conformance suite (`@modelcontextprotocol/conformance`, server and client) and the A2A TCK in
   `.github/workflows/conformance.yml`. Each suite has a baseline (`conformance/*-baseline.yml`)
   whose entries name an unsupported feature id or a precise bug; an unexpected failure or a stale
-  entry fails the job. Results and every baselined item are published in the docs. The suites
+  entry fails the job. Results and every baselined item are published in the docs. AG-UI has no
+  official suite, so its checker is Protoweft's own (`AgUiConformance`, run against
+  `conformance/agui-sut` with the same baseline rules). Its independence comes from the interop job,
+  which runs the official TypeScript client against Protoweft's server, and Protoweft's client and
+  the checker against an agent on the official Python SDK. The suites
   found two real gaps that unit tests had missed — embedded resources in MCP tool results and
   inline A2A file names — which led to `Content.Resource` and `Data.name`.
 - **Release only through the gate.** `com.vanniktech.maven.publish` publishes the `protoweft-*`
@@ -204,7 +208,7 @@ Dependency rules, enforced by module boundaries:
 | **A2A** | `1.0` (prior `0.3.0`, `0.2.6`, `0.1.0`) | `org.a2aproject.sdk` **1.5.0.Final** (spec 1.0) | Client and full-lifecycle server over JSON-RPC; A2A TCK `1.0.0.alpha3` MUST level passes with an empty baseline. Not built: gRPC and HTTP+JSON bindings, card signatures, multi-tenancy |
 | **UTCP** | **`1.1`** (`1.0` manuals accepted) | none (Python, TypeScript and Go only) | Client (http, text and file manuals; http tools; api_key, basic and oauth2 auth) and manual provider. Not built: YAML, OpenAPI conversion, non-HTTP tool templates |
 | **RAP** | unversioned; recorded as `infinity@e1a3e4b` | none (Rust `rap-protocol`/`rap-client` 0.2.0 and JS `rap-js` only) | Client and tool server: toolset discovery, invocation, text and image results, subscriptions, OAuth and user-choice prompts, cancellation, thread closure, durable state; interop tested both ways against Hydro's JS and Rust implementations at `e1a3e4b` (`scripts/interop/rap.sh`). Not built: view updates, migration, `display_as`, `displayScript`, argument validation against `inputSchema` |
-| **AG-UI** | **`1.0`** (in-band `MAJOR.MINOR`) | none official (TypeScript, Python, .NET first-party; community Java SDK not used) | Agent server over HTTP + SSE: all 31 event types, interrupts, frontend tools, version negotiation, opt-in CORS, `GET <path>/capabilities` (a Protoweft convention); every event checked against the spec's sequence rules before sending. Client: the consumer pipeline (drop and strip with warnings, chunk expansion, verification), conversations with state, interrupts and resume checks, an opt-in tool bridge with consent, `AgentConnector` with an `ask` tool. Not built: the HTTP + Protobuf binding |
+| **AG-UI** | **`1.0`** (in-band `MAJOR.MINOR`) | none official (TypeScript, Python, .NET first-party; community Java SDK not used) | Agent server over HTTP + SSE: all 31 event types, interrupts, frontend tools, version negotiation, opt-in CORS, `GET <path>/capabilities` (a Protoweft convention); every event checked against the spec's sequence rules before sending; checked by `AgUiConformance` and by interop with the official TypeScript (`@ag-ui/client` 1.0.4) and Python (`ag-ui-protocol` 1.0.0) SDKs in CI. Client: the consumer pipeline (drop and strip with warnings, chunk expansion, verification), conversations with state, interrupts and resume checks, an opt-in tool bridge with consent, `AgentConnector` with an `ask` tool. Not built: the HTTP + Protobuf binding |
 
 Frameworks: LangChain4j 1.23.0, Spring AI 2.0.2, ARGI 2.1.0-RC1 (plus ARGI main at
 `a869538` for `protoweft-argi-neutral`), Spring Boot 4.1.2.

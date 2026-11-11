@@ -186,6 +186,25 @@ contract has no words for (state, activity, reasoning, subagents, the applicatio
   `WORKING`, text deltas as `response` artifact chunks, final status. The descriptor comes from
   the builder or the capabilities document's `identity`.
 
+### Conformance checker (`AgUiConformance`)
+
+AG-UI has no official conformance suite, so the module ships one for producers (decided with the
+user: inside the module, public, with a `main`, offered as the JBang alias `agui-conformance`, no
+dependency beyond Jackson 3). It sends runs to any agent URL and reports 12 checks with stable ids:
+
+- **Binding:** `binding/run-starts`, `binding/lf-framing`, `binding/one-event-per-frame`.
+- **Event shapes:** `events/described-shapes`, using the module's own decoder in strict mode. Any
+  warning is a failure, because a producer may emit only described shapes and must omit absent
+  fields rather than send `null`.
+- **Run lifecycle:** `lifecycle/sequence` (chunk expansion, then the verifier), `lifecycle/terminal`,
+  `lifecycle/identity`.
+- **Version:** `version/declared`, `version/newer-minor-served`.
+- **Input:** `input/unknown-member-served`, `input/malformed-rejected`,
+  `input/missing-required-rejected`.
+
+Rejecting another major version is left unchecked, because the spec makes it optional (MAY). The
+JSON report and the exit code feed a baseline (`conformance/agui-baseline.yml`, empty) in CI.
+
 ## Spec rules implemented
 
 Event model and envelope; run input (all fields); metadata kept open; streaming triads with
@@ -227,10 +246,32 @@ expansion and the tool bridge. Both report `binding/http-protobuf` as unsupporte
   coverage and expiry, read-only tools run, approval required / declined / given, argument
   checks, application tools handed to the application, the connector (states, resume, `ask`),
   `MESSAGES_SNAPSHOT` reconciliation.
+- The checker passes a Protoweft server and catches each kind of broken producer (CR framing,
+  `null` and unknown members, sequence errors, missing terminal event and version, wrong identity,
+  bad frames) in `AgUiConformanceTest`.
 - Jazzer fuzz targets for the run-input and event parsers, the client's whole reading path (raw
   bytes through SSE, decoding, chunk expansion, verification) and JSON Patch, with regression
   seeds (including the fuzzer's finds: huge numbers, token counts beyond 2^53−1), in the CI fuzz
   job.
+
+## Interoperability
+
+`scripts/interop/agui.sh`, run in CI on every pull request (`conformance.yml`, job
+`agui-interop`). Versions are pinned with integrity hashes: `interop/agui/ts/package-lock.json` and
+`interop/agui/python/requirements.txt`, both under Dependabot.
+
+- **Direction A: official TypeScript client → Protoweft server.** `@ag-ui/client` 1.0.4, whose own
+  enforcement stage validates every stream, drives `conformance/agui-sut`. It covers every event
+  family, state applied as `{"turns": 2}`, a frontend tool round trip, and interrupt then resume.
+  Result: passes.
+- **Direction B: Protoweft client → official Python SDK.** `interop/agui/python/server.py` is an
+  agent on `ag-ui-protocol` 1.0.0 that streams replies as `TEXT_MESSAGE_CHUNK`.
+  `OfficialPythonAgentInteropTest` (gated by `AGUI_INTEROP_PYTHON_URL`) runs `AgUiThread` against
+  it, covering chunk expansion, state, the frontend tool and interrupt/resume, plus
+  `AgUiClientConnector` and the checker. Result: passes, with no warnings. The official agent
+  passing all 12 checks also cross-checks the checker.
+- **Browser smoke (local, not in CI).** The `examples/agui-web` page runs in Chrome against
+  `conformance/agui-sut`: streamed text, a tool card, shared state, and a frontend tool round trip.
 
 ## Sources
 

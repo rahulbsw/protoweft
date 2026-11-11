@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: agui-web
+  ai:
+    openai:
+      # Empty means "no key": the application still starts, model calls are rejected.
+      api-key: ${OPENAI_API_KEY:}
+      # base-url: http://localhost:11434   # any OpenAI-compatible server, e.g. Ollama
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-4o-mini}
+
+server:
+  port: 8080
+
+protoweft:
+  server:
+    agui:
+      enabled: true                    # POST /agui (runs), GET /agui/capabilities
+      name: Protoweft web assistant
+      description: Answers questions, looks up temperatures and can recolour the page
+      # The page is served from this application, so CORS is not needed. A page served elsewhere
+      # (a dev server, CopilotKit's runtime calling from the browser) needs its origin listed:
+      allowed-origins: http://localhost:5173

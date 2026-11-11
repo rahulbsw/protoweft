@@ -113,6 +113,7 @@ Run an example:
 ./gradlew :examples:mcp-client-example:run          # MCP client against a bundled stdio server
 ./gradlew :examples:plain-java-gateway:run          # one tool and agent over MCP, UTCP, A2A and RAP
 ./gradlew :examples:spring-boot-example:bootRun     # the same in Spring Boot
+./gradlew :examples:agui-web:bootRun                # a Spring AI agent behind an AG-UI browser page (see its README)
 ```
 
 ## Documentation

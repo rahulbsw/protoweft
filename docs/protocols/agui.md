@@ -279,6 +279,56 @@ The conversation id is both the task id and the context id. `getTask` is unsuppo
 tasks); `cancel` closes the stream of the run in flight; `thread(taskId)` gives the `AgUiThread`.
 While streaming, the assistant's text arrives as chunks of a `response` artifact.
 
+## Checking an AG-UI agent
+
+AG-UI has no official conformance suite, so `protoweft-agui` ships a checker for the producer
+rules of specification 1.0. It works against any AG-UI agent, whichever language it is written in:
+
+```bash
+jbang agui-conformance@rahulbsw/protoweft https://agents.example.com/agent --bearer "$TOKEN"
+```
+
+or from Java (for example in your own tests):
+
+```java
+AgUiConformance.Report report = AgUiConformance.builder(URI.create("http://localhost:8080/agui")).build().run();
+assertThat(report.passed()).as(report.text()).isTrue();
+```
+
+It sends a few runs and checks:
+
+- **The binding:** 200 with `text/event-stream`, LF framing, one event per `data:` frame.
+- **Event shapes:** only shapes the specification describes, with absent fields omitted rather
+  than `null`. A producer must not rely on consumers stripping extras, so extras fail here.
+- **The run lifecycle:** ordering, a terminal event, and the input's thread and run ids.
+- **The version:** declared on `RUN_STARTED`, and a newer minor still served.
+- **Input:** unknown input members served; malformed or incomplete input rejected before the
+  stream starts.
+
+`--json` prints a machine-readable report; the exit code is 0 only when every check passes.
+Protoweft's own server is checked on every pull request, and so is an agent built on the official
+Python SDK; see [Conformance testing](../operations/conformance.md).
+
+## Example: a browser page and CopilotKit
+
+`examples/agui-web` serves a Spring AI agent over AG-UI. Its page uses the official
+`@ag-ui/client` from the browser and shows:
+
+- streamed text;
+- the agent's tool calls, as cards;
+- a frontend tool the page runs itself (`set_theme`);
+- the shared state.
+
+To use the same agent from [CopilotKit](https://docs.copilotkit.ai), register its URL as an AG-UI
+`HttpAgent` in CopilotKit's runtime:
+
+```ts
+import { HttpAgent } from "@ag-ui/client";
+const runtime = new CopilotRuntime({
+  agents: { assistant: new HttpAgent({ url: "http://localhost:8080/agui" }) },
+});
+```
+
 ## Coverage
 
 | | Server | Client |

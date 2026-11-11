@@ -29,6 +29,10 @@ All notable changes to Protoweft are documented here. The format follows
   LangChain4j agents use the frontend's conversation (`LangChain4jAgents.chatMemory`); ARGI
   approvals become AG-UI interrupts; Protoweft and LangChain4j tool calls are shown in the stream.
   The Spring Boot starter adds `protoweft.server.agui.*` and `protoweft.agui.agents.*`.
+  `AgUiConformance` checks any AG-UI agent against the producer rules of spec 1.0, from Java or as
+  the JBang alias `agui-conformance`. CI runs it against Protoweft's server and runs interop in both
+  directions with the official TypeScript and Python SDKs. `examples/agui-web` adds a browser page
+  on `@ag-ui/client`.
   `AgUiAgentServer` serves an agent to AG-UI frontends over HTTP + SSE: all 31 event types,
   interrupts, frontend tool calls, version negotiation, opt-in CORS and a capabilities document
   at `GET <path>/capabilities`. Every event is checked against the spec's sequence rules before it

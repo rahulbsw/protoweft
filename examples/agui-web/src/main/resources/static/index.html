@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Protoweft · AG-UI</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Protoweft AG-UI agent</h1>
+      <p>A Spring AI agent served with <code>protoweft-agui</code>, talked to with the official
+        <code>@ag-ui/client</code>. Try “What is the temperature in Oslo?” or “Make the page teal”.</p>
+    </header>
+    <p id="loading" class="bubble error">The page script is not built yet: run
+      <code>npm ci &amp;&amp; npm run build</code> in <code>examples/agui-web/frontend</code>.</p>
+    <section id="log" aria-live="polite"></section>
+    <form id="ask">
+      <input id="message" autocomplete="off" placeholder="Ask the agent…" aria-label="Message">
+      <button type="submit">Send</button>
+    </form>
+    <details>
+      <summary>Shared state</summary>
+      <pre id="state">{}</pre>
+    </details>
+  </main>
+</body>
+</html>

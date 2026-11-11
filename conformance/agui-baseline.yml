@@ -1,0 +1,6 @@
+# Expected failures of Protoweft's AG-UI server (conformance/agui-sut, AgUiAgentServer) in the
+# AG-UI 1.0 conformance checker (io.github.rahulbsw.protoweft.agui.AgUiConformance), run by
+# scripts/conformance/agui.sh. Each entry is a check id ("- binding/lf-framing") with a comment
+# naming the unsupported feature or the bug. A failure not listed here, or an entry that now
+# passes, fails the run. There are none.
+expected-failures: []
