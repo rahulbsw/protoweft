@@ -6,7 +6,11 @@ dependencies {
     api("dev.langchain4j:langchain4j:${project.property("langchain4jVersion")}")
     // Jackson 2 is already a compile dependency of LangChain4j; no version here so LangChain4j's governs.
     implementation("com.fasterxml.jackson.core:jackson-databind")
+    // Optional: AgUiHistory, used only when an AI Service is served over AG-UI.
+    compileOnly(project(":protoweft-agui"))
 
+    testImplementation(project(":protoweft-agui"))
+    testImplementation(project(":protoweft-server-jetty"))
     testImplementation(platform("org.junit:junit-bom:${project.property("junitVersion")}"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:${project.property("assertjVersion")}")

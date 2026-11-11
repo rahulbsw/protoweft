@@ -25,6 +25,10 @@ All notable changes to Protoweft are documented here. The format follows
   pipeline (unknown material dropped with warnings, chunks expanded, sequence verified),
   conversations with state and interrupts, and an opt-in bridge that offers Protoweft tools to the
   agent and runs its calls (read-only tools automatically, others only with approval).
+  Spring AI agents over AG-UI use the frontend's conversation and the frontend's own tools;
+  LangChain4j agents use the frontend's conversation (`LangChain4jAgents.chatMemory`); ARGI
+  approvals become AG-UI interrupts; Protoweft and LangChain4j tool calls are shown in the stream.
+  The Spring Boot starter adds `protoweft.server.agui.*` and `protoweft.agui.agents.*`.
   `AgUiAgentServer` serves an agent to AG-UI frontends over HTTP + SSE: all 31 event types,
   interrupts, frontend tool calls, version negotiation, opt-in CORS and a capabilities document
   at `GET <path>/capabilities`. Every event is checked against the spec's sequence rules before it
@@ -102,8 +106,8 @@ All notable changes to Protoweft are documented here. The format follows
   Gradle dependency verification, SHA-pinned actions and OpenSSF Scorecard.
 
 ### Changed
-- Streaming agents no longer report answer tokens as `working` status text. The Spring AI and
-  LangChain4j streaming handlers send them with `textDelta`, which the A2A server streams as
+- Streaming agents no longer report answer tokens as `working` status text. The Spring AI,
+  LangChain4j and ARGI streaming handlers send them with `textDelta`, which the A2A server streams as
   chunks of one appended `response` artifact, replaced by the whole text as the last chunk; they
   no longer add a separate final `response` artifact.
 - `InboundAuthFilter` lets CORS preflight requests (`OPTIONS` with `Origin` and

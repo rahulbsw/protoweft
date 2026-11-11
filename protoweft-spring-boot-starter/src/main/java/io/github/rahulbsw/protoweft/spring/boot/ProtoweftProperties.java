@@ -30,6 +30,7 @@ public class ProtoweftProperties {
     private final Utcp utcp = new Utcp();
     private final A2a a2a = new A2a();
     private final Rap rap = new Rap();
+    private final AgUi agui = new AgUi();
 
     public boolean isFailFast() {
         return failFast;
@@ -57,6 +58,51 @@ public class ProtoweftProperties {
 
     public Rap getRap() {
         return rap;
+    }
+
+    public AgUi getAgui() {
+        return agui;
+    }
+
+    /** AG-UI client connectors. */
+    public static class AgUi {
+
+        /** Remote AG-UI agents, by registry name; each is offered as the tool {@code <name>.ask}. */
+        private Map<String, AgUiAgent> agents = new LinkedHashMap<>();
+
+        public Map<String, AgUiAgent> getAgents() {
+            return agents;
+        }
+
+        public void setAgents(Map<String, AgUiAgent> agents) {
+            this.agents = agents;
+        }
+    }
+
+    /** One remote AG-UI agent. */
+    public static class AgUiAgent {
+
+        /** The agent's endpoint URL (the URL runs are POSTed to). */
+        private String url;
+
+        /** How long to wait for a run's response to start (connector default: 60 seconds). */
+        private Duration responseTimeout;
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public Duration getResponseTimeout() {
+            return responseTimeout;
+        }
+
+        public void setResponseTimeout(Duration responseTimeout) {
+            this.responseTimeout = responseTimeout;
+        }
     }
 
     /** Discovery of {@code @AgentTool} beans. */

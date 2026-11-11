@@ -7,11 +7,15 @@ import io.github.rahulbsw.protoweft.core.agent.AgentTaskContext;
 import io.github.rahulbsw.protoweft.core.tool.Content;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import reactor.core.Disposable;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -48,6 +52,8 @@ public final class SpringAiAgents {
     public static final String ARTIFACT_NAME = "response";
 
     private static final long POLL_MILLIS = 100;
+    /** Whether {@code protoweft-agui} is on the classpath; {@link AgUiPrompts} is loaded only if so. */
+    private static final boolean AGUI = present("io.github.rahulbsw.protoweft.agui.AgUi");
     private static final Object COMPLETE = new Object();
 
     private SpringAiAgents() {
@@ -67,13 +73,14 @@ public final class SpringAiAgents {
         Objects.requireNonNull(chatClient, "chatClient");
         Objects.requireNonNull(customizer, "customizer");
         return (request, task) -> {
-            if (request.text().isBlank()) {
+            Prepared prepared = prepare(chatClient, customizer, request, task);
+            if (prepared == null) {
                 task.fail("the message has no text");
                 return;
             }
             String answer;
             try {
-                answer = prompt(chatClient, customizer, request).call().content();
+                answer = text(prepared.spec().call().chatResponse(), prepared.applicationTools());
             } catch (Exception e) {
                 task.fail(message(e));
                 return;
@@ -98,14 +105,15 @@ public final class SpringAiAgents {
         Objects.requireNonNull(chatClient, "chatClient");
         Objects.requireNonNull(customizer, "customizer");
         return (request, task) -> {
-            if (request.text().isBlank()) {
+            Prepared prepared = prepare(chatClient, customizer, request, task);
+            if (prepared == null) {
                 task.fail("the message has no text");
                 return;
             }
             BlockingQueue<Object> events = new LinkedBlockingQueue<>();
             Disposable subscription;
             try {
-                subscription = prompt(chatClient, customizer, request).stream().content()
+                subscription = prepared.spec().stream().chatResponse()
                         .subscribe(events::add, events::add, () -> events.add(COMPLETE));
             } catch (Exception e) {
                 task.fail(message(e));
@@ -114,8 +122,8 @@ public final class SpringAiAgents {
             try {
                 while (!task.isCancelled()) {
                     Object event = events.poll(POLL_MILLIS, TimeUnit.MILLISECONDS);
-                    if (event instanceof String chunk) {
-                        task.textDelta(chunk);
+                    if (event instanceof ChatResponse chunk) {
+                        task.textDelta(text(chunk, prepared.applicationTools()));
                     } else if (event == COMPLETE) {
                         task.complete();
                         return;
@@ -149,16 +157,59 @@ public final class SpringAiAgents {
         return request.taskId() != null ? request.taskId() : UUID.randomUUID().toString();
     }
 
-    private static ChatClient.ChatClientRequestSpec prompt(ChatClient chatClient,
-                                                           BiConsumer<AgentRequest, ChatClient.ChatClientRequestSpec> customizer,
-                                                           AgentRequest request) {
+    /** A prepared request and the names of the application tools it offers (AG-UI only). */
+    private record Prepared(ChatClient.ChatClientRequestSpec spec, Set<String> applicationTools) {
+    }
+
+    /**
+     * The request for one message: the message as the user text, or over AG-UI the run's whole
+     * conversation and the application's tools. {@code null} if there is nothing to send.
+     */
+    private static Prepared prepare(ChatClient chatClient,
+                                    BiConsumer<AgentRequest, ChatClient.ChatClientRequestSpec> customizer,
+                                    AgentRequest request, AgentTaskContext task) {
         String conversationId = conversationId(request);
         ChatClient.ChatClientRequestSpec spec = chatClient.prompt()
-                .user(request.text())
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
-                .toolContext(Map.of(ProtoweftToolCallbacks.CALLER_KEY, request.caller()));
+                .toolContext(Map.of(ProtoweftToolCallbacks.CALLER_KEY, request.caller(),
+                        ProtoweftToolCallbacks.TASK_KEY, task));
+        Set<String> applicationTools = Set.of();
+        Optional<?> agUi = AGUI ? AgUiPrompts.run(task) : Optional.empty();
+        if (agUi.isPresent()) {
+            applicationTools = AgUiPrompts.apply(spec, (io.github.rahulbsw.protoweft.agui.AgUiRun) agUi.get());
+        } else if (request.text().isBlank()) {
+            return null;
+        } else {
+            spec.user(request.text());
+        }
         customizer.accept(request, spec);
-        return spec;
+        return new Prepared(spec, applicationTools);
+    }
+
+    /** The response's text, without the placeholders Spring AI returns for the application's tools. */
+    private static String text(ChatResponse response, Set<String> applicationTools) {
+        if (response == null) {
+            return "";
+        }
+        StringBuilder text = new StringBuilder();
+        for (Generation g : response.getResults()) {
+            if (AGUI && !applicationTools.isEmpty() && AgUiPrompts.isApplicationToolResult(g, applicationTools)) {
+                continue;
+            }
+            if (g.getOutput() != null && g.getOutput().getText() != null) {
+                text.append(g.getOutput().getText());
+            }
+        }
+        return text.toString();
+    }
+
+    private static boolean present(String className) {
+        try {
+            Class.forName(className, false, SpringAiAgents.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
     }
 
     private static void finish(AgentTaskContext task, String answer) {

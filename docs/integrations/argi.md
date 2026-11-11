@@ -154,7 +154,9 @@ A2aAgentServer server = A2aAgentServer.builder(handler, card).build();
   `"Exception: ..."` assistant answer, which completes the task. Set `throwOnModelError(true)` to
   fail it instead.
 - **Streaming.** `streamingHandler` (or `builder(agent).streaming(true)`) uses `Agent.stream`, and
-  model text chunks become `working` statuses. Cancelling the task disposes the subscription.
+  model text chunks are streamed with `textDelta` (over A2A: chunks of the `response` artifact).
+  The answer is added as an artifact only when it differs from the streamed text. Cancelling the
+  task disposes the subscription.
 - **A saver is required.** Building a handler for an agent without a checkpoint saver fails with
   `IllegalArgumentException` naming `MemorySaver`.
 
@@ -187,6 +189,25 @@ curl -s -X POST localhost:8080/a2a -H 'Content-Type: application/json' -H 'A2A-V
 Interrupts without tool feedback (for example ARGI's `interruptBefore`) fail the task, because
 there is nothing to approve. A reply on a task the handler has no paused run for (for example after
 a restart) fails with a clear message rather than running the pending calls.
+
+### Agents over AG-UI, with approvals as interrupts
+
+`AgUiAgentServer.builder(AgUi.agent(ArgiAgents.streamingHandler(agent)))` serves an ARGI agent to
+AG-UI frontends. A tool call that needs approval ends the run with one AG-UI **interrupt per
+call**:
+
+- the interrupt id is the tool call id, and its reason is `tool_approval`;
+- its message names the tool, its description and arguments, and so does its metadata
+  (`toolName`, `arguments`);
+- its response schema asks for `decision` (`approved`, `rejected` or `edited`), plus `arguments`
+  for an edit or `reason` for a rejection.
+
+The frontend answers with `resume` entries on the next run. The payload may be such a decision
+object, or text such as `approve` or `reject too much`. An abandoned interrupt rejects the call.
+If an answer is incomplete or not understood, the run ends with the remaining interrupts again.
+ARGI keeps its conversation in its checkpoint, keyed by the AG-UI thread id.
+
+Not supported yet: offering the frontend's own tools to ARGI agents.
 
 ### Limitations
 

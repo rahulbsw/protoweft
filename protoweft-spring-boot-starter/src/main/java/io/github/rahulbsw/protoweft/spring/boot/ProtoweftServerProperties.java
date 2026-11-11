@@ -22,6 +22,7 @@ public class ProtoweftServerProperties {
     private final UtcpServer utcp = new UtcpServer();
     private final A2aServer a2a = new A2aServer();
     private final RapServer rap = new RapServer();
+    private final AgUiServer agui = new AgUiServer();
 
     public int getAuthFilterOrder() {
         return authFilterOrder;
@@ -45,6 +46,80 @@ public class ProtoweftServerProperties {
 
     public RapServer getRap() {
         return rap;
+    }
+
+    public AgUiServer getAgui() {
+        return agui;
+    }
+
+    /** The AG-UI agent endpoint (HTTP + SSE), for browser frontends such as CopilotKit. */
+    public static class AgUiServer {
+
+        /** Whether to serve the application's agent over AG-UI. */
+        private boolean enabled;
+
+        /** Serve the application's Spring AI ChatClient as the agent (when there is no AgentHandler or AgUiAgent bean). */
+        private boolean fromChatClient;
+
+        /** The agent's path; its capabilities document is at {@code <path>/capabilities}. */
+        private String path = "/agui";
+
+        /** Browser origins allowed to call the agent cross-origin ({@code *} for any); empty means no CORS. */
+        private List<String> allowedOrigins = new ArrayList<>();
+
+        /** The agent's name, published in its capabilities document. */
+        private String name;
+
+        /** What the agent does, published in its capabilities document. */
+        private String description;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public boolean isFromChatClient() {
+            return fromChatClient;
+        }
+
+        public void setFromChatClient(boolean fromChatClient) {
+            this.fromChatClient = fromChatClient;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public void setPath(String path) {
+            this.path = path;
+        }
+
+        public List<String> getAllowedOrigins() {
+            return allowedOrigins;
+        }
+
+        public void setAllowedOrigins(List<String> allowedOrigins) {
+            this.allowedOrigins = allowedOrigins;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
     }
 
     /** Which tools a tool server publishes. */

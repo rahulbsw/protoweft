@@ -117,8 +117,35 @@ A2aAgentServer server = A2aAgentServer.builder(handler, card).publicUrl("https:/
   message.
 - **Streaming.** Each partial response is streamed with `textDelta` (over A2A: a chunk of the
   `response` artifact), and no separate final artifact is added; if the model streamed nothing,
-  the complete response's text becomes the artifact. Callbacks are replayed on the handler's thread. Cancelling stops
+  the complete response's text becomes the artifact. Tool calls the AI Service makes are reported
+  with `toolCall`/`toolResult` (shown over AG-UI). Callbacks are replayed on the handler's thread. Cancelling stops
   listening, but LangChain4j's stream itself isn't aborted.
+
+### Over AG-UI
+
+The same handlers serve an AI Service to AG-UI frontends:
+`AgUiAgentServer.builder(AgUi.agent(LangChain4jAgents.streamingHandler(assistant::chat)))`.
+
+AG-UI clients send the whole conversation on every run. To let the AI Service use that
+conversation instead of its stored memory, build it with `LangChain4jAgents.chatMemory(...)`,
+wrapping the memory it would use otherwise:
+
+```java
+Assistant assistant = AiServices.builder(Assistant.class)
+        .streamingChatModel(model)
+        .chatMemoryProvider(LangChain4jAgents.chatMemory(id -> MessageWindowChatMemory.withMaxMessages(20)))
+        .build();
+```
+
+While an AG-UI run is in flight for a conversation, the AI Service sees that run's conversation.
+The wrapped memory is left untouched, and A2A requests keep using it. Without the wrapper, AG-UI
+runs use the stored memory, and a warning is logged once.
+
+With `streamingHandler`, tool calls the AI Service makes stream as AG-UI tool-call events with
+their results.
+
+Not supported yet: offering the frontend's own tools to LangChain4j agents. An AI Service always
+needs a new user message to continue, and after a frontend tool result there is none.
 
 ## `@Tool` methods out
 

@@ -21,12 +21,15 @@ dependencies {
 
     // Optional: only CatalogToolSelectionInterceptor needs it.
     compileOnly(project(":protoweft-discovery"))
+    // Optional: ArgiAgUi, used only when an ARGI agent is served over AG-UI.
+    compileOnly(project(":protoweft-agui"))
     // The interceptor reuses CatalogToolIndex's catalog callbacks, which load ToolIndex; the jar
     // has no required dependencies besides jackson-annotations (Lucene and vector store are optional).
     implementation("org.springframework.ai:spring-ai-tool-search-tool:$springAiVersion")
 
     testImplementation(project(":protoweft-discovery"))
     testImplementation(project(":protoweft-a2a"))
+    testImplementation(project(":protoweft-agui"))
     testImplementation(project(":protoweft-server-jetty"))
     testImplementation(platform("org.junit:junit-bom:${project.property("junitVersion")}"))
     testImplementation("org.junit.jupiter:junit-jupiter")

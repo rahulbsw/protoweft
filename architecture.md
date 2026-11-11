@@ -64,7 +64,9 @@ Dependency rules, enforced by module boundaries:
 - Integrations depend on what they wire. No protocol, discovery or core module depends on an
   integration, so plain-Java and non-Spring users take `core` plus the modules they need. The one
   integration-to-integration edge is `argi` → `spring-ai`, because ARGI 2.1.0-RC1's tool API *is*
-  Spring AI's `ToolCallback`.
+  Spring AI's `ToolCallback`. Spring AI, LangChain4j and ARGI depend on `protoweft-agui`
+  `compileOnly`, each touching it from one class loaded only when it is present, so their agents
+  can use AG-UI-only features without making the module a requirement.
 
 ## Core seams (`protoweft-core`)
 

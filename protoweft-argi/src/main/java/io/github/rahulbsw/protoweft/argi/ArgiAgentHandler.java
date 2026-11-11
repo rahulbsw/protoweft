@@ -33,6 +33,8 @@ import java.util.function.Function;
 final class ArgiAgentHandler implements AgentHandler {
 
     private static final long POLL_MILLIS = 100;
+    /** Whether {@code protoweft-agui} is on the classpath; {@link ArgiAgUi} is loaded only if so. */
+    private static final boolean AGUI = present("io.github.rahulbsw.protoweft.agui.AgUi");
     private static final Object COMPLETE = new Object();
 
     /** A paused run: ARGI's interruption and the decisions received so far, by tool call id. */
@@ -85,11 +87,12 @@ final class ArgiAgentHandler implements AgentHandler {
 
     private void resume(AgentRequest request, AgentTaskContext task, Pending paused) {
         List<ToolFeedback> calls = paused.interruption().toolFeedbacks();
-        ToolApprovals.Parsed parsed = ToolApprovals.parse(request.message(), calls, paused.decided());
+        ToolApprovals.Parsed parsed = ToolApprovals.parse(ToolApprovals.fromResumeEntries(request.message()), calls,
+                paused.decided());
         Pending next = new Pending(paused.threadId(), paused.interruption(), parsed.decided());
         if (parsed.error() != null || parsed.decided().size() < calls.size()) {
             pending.put(request.taskId(), next);
-            task.requireInput(ToolApprovals.question(calls, parsed.decided(), parsed.error()));
+            askApproval(task, calls, parsed.decided(), parsed.error());
             return;
         }
         InterruptionMetadata.Builder feedback = InterruptionMetadata.builder()
@@ -117,8 +120,10 @@ final class ArgiAgentHandler implements AgentHandler {
                      RunnableConfig.Builder config) {
         customizer.accept(request, config);
         Optional<NodeOutput> output;
+        StringBuilder streamed = new StringBuilder();
         try {
-            output = streaming ? stream(task, input, config.build()) : agent.invokeAndGetOutput(input, config.build());
+            output = streaming ? stream(task, input, config.build(), streamed)
+                    : agent.invokeAndGetOutput(input, config.build());
         } catch (Exception e) {
             task.fail(message(e));
             return;
@@ -137,18 +142,40 @@ final class ArgiAgentHandler implements AgentHandler {
                 return;
             }
             pending.put(request.taskId(), new Pending(thread, interruption, Map.of()));
-            task.requireInput(ToolApprovals.question(interruption.toolFeedbacks(), Map.of(), null));
+            askApproval(task, interruption.toolFeedbacks(), Map.of(), null);
             return;
         }
-        task.artifact(ArgiAgents.ARTIFACT_NAME, List.of(new Content.Text(answer(output.get().state()))));
+        String answer = answer(output.get().state());
+        if (!answer.equals(streamed.toString())) {
+            // Not already streamed: the agent's output key, or a non-streaming run.
+            task.artifact(ArgiAgents.ARTIFACT_NAME, List.of(new Content.Text(answer)));
+        }
         task.complete();
     }
 
+    /** Over AG-UI one interrupt per undecided call; elsewhere an input-required question. */
+    private static void askApproval(AgentTaskContext task, List<ToolFeedback> calls, Map<String, ToolFeedback> decided,
+                                    String problem) {
+        if (!(AGUI && ArgiAgUi.interrupt(task, calls, decided, problem))) {
+            task.requireInput(ToolApprovals.question(calls, decided, problem));
+        }
+    }
+
+    private static boolean present(String className) {
+        try {
+            Class.forName(className, false, ArgiAgentHandler.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
+    }
+
     /**
-     * Runs {@code Agent.stream}, reporting model text chunks as {@code working} on this thread, and
+     * Runs {@code Agent.stream}, streaming model text chunks with {@code textDelta} on this thread, and
      * returns the interruption if one was emitted, else the last output.
      */
-    private Optional<NodeOutput> stream(AgentTaskContext task, String input, RunnableConfig config) throws Exception {
+    private Optional<NodeOutput> stream(AgentTaskContext task, String input, RunnableConfig config,
+                                        StringBuilder streamed) throws Exception {
         BlockingQueue<Object> events = new LinkedBlockingQueue<>();
         Disposable subscription = agent.stream(input, config)
                 .subscribe(events::add, events::add, () -> events.add(COMPLETE));
@@ -163,7 +190,8 @@ final class ArgiAgentHandler implements AgentHandler {
                     last = out;
                     String chunk = chunk(out);
                     if (chunk != null) {
-                        task.working(chunk);
+                        streamed.append(chunk);
+                        task.textDelta(chunk);
                     }
                 } else if (event == COMPLETE) {
                     return Optional.ofNullable(interruption != null ? interruption : last);

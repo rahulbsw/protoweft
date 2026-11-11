@@ -92,4 +92,23 @@ public class ProtoweftSpringAiAutoConfiguration {
                     ? SpringAiAgents.streamingHandler(client) : SpringAiAgents.handler(client);
         }
     }
+
+    /**
+     * {@code protoweft.server.agui.from-chat-client=true}: serve the ChatClient as the AG-UI agent
+     * (streaming). The prompt is the conversation each run carries, so the ChatClient should not
+     * also have a chat-memory advisor.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = {"org.springframework.ai.chat.client.ChatClient",
+            "io.github.rahulbsw.protoweft.agui.AgUiAgentServer"})
+    @ConditionalOnProperty(prefix = "protoweft.server.agui", name = "from-chat-client", havingValue = "true")
+    static class ChatClientAgUiAgent {
+
+        @Bean
+        @ConditionalOnMissingBean(AgentHandler.class)
+        AgentHandler protoweftChatClientAgUiAgent(ObjectProvider<ChatClient> chatClient,
+                                                  ObjectProvider<ChatClient.Builder> builder) {
+            return SpringAiAgents.streamingHandler(chatClient.getIfUnique(() -> builder.getObject().build()));
+        }
+    }
 }

@@ -101,6 +101,15 @@ public class ProtoweftAutoConfiguration {
         }
     }
 
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = PropertiesValidator.AGUI_CLASS)
+    static class AgUiClients {
+        @Bean
+        ConnectorFactory protoweftAgUiConnectorFactory() {
+            return new AgUiConnectorFactory();
+        }
+    }
+
     /**
      * RAP connectors and what they share: the {@link RapStore} (also used by the RAP tool server)
      * and, with {@code protoweft.rap.callback.listener.enabled}, the built-in callback listener.

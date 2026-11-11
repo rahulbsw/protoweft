@@ -102,6 +102,27 @@ A handler reaches AG-UI-only features (shared state, activity, reasoning, subage
 application's tools) through `AgUi.run(task)`, which is empty when the task is served over
 another protocol.
 
+### Spring AI, LangChain4j and ARGI agents
+
+Their handlers know when they are served over AG-UI:
+
+| | Conversation | Frontend tools | Tool calls shown | Approvals |
+|---|---|---|---|---|
+| [Spring AI](../integrations/spring-ai.md#agents-out-over-ag-ui) `ChatClient` | from each run | yes | Protoweft tools | — |
+| [LangChain4j](../integrations/langchain4j.md#over-ag-ui) AI Service | from each run, with `LangChain4jAgents.chatMemory(...)` | not yet | yes (streaming) | — |
+| [ARGI](../integrations/argi.md#agents-over-ag-ui-with-approvals-as-interrupts) agent | ARGI's checkpoint | not yet | — | as interrupts |
+
+### Spring Boot
+
+```properties
+protoweft.server.agui.enabled=true
+protoweft.server.agui.allowed-origins=https://app.example.com
+protoweft.server.agui.from-chat-client=true          # serve the ChatClient, if there is no AgentHandler
+protoweft.agui.agents.planner.url=https://agents.example.com/agent   # a remote AG-UI agent, as planner.ask
+```
+
+See the [property reference](../integrations/spring-boot.md#property-reference).
+
 ### Builder options
 
 | Option | Default | |

@@ -145,7 +145,7 @@ class ArgiAgentsTest {
     void streamingHandlerReportsChunksAndResumesApprovals() {
         ScriptedChatModel model = new ScriptedChatModel(callTool("bank__transfer", TRANSFER_10),
                 answer("Sent the money to bob."));
-        List<String> working = new CopyOnWriteArrayList<>();
+        List<String> chunks = new CopyOnWriteArrayList<>();
 
         try (A2aHarness server = new A2aHarness(ArgiAgents.streamingHandler(agent(model)));
              A2aAgentConnector client = server.client(null)) {
@@ -153,14 +153,16 @@ class ArgiAgentsTest {
             assertThat(first.state()).isEqualTo(TaskState.INPUT_REQUIRED);
 
             AgentReply second = client.send(AgentMessage.userReply(first.taskId(), first.contextId(), "yes"), event -> {
-                if (event instanceof AgentEvent.StatusUpdate s && s.state() == TaskState.WORKING && s.message() != null) {
-                    working.add(s.message().text());
+                if (event instanceof AgentEvent.ArtifactUpdate a && !a.lastChunk()) {
+                    chunks.add(((Content.Text) a.artifact().parts().get(0)).text());
                 }
             });
 
             assertThat(second.state()).isEqualTo(TaskState.COMPLETED);
             assertThat(second.text()).isEqualTo("Sent the money to bob.");
-            assertThat(working).contains("Sent ", "the ", "bob.");
+            assertThat(chunks).contains("Sent ", "the ", "bob.");   // streamed as response-artifact chunks
+            assertThat(second.artifacts()).singleElement()
+                    .satisfies(a -> assertThat(a.parts()).containsExactly(new Content.Text("Sent the money to bob.")));
             assertThat(transfers).containsExactly("bob:10 by anonymous");
         }
     }

@@ -113,6 +113,17 @@ Speaks AG-UI, the agent ↔ user-facing-application protocol, in both roles:
 `AgUi.run(task)` returns the `AgUiRun` behind a task served this way, for features the neutral
 contract has no words for (state, activity, reasoning, subagents, the application's tools).
 
+### Framework agents (owned by their integration specs)
+
+- Spring AI: the frontend's conversation as the prompt, the application's tools as
+  `returnDirect` callbacks, Protoweft tool calls reported (`protoweft-spring-ai`).
+- LangChain4j: the frontend's conversation through `LangChain4jAgents.chatMemory(...)`, tool calls
+  reported; the application's tools deferred (`protoweft-langchain4j`).
+- ARGI: approvals as `tool_approval` interrupts, resume entries as decisions; the application's
+  tools deferred (`protoweft-argi`).
+- Each integration depends on this module `compileOnly` and touches it only from one class,
+  loaded after a class-presence check, so it works without it.
+
 ### Client
 
 - **Pipeline** (`ConsumerPipeline`), in the spec's order: decode (drop unrecognised events, strip
