@@ -72,6 +72,7 @@ Nothing here is needed outside Spring. Every capability comes from `protoweft-co
 | `protoweft.mcp.clients.<name>` | `command` + `args` + `env` (stdio) **or** `url` + `endpoint` (`/mcp`) + `headers` (HTTP) · `request-timeout` |
 | `protoweft.utcp.manuals.<name>` | `url` **or** `file` · `headers` · `variables` · `discovery-timeout` · `call-timeout` |
 | `protoweft.a2a.agents.<name>` | `url` · `timeout` · `streaming` (true) |
+| `protoweft.agui.agents.<name>` | `url` · `response-timeout` (connector: 60 s) |
 | `protoweft.rap.servers.<name>` | `url` · `additional-urls` · `timeout` (connector: 10 min) · `request-timeout` (connector: 30 s) · `thread-id` |
 | `protoweft.rap` | `callback.public-base-url` · `callback.listener.enabled` (false) · `callback.listener.host` (`127.0.0.1`) · `callback.listener.port` (0) · `store.dir` |
 | `protoweft.server` | `auth-filter-order` (0) |
@@ -79,10 +80,11 @@ Nothing here is needed outside Spring. Every capability comes from `protoweft-co
 | `protoweft.server.utcp` | `enabled` · `base-url` · `expose` · `manual-version` · `api-key-header` + `api-key-variable` |
 | `protoweft.discovery` | `enabled` (false) · `fallback` (`progressive`\|`all-schemas`\|`none`) · `sources.<name>.required-scopes` · `expose-mcp` (false) · `mcp-path` (`/mcp-discovery`) |
 | `protoweft.server.a2a` | `enabled` · `public-url` · `path` (`/a2a`) · `name` · `description` · `version` · `skills[]` · `streaming` · `push-notifications` · `agent-timeout` |
+| `protoweft.server.agui` | `enabled` · `path` (`/agui`) · `allowed-origins` · `name` · `description` · `from-chat-client` |
 | `protoweft.server.rap` | `enabled` · `base-path` (`/rap`) · `base-url` · `expose` · `name` (`protoweft`) · `description` · `allowed-callback-hosts` · `choice-timeout` |
 
-`<name>` is the registry source name, so tools appear as `<name>.<tool>`; an A2A agent appears as
-`<name>.ask`. The configuration processor generates metadata, including the
+`<name>` is the registry source name, so tools appear as `<name>.<tool>`; an A2A or AG-UI agent
+appears as `<name>.ask`. The configuration processor generates metadata, including the
 `management.{health,info}.protoweft.enabled` switches.
 
 Properties are validated at startup, and errors are reported as
@@ -91,7 +93,8 @@ The checks:
 - An MCP client sets exactly one of `command` and `url`, and never uses options that belong to
   the other kind.
 - A UTCP manual sets exactly one of `url` and `file`.
-- An A2A agent has a `url`.
+- An A2A agent has a `url`. An AG-UI agent has an absolute http(s) `url`.
+- The AG-UI server's `path` starts with `/`, doesn't end with `/` and has no `*`.
 - A RAP connector has a `url`; it, its `additional-urls` and `protoweft.rap.callback.public-base-url`
   are absolute http(s) URLs. A `thread-id` isn't empty.
 - RAP connectors without a servlet web application need `protoweft.rap.callback.listener.enabled`.
@@ -239,6 +242,11 @@ The checks:
     becomes `RapCallbackPolicy.DEFAULT.allowingHosts(..)`; any other policy, a callback
     authorizer or retry policy needs an own `RapToolServer` bean. The bean is injectable, so the
     application can resume `recoveredSubscriptions()` after a restart.
+- **AG-UI (`protoweft-agui`).** `protoweft.server.agui.enabled` serves an `AgUiAgent` bean, else
+  the `AgentHandler` bean through `AgUi.agent`, else fails naming the property. `name` and
+  `description` become the capabilities document's `identity`; `allowed-origins` turns on CORS.
+  `AgUiConnectorFactory` builds an `AgUiClientConnector` per `protoweft.agui.agents.<name>`,
+  with the application's `CredentialProvider`.
 - **Actuator.**
   - Health `protoweft` reports connector lifecycle state; it doesn't probe peers on every check.
     It is DOWN if any connector failed, OUT_OF_SERVICE while any is pending, and UP otherwise.
@@ -258,6 +266,8 @@ The checks:
   - `protoweft.server.a2a.from-chat-client=true` serves the application's `ChatClient` (or one
     built from `ChatClient.Builder`) as the A2A agent when there's no `AgentHandler` bean. It
     streams when `protoweft.server.a2a.streaming` is true.
+  - `protoweft.server.agui.from-chat-client=true` does the same for AG-UI, always streaming. With
+    both set, one `AgentHandler` serves both protocols.
   - There's no ordering against the server auto-configuration, which resolves the
     `AgentHandler` lazily. Ordering it before would form a cycle with discovery.
   - Both builder additions are `ChatClientBuilderCustomizer` beans. Spring AI 2.0 deprecates
@@ -361,6 +371,11 @@ Not implemented:
     unknown token);
   - `allowed-callback-hosts` admits a named host and the default policy still refuses `10.x`;
   - a second, non-web context consumes the same server through the built-in listener.
+- **Real Tomcat, AG-UI (in `ProtoweftHttpTest`):** the echo agent is served at `/agui` behind the
+  authenticator (anonymous run → 401), a preflight from the allowed origin passes (204 with the
+  CORS header), the capabilities carry the configured name, and an AG-UI connector declared in
+  properties calls the app's own agent as `ui.ask`. `from-chat-client` for AG-UI yields one
+  `AgentHandler`, also together with A2A's.
 - **Real Tomcat with Spring Security:** HTTP Basic on `/mcp` rejects anonymous MCP clients, and
   the authenticated user reaches the tool as the caller, which proves the filter order.
 

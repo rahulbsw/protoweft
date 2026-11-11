@@ -1,7 +1,8 @@
 name: Conformance
 
 # The official MCP conformance suite (server and client scenarios) and the A2A TCK, run against
-# the apps in conformance/. Each job exits 0 only when every failure is listed in its baseline
+# the apps in conformance/, plus Protoweft's AG-UI checker and the AG-UI interop runs against the
+# official TypeScript and Python SDKs. Each job exits 0 only when every failure is listed in its baseline
 # (conformance/*-baseline.yml) and no baseline entry is stale. See docs/operations/conformance.md.
 
 on:
@@ -128,4 +129,59 @@ jobs:
         with:
           name: conformance-a2a-tck
           path: build/conformance/a2a-tck/
+          if-no-files-found: warn
+
+  agui-conformance:
+    name: AG-UI 1.0 conformance (checker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Run AgUiConformance against conformance/agui-sut
+        run: scripts/conformance/agui.sh
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: conformance-agui
+          path: build/conformance/agui/
+          if-no-files-found: warn
+
+  agui-interop:
+    name: AG-UI interop (official TypeScript and Python SDKs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        run: "python -m pip install --require-hashes --only-binary=:all: -r .github/requirements/uv.txt"
+      - name: Run both interop directions
+        env:
+          AGUI_INTEROP_PYTHON: python3.12
+        run: scripts/interop/agui.sh
+      - name: Build the examples/agui-web page (official @ag-ui/client in the browser)
+        working-directory: examples/agui-web/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund && npm run build
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interop-agui
+          path: build/interop/agui/
           if-no-files-found: warn

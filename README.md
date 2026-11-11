@@ -1,9 +1,9 @@
 # Protoweft
 
-**The protocol backbone for Java agents.** Protoweft puts the agent and tool interoperability
-protocols — [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org),
-[UTCP](https://www.utcp.io) and [RAP](https://infinity.hydro.run/docs/rap/what-is-rap) — behind one
-protocol-neutral Java 17 API, in both the client and the
+**The protocol backbone for Java agents.** Protoweft puts the agent interoperability protocols
+— [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org),
+[UTCP](https://www.utcp.io), [RAP](https://infinity.hydro.run/docs/rap/what-is-rap) and
+[AG-UI](https://docs.ag-ui.com) — behind one protocol-neutral Java 17 API, in both the client and the
 server role, with optional LangChain4j, Spring AI, ARGI and Spring Boot 4 integrations.
 
 ```java
@@ -27,11 +27,11 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
 
 ## Features
 
-- **One API, four protocols.** Application code depends on `ToolSource`, `ToolConnector` and
+- **One API, five protocols.** Application code depends on `ToolSource`, `ToolConnector` and
   `AgentConnector`; only the builder call names a protocol.
-- **Client and server for every protocol.** Consume MCP servers, UTCP manuals, RAP tool servers and
-  A2A agents; publish tools over MCP, UTCP and RAP and agents over A2A, all behind one
-  `InboundAuthenticator`.
+- **Client and server for every protocol.** Consume MCP servers, UTCP manuals, RAP tool servers, A2A
+  agents and AG-UI agents; publish tools over MCP, UTCP and RAP and agents over A2A and AG-UI (to
+  frontends such as CopilotKit), all behind one `InboundAuthenticator`.
 - **One tool registry.** `ToolRegistry` namespaces local methods, MCP servers, UTCP manuals, RAP
   tool servers and A2A agents (as an `ask` tool) as `<source>.<tool>`.
 - **Subscriptions.** A tool call can keep streaming events after its first result
@@ -56,6 +56,7 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
 | A2A | `A2aAgentConnector` | `A2aAgentServer` | JSON-RPC, SSE streaming | `1.0` | a2a-java `1.5.0.Final` |
 | UTCP | `UtcpClientConnector` | `UtcpManualProvider` | HTTP, text and file manuals; `http` and `text` tools | `1.1` (accepts `1.0`) | implemented from the spec |
 | RAP (Hydro Infinity) | `RapClientConnector` | `RapToolServer` | HTTP + JSON with callbacks; subscriptions, OAuth and choice prompts, cancellation, thread closure, durable store | unversioned; Infinity `e1a3e4b` | implemented from the spec |
+| AG-UI | `AgUiClientConnector`, `AgUiThread` | `AgUiAgentServer` | HTTP + SSE; all event families, interrupts, frontend tools (Protoweft tools offered to remote agents, with consent), opt-in CORS | `1.0` | implemented from the spec |
 
 Coverage and limitations are documented per protocol in the [user guide](docs/index.md).
 
@@ -72,6 +73,7 @@ Protoweft is not an LLM framework: it has no model clients, chains, memory or RA
 | `protoweft-a2a` | A2A client and agent server (JSON-RPC). |
 | `protoweft-utcp` | UTCP client and manual provider. |
 | `protoweft-rap` | RAP (Reactive Agent Protocol) client and tool server, with subscriptions, prompts and a durable store. |
+| `protoweft-agui` | AG-UI (Agent–User Interaction) client and agent server: Java agents behind any AG-UI frontend, and AG-UI agents called from Java. |
 | `protoweft-server`, `protoweft-server-jetty` | Servlet hosting contract and an embedded Jetty 12 host. |
 | `protoweft-oauth` | OAuth 2.1 for MCP authorization: client and resource-server pieces (Nimbus). |
 | `protoweft-discovery` | Capability catalog, hybrid search, fallback, sessions, meta-tools, provider payloads. |
@@ -111,6 +113,7 @@ Run an example:
 ./gradlew :examples:mcp-client-example:run          # MCP client against a bundled stdio server
 ./gradlew :examples:plain-java-gateway:run          # one tool and agent over MCP, UTCP, A2A and RAP
 ./gradlew :examples:spring-boot-example:bootRun     # the same in Spring Boot
+./gradlew :examples:agui-web:bootRun                # a Spring AI agent behind an AG-UI browser page (see its README)
 ```
 
 ## Documentation
@@ -121,7 +124,7 @@ Run an example:
   [errors and observability](docs/concepts/errors-and-observability.md),
   [versions and compliance](docs/concepts/compliance.md)
 - Protocols: [MCP](docs/protocols/mcp.md), [A2A](docs/protocols/a2a.md), [UTCP](docs/protocols/utcp.md),
-  [RAP](docs/protocols/rap.md)
+  [RAP](docs/protocols/rap.md), [AG-UI](docs/protocols/agui.md)
 - Integrations: [Spring Boot](docs/integrations/spring-boot.md),
   [LangChain4j](docs/integrations/langchain4j.md), [Spring AI](docs/integrations/spring-ai.md),
   [ARGI](docs/integrations/argi.md), [OAuth](docs/integrations/oauth.md),

@@ -24,6 +24,9 @@ public record ProtocolId(String value) {
     /** Reactive Agent Protocol (Hydro project / AWS Infinity). */
     public static final ProtocolId RAP = new ProtocolId("rap");
 
+    /** Agent–User Interaction Protocol (AG-UI). */
+    public static final ProtocolId AGUI = new ProtocolId("agui");
+
     public ProtocolId {
         Objects.requireNonNull(value, "value");
         if (value.isBlank()) {

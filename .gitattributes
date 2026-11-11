@@ -1,0 +1,2 @@
+# Fuzz seeds are byte-exact inputs (some carry CR/CRLF on purpose).
+**/*FuzzTestInputs/** -text

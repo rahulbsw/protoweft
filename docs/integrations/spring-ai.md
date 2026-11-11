@@ -221,6 +221,32 @@ A2aAgentServer server = A2aAgentServer.builder(handler, card).publicUrl("https:/
     `AgentExecutor`. `SpringAiAgents.streamingHandler` streams each chunk with `textDelta` (over
     A2A: chunks of the `response` artifact) and cancels generation when the task is cancelled.
 
+## Agents out over AG-UI
+
+The same handlers serve a `ChatClient` to AG-UI frontends such as CopilotKit:
+
+```java
+AgUiAgentServer agui = AgUiAgentServer.builder(AgUi.agent(SpringAiAgents.streamingHandler(chat))).build();
+```
+
+Over AG-UI the agent behaves the way AG-UI expects:
+
+- **The conversation comes from the frontend.** AG-UI clients send the whole conversation on
+  every run, so the prompt is that conversation: system and developer messages, user text,
+  assistant replies with their tool calls, and tool results. The run's context entries are added
+  as a system message. Give the AG-UI `ChatClient` **no chat-memory advisor**; it would add a
+  second copy of the history. (Over A2A, chat memory keeps working as before.)
+- **The frontend's own tools** (for example CopilotKit actions) are offered to the model next to
+  the `ChatClient`'s tools. When the model calls one, the call goes to the frontend and the run ends.
+  The frontend runs it and sends the result on the next run, and the model continues from there.
+- **Tool calls are visible.** Calls the agent makes to Protoweft tools (`ProtoweftToolCallbacks`)
+  stream as AG-UI tool-call events with their results, so the UI can show them. Spring AI tools
+  that are not Protoweft tools run as usual but are not shown.
+
+Limitation: if the model calls a frontend tool and one of its own tools in the same step, Spring
+AI still runs its own tool and the turn continues. The frontend call stays unanswered until the
+next run.
+
 ## Tools out: Spring AI `@Tool` methods over MCP and UTCP
 
 ```java
@@ -257,6 +283,10 @@ McpToolServer.http(tools);   // or UtcpManualProvider.builder(tools).build()
   `springAi.returnDirect`.
 
 ## Spring Boot
+
+`protoweft.server.agui.from-chat-client=true` (with `protoweft.server.agui.enabled=true`) serves
+the application's `ChatClient` over AG-UI, streaming. It works the same way as `from-chat-client`
+does for A2A.
 
 With the [Spring Boot starter](spring-boot.md) and `protoweft-spring-ai` on the classpath, three
 opt-in properties wire the pieces above into Spring AI's auto-configured `ChatClient.Builder`:

@@ -33,6 +33,7 @@ compatibility matrix. Each module's own decisions live in its `SPEC.md`, linked 
 | | `protoweft-a2a` | A2A client and full-lifecycle agent server, JSON-RPC binding (a2a-java 1.5.0.Final) | `protoweft-a2a` |
 | | `protoweft-utcp` | UTCP client and manual provider, implemented from spec 1.1 | `protoweft-utcp` |
 | | `protoweft-rap` | RAP client (callback endpoint mounted or built-in) and tool server, durable store; implemented from the unversioned spec at Infinity `e1a3e4b` | `protoweft-rap` |
+| | `protoweft-agui` | AG-UI client (with a tool bridge) and agent server over HTTP + SSE, implemented from spec 1.0 | `protoweft-agui` |
 | Security | `protoweft-oauth` | Protocol-neutral OAuth 2.1: an `HttpAuthorizer` client and resource-server pieces (Nimbus) | `protoweft-oauth` |
 | Discovery | `protoweft-discovery` | Capability catalog, hybrid search, fallback, sessions, generic meta-tools, raw provider payloads | `protoweft-discovery` |
 | | `protoweft-discovery-embeddings` | Offline bge-small `Embedder` and a pure-Java WordPiece tokenizer on ONNX Runtime alone | `protoweft-discovery-embeddings` |
@@ -46,7 +47,7 @@ compatibility matrix. Each module's own decisions live in its `SPEC.md`, linked 
 | | `protoweft-spring-boot-starter` | Spring Boot 4 auto-configuration; every protocol optional | `protoweft-spring-boot-starter` |
 | Packaging | `protoweft-bom` | Version alignment (`java-platform`) | — |
 | Not published | `examples/*`, `evals/tool-discovery` | Runnable examples; the discovery evaluation harness | `evals-tool-discovery` |
-| | `conformance/*` | Apps under test for the official MCP conformance suite and the A2A TCK | (this spec) |
+| | `conformance/*` | Apps under test for the official MCP conformance suite, the A2A TCK and Protoweft's AG-UI checker | (this spec) |
 | | `templates/*`, `jbang/` | Copyable starter projects (separate Gradle builds) and a JBang demo | — |
 
 Dependency rules, enforced by module boundaries:
@@ -55,7 +56,7 @@ Dependency rules, enforced by module boundaries:
 - `server` depends on `core` and on the servlet API (compileOnly). Only `server-jetty` brings a
   container.
 - Each protocol module depends on `core`, on `server` (for its endpoints), and on exactly its own
-  protocol SDK (or none, for UTCP and RAP).
+  protocol SDK (or none, for UTCP, RAP and AG-UI).
 - `discovery` depends on `core` only. Its embedding and provider modules add one library each
   (ONNX Runtime for embeddings, plus the model artifact, which holds only data files).
 - `oauth` depends on `core`, `server` and Nimbus. Protocol modules depend only on core's
@@ -63,7 +64,9 @@ Dependency rules, enforced by module boundaries:
 - Integrations depend on what they wire. No protocol, discovery or core module depends on an
   integration, so plain-Java and non-Spring users take `core` plus the modules they need. The one
   integration-to-integration edge is `argi` → `spring-ai`, because ARGI 2.1.0-RC1's tool API *is*
-  Spring AI's `ToolCallback`.
+  Spring AI's `ToolCallback`. Spring AI, LangChain4j and ARGI depend on `protoweft-agui`
+  `compileOnly`, each touching it from one class loaded only when it is present, so their agents
+  can use AG-UI-only features without making the module a requirement.
 
 ## Core seams (`protoweft-core`)
 
@@ -129,7 +132,10 @@ Dependency rules, enforced by module boundaries:
 - **Wrap, don't reimplement.** MCP and A2A wrap the official Java SDKs. UTCP has none, so it is
   implemented from the spec, with the official Python implementation as the authority where the
   docs disagree. RAP has none either; it is implemented from the Hydro spec, with Hydro's Rust and
-  JS implementations as the reference.
+  JS implementations as the reference. AG-UI's first-party SDKs are TypeScript, Python and .NET;
+  a community Java SDK exists but is not used, by decision, to keep third-party runtime
+  dependencies (and their vulnerabilities) out. AG-UI is implemented from spec 1.0, whose JSON
+  Schema is the structural authority and a test oracle.
 - **Subscriptions entered core for one protocol, by decision.** Principle 9 keeps protocol-specific
   types out of core until two integrations need them. RAP is the only protocol that delivers tool
   events after a call returns today; the user chose to add `ToolSubscription` to core anyway, so
@@ -148,6 +154,10 @@ Dependency rules, enforced by module boundaries:
 - **No model calls.** Protoweft never calls an LLM. Discovery's provider adapters build request
   parts and process responses. LangChain4j, Spring AI and ARGI remain the model and agent-runtime
   layers (goal non-goal); their adapters hand Protoweft tools to the framework's own model call.
+- **CORS preflights pass authentication.** Browsers never send credentials on a preflight, so
+  `InboundAuthFilter` passes `OPTIONS` requests carrying `Origin` and
+  `Access-Control-Request-Method` as anonymous. Servlets answer them without running anything; the
+  AG-UI server is the one endpoint that grants cross-origin access, and only to listed origins.
 - **Authorization is a servlet filter, OAuth a separate module.** MCP SDK 2.1.0's
   `ServerHttpHeaderValidator` can only `sendError`, so it cannot set `WWW-Authenticate`; inbound
   auth therefore stays in `InboundAuthFilter` for every protocol. OAuth uses Nimbus
@@ -158,7 +168,11 @@ Dependency rules, enforced by module boundaries:
   conformance suite (`@modelcontextprotocol/conformance`, server and client) and the A2A TCK in
   `.github/workflows/conformance.yml`. Each suite has a baseline (`conformance/*-baseline.yml`)
   whose entries name an unsupported feature id or a precise bug; an unexpected failure or a stale
-  entry fails the job. Results and every baselined item are published in the docs. The suites
+  entry fails the job. Results and every baselined item are published in the docs. AG-UI has no
+  official suite, so its checker is Protoweft's own (`AgUiConformance`, run against
+  `conformance/agui-sut` with the same baseline rules). Its independence comes from the interop job,
+  which runs the official TypeScript client against Protoweft's server, and Protoweft's client and
+  the checker against an agent on the official Python SDK. The suites
   found two real gaps that unit tests had missed — embedded resources in MCP tool results and
   inline A2A file names — which led to `Content.Resource` and `Data.name`.
 - **Release only through the gate.** `com.vanniktech.maven.publish` publishes the `protoweft-*`
@@ -194,6 +208,7 @@ Dependency rules, enforced by module boundaries:
 | **A2A** | `1.0` (prior `0.3.0`, `0.2.6`, `0.1.0`) | `org.a2aproject.sdk` **1.5.0.Final** (spec 1.0) | Client and full-lifecycle server over JSON-RPC; A2A TCK `1.0.0.alpha3` MUST level passes with an empty baseline. Not built: gRPC and HTTP+JSON bindings, card signatures, multi-tenancy |
 | **UTCP** | **`1.1`** (`1.0` manuals accepted) | none (Python, TypeScript and Go only) | Client (http, text and file manuals; http tools; api_key, basic and oauth2 auth) and manual provider. Not built: YAML, OpenAPI conversion, non-HTTP tool templates |
 | **RAP** | unversioned; recorded as `infinity@e1a3e4b` | none (Rust `rap-protocol`/`rap-client` 0.2.0 and JS `rap-js` only) | Client and tool server: toolset discovery, invocation, text and image results, subscriptions, OAuth and user-choice prompts, cancellation, thread closure, durable state; interop tested both ways against Hydro's JS and Rust implementations at `e1a3e4b` (`scripts/interop/rap.sh`). Not built: view updates, migration, `display_as`, `displayScript`, argument validation against `inputSchema` |
+| **AG-UI** | **`1.0`** (in-band `MAJOR.MINOR`) | none official (TypeScript, Python, .NET first-party; community Java SDK not used) | Agent server over HTTP + SSE: all 31 event types, interrupts, frontend tools, version negotiation, opt-in CORS, `GET <path>/capabilities` (a Protoweft convention); every event checked against the spec's sequence rules before sending; checked by `AgUiConformance` and by interop with the official TypeScript (`@ag-ui/client` 1.0.4) and Python (`ag-ui-protocol` 1.0.0) SDKs in CI. Client: the consumer pipeline (drop and strip with warnings, chunk expansion, verification), conversations with state, interrupts and resume checks, an opt-in tool bridge with consent, `AgentConnector` with an `ask` tool. Not built: the HTTP + Protobuf binding |
 
 Frameworks: LangChain4j 1.23.0, Spring AI 2.0.2, ARGI 2.1.0-RC1 (plus ARGI main at
 `a869538` for `protoweft-argi-neutral`), Spring Boot 4.1.2.
@@ -210,6 +225,9 @@ the generic meta-tools.
 - RAP is young: its spec has no version or negotiation, no conformance suite exists, and a
   breaking rename (`group_id` → `thread_id`, Hydro issue #101) is open. `protoweft-rap` records
   the Infinity commit it follows and its interop results with Hydro's implementations.
+- AG-UI is implemented in-house, so following the spec is Protoweft's job. The spec grows by
+  additions that older peers must tolerate, the schema is pinned by SHA-256 in tests, and a new
+  minor version means re-reading the spec and refreshing the vendored schema.
 - SDKs move fast. Versions are pinned, and SDK workarounds live in module specs; for example, the
   MCP session-sweeper thread leak is documented in `protoweft-mcp`.
 - LangChain4j's tool-search API is `@Experimental`.
@@ -222,7 +240,8 @@ the generic meta-tools.
 - Licenses: Protoweft is MIT. The dependencies are MCP SDK (MIT), a2a-java (Apache-2.0), Nimbus
   (Apache-2.0), Spring AI and ARGI (Apache-2.0) and the Anthropic and OpenAI SDKs
   (MIT/Apache-2.0). The UTCP specification is MPL-2.0; it is implemented
-  from the docs, and no code is copied. ToolRet evaluation data carries no license tag, so it is
+  from the docs, and no code is copied. The AG-UI JSON Schema, vendored as a test resource only, comes
+  from the MIT-licensed `ag-ui-protocol/ag-ui` repository. ToolRet evaluation data carries no license tag, so it is
   downloaded locally only.
 
 ## Out of scope
@@ -248,6 +267,9 @@ Taken from official specifications and reference implementations on 2026-11-05:
 - RAP:
   - [Specification](https://infinity.hydro.run/docs/rap/spec/overview) and
     [hydro-project/infinity](https://github.com/hydro-project/infinity) at `e1a3e4b` (Apache-2.0)
+- AG-UI:
+  - [Specification 1.0](https://docs.ag-ui.com/spec/1.0) and its
+    [JSON Schema](https://docs.ag-ui.com/spec/1.0/schema.json), read 2026-11-11
 - UTCP:
   - [utcp.io](https://www.utcp.io/)
   - [Specification repository](https://github.com/universal-tool-calling-protocol/utcp-specification)

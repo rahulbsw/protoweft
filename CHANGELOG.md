@@ -20,6 +20,25 @@ All notable changes to Protoweft are documented here. The format follows
   - Cross-cutting: `ComplianceReport`, `CredentialProvider`, `HttpAuthorizer`,
     `InboundAuthenticator` with `CallerIdentity` and `WWW-Authenticate` challenges,
     `ObservationHandler`, and `ProtoweftException` with `ErrorCategory`.
+- **AG-UI (`protoweft-agui`, Agent–User Interaction protocol, implemented from spec 1.0).**
+  `AgUiClient`, `AgUiThread` and `AgUiClientConnector` call remote AG-UI agents: the spec's consumer
+  pipeline (unknown material dropped with warnings, chunks expanded, sequence verified),
+  conversations with state and interrupts, and an opt-in bridge that offers Protoweft tools to the
+  agent and runs its calls (read-only tools automatically, others only with approval).
+  Spring AI agents over AG-UI use the frontend's conversation and the frontend's own tools;
+  LangChain4j agents use the frontend's conversation (`LangChain4jAgents.chatMemory`); ARGI
+  approvals become AG-UI interrupts; Protoweft and LangChain4j tool calls are shown in the stream.
+  The Spring Boot starter adds `protoweft.server.agui.*` and `protoweft.agui.agents.*`.
+  `AgUiConformance` checks any AG-UI agent against the producer rules of spec 1.0, from Java or as
+  the JBang alias `agui-conformance`. CI runs it against Protoweft's server and runs interop in both
+  directions with the official TypeScript and Python SDKs. `examples/agui-web` adds a browser page
+  on `@ag-ui/client`.
+  `AgUiAgentServer` serves an agent to AG-UI frontends over HTTP + SSE: all 31 event types,
+  interrupts, frontend tool calls, version negotiation, opt-in CORS and a capabilities document
+  at `GET <path>/capabilities`. Every event is checked against the spec's sequence rules before it
+  is sent. `AgUi.agent(handler)` serves any core `AgentHandler`. No runtime dependency beyond
+  Jackson 3; tests validate against the official JSON Schema, and the run-input, event and JSON
+  Patch parsers are fuzzed.
 - **Hosting.** `protoweft-server` (servlet endpoints plus an inbound-auth filter) and
   `protoweft-server-jetty` (an embedded Jetty 12 host).
 - **MCP (`protoweft-mcp`, MCP Java SDK 2.1.0).** A client over stdio and Streamable HTTP. A tool
@@ -91,10 +110,13 @@ All notable changes to Protoweft are documented here. The format follows
   Gradle dependency verification, SHA-pinned actions and OpenSSF Scorecard.
 
 ### Changed
-- Streaming agents no longer report answer tokens as `working` status text. The Spring AI and
-  LangChain4j streaming handlers send them with `textDelta`, which the A2A server streams as
+- Streaming agents no longer report answer tokens as `working` status text. The Spring AI,
+  LangChain4j and ARGI streaming handlers send them with `textDelta`, which the A2A server streams as
   chunks of one appended `response` artifact, replaced by the whole text as the last chunk; they
   no longer add a separate final `response` artifact.
+- `InboundAuthFilter` lets CORS preflight requests (`OPTIONS` with `Origin` and
+  `Access-Control-Request-Method`) through as anonymous, because browsers never attach credentials
+  to them. Servlets answer preflights without running anything.
 
 ### Fixed
 - The discovery search meta-tool offers models only `query` and `limit`. Its former `protocols`,

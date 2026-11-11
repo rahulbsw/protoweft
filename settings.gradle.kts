@@ -11,6 +11,7 @@ val modules = listOf(
     "protoweft-a2a",
     "protoweft-utcp",
     "protoweft-rap",
+    "protoweft-agui",
     "protoweft-discovery",
     "protoweft-discovery-embeddings",
     "protoweft-model-bge-small-en-v15",
@@ -27,10 +28,12 @@ val modules = listOf(
     "examples:langchain4j-example",
     "examples:spring-ai-example",
     "examples:argi-example",
+    "examples:agui-web",
     "evals:tool-discovery",
     "conformance:mcp-server",
     "conformance:mcp-client",
     "conformance:a2a-sut",
+    "conformance:agui-sut",
 )
 
 modules.filter { file(it.replace(':', '/')).isDirectory }.forEach { include(it) }

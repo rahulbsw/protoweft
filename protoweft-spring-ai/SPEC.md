@@ -145,9 +145,28 @@ chat.prompt().user(q).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversa
     replayed, because the memory owns the conversation.
   - **Results.** The answer becomes one text artifact `response`, then the task is completed. An
     exception, or a message with no text (Spring AI rejects blank user text), fails the task.
-  - **Streaming.** `stream().content()` chunks are sent with `textDelta`, one call each, and no
+  - **Streaming.** `stream().chatResponse()` chunks are sent with `textDelta`, one call each, and no
     final artifact is added: the fragments are the answer. Events are queued and handled on the
     handler's thread, so `AgentTaskContext` is called from one thread.
+  - **Tool calls reported.** The tool context also carries `protoweft.task` (the
+    `AgentTaskContext`); `ProtoweftToolCallback` reports each call with `toolCall` before and
+    `toolResult` after (failures included). Spring AI's tool-calling advisor is not replaced, so
+    its configuration survives; only Protoweft tools are reported.
+  - **Over AG-UI** (decided with the user; `AgUiPrompts`, the only class touching
+    `protoweft-agui`, which is `compileOnly` and loaded only after a class-presence check):
+    - The prompt is the run's own conversation (`messages(...)`, not `user(text)`): system and
+      developer → system, user text (media parts not sent), assistant text with tool calls,
+      consecutive tool messages → one `ToolResponseMessage`; activity and reasoning skipped; the
+      run's context entries as a trailing system message. Chat memory is not the source of
+      history; a memory advisor on the AG-UI `ChatClient` would duplicate it (documented).
+    - A boolean tool schema becomes its object equivalent (`false`: no properties and no
+      additional ones; `true`: an unconstrained object), because providers take object schemas.
+    - The application's tools become per-request `returnDirect` callbacks (`tools(...)`, the
+      non-deprecated form) whose call emits the AG-UI tool call and returns `""`; Spring AI then
+      ends the turn, and that placeholder generation (finish reason `returnDirect`, `toolName` one
+      of them) is dropped from the text. The next run carries the result as a tool message.
+    - Limitation: a step calling an application tool together with an agent-side tool lets Spring
+      AI continue with the agent-side result; the application call stays pending.
   - **Cancellation.** It disposes the subscription, which cancels the upstream `Flux`. This is
     different from LangChain4j, whose stream couldn't be aborted.
 - **Tools out.**

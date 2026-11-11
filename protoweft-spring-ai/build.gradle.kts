@@ -14,11 +14,15 @@ dependencies {
     compileOnly("org.springframework.ai:spring-ai-tool-search-tool:$springAiVersion")
     compileOnly("org.springframework.ai:spring-ai-tool-search-advisor:$springAiVersion")
     compileOnly(project(":protoweft-discovery"))
+    // Optional: AgUiPrompts, used only when a ChatClient agent is served over AG-UI.
+    compileOnly(project(":protoweft-agui"))
 
     testImplementation("org.springframework.ai:spring-ai-client-chat:$springAiVersion")
     testImplementation("org.springframework.ai:spring-ai-tool-search-tool:$springAiVersion")
     testImplementation("org.springframework.ai:spring-ai-tool-search-advisor:$springAiVersion")
     testImplementation(project(":protoweft-discovery"))
+    testImplementation(project(":protoweft-agui"))
+    testImplementation(project(":protoweft-server-jetty"))
     testImplementation(platform("org.junit:junit-bom:${project.property("junitVersion")}"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:${project.property("assertjVersion")}")
