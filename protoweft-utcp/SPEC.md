@@ -139,7 +139,7 @@ processors, embedding search.
   `utcp-http` 1.1.15): the reference client registered our manual from loopback with api_key
   auth and called tools; results matched (`"5"`, structured object, caller identity, error
   `"Server Error: boom"`).
-- Fuzzing (Jazzer `@FuzzTest`, regression inputs in a normal build; CONTRIBUTING.md
+- Fuzzing (Jazzer `@FuzzTest` in `src/fuzz/java`, seeds replayed by `fuzzTest` in every build; CONTRIBUTING.md
   "Fuzzing"): `ManualFuzzTest` feeds manual bodies to `Manual.parse`, `HttpTemplate.parse` and the
   remote-loopback rule (only `IllegalArgumentException` / `JacksonException` / `PROTOCOL`), and as a
   text manual through `UtcpClientConnector` (only `CONFIGURATION`, `PROTOCOL` or `UNSUPPORTED`

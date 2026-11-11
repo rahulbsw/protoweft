@@ -19,15 +19,17 @@ Some tests start real servers on free local ports. None of them need network acc
 The parsers of untrusted input have [Jazzer](https://github.com/CodeIntelligenceTesting/jazzer)
 fuzz tests (`@FuzzTest`, classes named `*FuzzTest`): RAP callbacks and toolset manifests, UTCP
 manuals and URL checks, OAuth `WWW-Authenticate` challenges and protected-resource metadata, and
-the WordPiece tokenizer. A normal `./gradlew build` runs them in regression mode: once per input
-in `src/test/resources/<package>/<TestClass>Inputs/<method>/`, which is fast and deterministic.
+the WordPiece tokenizer. They live in their own source set, `src/fuzz/java` (seeds in
+`src/fuzz/resources/<package>/<TestClass>Inputs/<method>/`), run by each module's `fuzzTest` task.
+`./gradlew build` (through `check`) runs them in regression mode, once per seed input, which is fast
+and deterministic.
 
 To fuzz, set `JAZZER_FUZZ=1` and select exactly one fuzz test per run (Jazzer fuzzes a single test
 per JVM). It stops after the test's `maxDuration` (2 minutes) or `JAZZER_MAX_DURATION`:
 
 ```bash
-JAZZER_FUZZ=1 ./gradlew :protoweft-rap:test --tests '*ToolsetFuzzTest.manifest' --rerun
-JAZZER_FUZZ=1 JAZZER_MAX_DURATION=10m ./gradlew :protoweft-utcp:test --tests '*ManualFuzzTest.manual' --rerun
+JAZZER_FUZZ=1 ./gradlew :protoweft-rap:fuzzTest --tests '*ToolsetFuzzTest.manifest' --rerun
+JAZZER_FUZZ=1 JAZZER_MAX_DURATION=10m ./gradlew :protoweft-utcp:fuzzTest --tests '*ManualFuzzTest.manual' --rerun
 ```
 
 `--rerun` stops Gradle from answering from its build cache. Coverage-increasing inputs collect in
@@ -43,10 +45,12 @@ JSON targets accept two input forms (see the test's `FuzzJson`): plain JSON, as 
 or a leading NUL byte followed by bytes that select and edit a valid template, which reaches
 type and null confusions inside otherwise valid documents.
 
-A module with fuzz tests runs them after its other test classes (`FuzzTestsLast`, configured in
-`src/test/resources/junit-platform.properties`): the first `@FuzzTest` installs Jazzer's agent,
-which drops parameter names from classes loaded afterwards, and `LocalTools` needs them. Copy both
-files when adding fuzz tests to another module.
+To add fuzz tests to another module, create `src/fuzz/java` there and add
+`"fuzzImplementation"("com.code-intelligence:jazzer-junit:...")`; the root build then creates the
+source set and `fuzzTest` task. Fuzz classes see the module's main and test classes. Keep them out
+of `src/test`: Jazzer's agent rewrites classes loaded after it in the same JVM (dropping the
+parameter names `LocalTools` needs), and OpenSSF Scorecard ignores `src/test/` when looking for
+fuzzers (ossf/scorecard#5458).
 
 ## Changing dependencies
 

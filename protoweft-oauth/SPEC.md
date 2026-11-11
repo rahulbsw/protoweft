@@ -129,7 +129,7 @@ challenge strings / custom verifier audience / ES256 / remote JWKS; PRM JSON; an
 Jetty test (`ProtoweftServer` + `InboundAuthFilter`) where `OAuthClient` discovers, authorizes and
 steps up against the real filter.
 
-- Fuzzing (Jazzer `@FuzzTest`, regression inputs in a normal build; CONTRIBUTING.md "Fuzzing"):
+- Fuzzing (Jazzer `@FuzzTest` in `src/fuzz/java`, seeds replayed by `fuzzTest` in every build; CONTRIBUTING.md "Fuzzing"):
   `ChallengeFuzzTest` (`Challenge.parse` never throws, keeps only an absolute `resource_metadata`
   and a trimmed non-blank `scope`; `handleUnauthorized` answers any header with a `TokenResult` over
   an offline HTTP client) and `ProtectedResourceMetadataFuzzTest` (`ProtectedResourceMetadata.parse`

@@ -330,7 +330,7 @@ field); the client's negotiated revision is that same value after `start()`.
   `onRecoveredResult`; both sides restart and a resumed server subscription reaches the client's
   recovered subscription, whose cancel reaches the server; store persistence and concurrent writers.
 - Core: `ToolSubscriptionTest` (5), `ToolContextsTest` (4).
-- Fuzzing (Jazzer `@FuzzTest`, regression inputs in a normal build; CONTRIBUTING.md
+- Fuzzing (Jazzer `@FuzzTest` in `src/fuzz/java`, seeds replayed by `fuzzTest` in every build; CONTRIBUTING.md
   "Fuzzing"): `ClientCallbacksFuzzTest` posts sequences of callback bodies for one pending call
   through `CallbackRouter` and requires a status of 200/400/404/413 and no escaping exception;
   `ToolsetFuzzTest` requires `Toolset.parse` to accept a manifest or throw
