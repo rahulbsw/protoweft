@@ -43,6 +43,12 @@ final class ScriptedChatModel implements ChatModel {
         return prompt -> AssistantMessage.builder().content("").toolCalls(Arrays.asList(calls)).build();
     }
 
+    /** Writes some text, then calls a tool, in the same model turn. */
+    static Function<Prompt, AssistantMessage> sayThenCallTool(String text, String name, String arguments) {
+        return prompt -> AssistantMessage.builder().content(text)
+                .toolCalls(List.of(new AssistantMessage.ToolCall("call-" + name, "function", name, arguments))).build();
+    }
+
     static Function<Prompt, AssistantMessage> answer(String text) {
         return prompt -> AssistantMessage.builder().content(text).build();
     }
@@ -65,7 +71,14 @@ final class ScriptedChatModel implements ChatModel {
     public Flux<ChatResponse> stream(Prompt prompt) {
         ChatResponse response = call(prompt);
         if (response.hasToolCalls()) {
-            return Flux.just(response);
+            // Text the model writes before calling tools streams first, as real models do.
+            AssistantMessage message = response.getResult().getOutput();
+            String before = message.getText() == null ? "" : message.getText();
+            Flux<ChatResponse> text = Flux.fromArray(before.isEmpty() ? new String[0] : before.split("(?<= )"))
+                    .map(w -> new ChatResponse(List.of(new Generation(AssistantMessage.builder().content(w).build()))));
+            ChatResponse calls = new ChatResponse(List.of(new Generation(
+                    AssistantMessage.builder().content("").toolCalls(message.getToolCalls()).build())));
+            return text.concatWith(Flux.just(calls));
         }
         String text = response.getResult().getOutput().getText();
         return Flux.fromArray(text.split("(?<= )"))

@@ -113,7 +113,9 @@ AgentHandler handler = ArgiAgents.handler(agent);   // serve with A2aAgentServer
     and `AGENT_MODEL_STREAMING` text chunks are sent with `textDelta`. Events are queued and handled
     on the handler thread, as in `SpringAiAgents`, and cancellation disposes the subscription.
   - **Answer.** The answer is the agent's `outputKey` value, else the last `AssistantMessage`, as
-    a `response` artifact, unless it equals the text already streamed. Then the task completes.
+    a `response` artifact, unless it equals the text streamed in the final model turn. Text streamed
+    before a tool call does not count, otherwise the answer would be repeated. Then the task
+    completes.
   - **Over AG-UI** (decided with the user; `ArgiAgUi` is the only class touching `protoweft-agui`,
     `compileOnly`, loaded after a class-presence check): approvals end the run with one interrupt
     per undecided call (id = tool call id, reason `tool_approval`, message with name, description

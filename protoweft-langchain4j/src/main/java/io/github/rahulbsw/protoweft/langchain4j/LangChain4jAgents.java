@@ -74,10 +74,25 @@ public final class LangChain4jAgents {
 
     /** Serves a blocking agent: one call per message, the answer becomes the task's artifact. */
     public static AgentHandler handler(Conversation conversation) {
+        return handler(conversation, null);
+    }
+
+    /**
+     * As {@link #handler(Conversation)}; over AG-UI the AI Service sees the conversation the client
+     * sent, through {@code memory} (the provider the AI Service was built with; see
+     * {@link #chatMemory(ChatMemoryProvider)}).
+     */
+    public static AgentHandler handler(Conversation conversation, FrontendHistory memory) {
         Objects.requireNonNull(conversation, "conversation");
         return (request, task) -> {
             String id = conversationId(request);
-            FrontendHistory.Run run = begin(id, task);
+            FrontendHistory.Run run;
+            try {
+                run = begin(memory, id, task);
+            } catch (IllegalStateException busy) {
+                task.fail(busy.getMessage());
+                return;
+            }
             String answer;
             try {
                 answer = conversation.chat(id, request.text());
@@ -85,7 +100,7 @@ public final class LangChain4jAgents {
                 task.fail(message(e));
                 return;
             } finally {
-                end(id, run);
+                end(memory, id, run);
             }
             finish(task, answer);
         };
@@ -98,14 +113,29 @@ public final class LangChain4jAgents {
      * calls are made on the handler's thread; a cancelled task stops listening to the stream.
      */
     public static AgentHandler streamingHandler(StreamingConversation conversation) {
+        return streamingHandler(conversation, null);
+    }
+
+    /**
+     * As {@link #streamingHandler(StreamingConversation)}; over AG-UI the AI Service sees the
+     * conversation the client sent, through {@code memory} (the provider the AI Service was built
+     * with; see {@link #chatMemory(ChatMemoryProvider)}).
+     */
+    public static AgentHandler streamingHandler(StreamingConversation conversation, FrontendHistory memory) {
         Objects.requireNonNull(conversation, "conversation");
         return (request, task) -> {
             String id = conversationId(request);
-            FrontendHistory.Run run = begin(id, task);
+            FrontendHistory.Run run;
+            try {
+                run = begin(memory, id, task);
+            } catch (IllegalStateException busy) {
+                task.fail(busy.getMessage());
+                return;
+            }
             try {
                 stream(conversation, request, task, id);
             } finally {
-                end(id, run);
+                end(memory, id, run);
             }
         };
     }
@@ -158,42 +188,59 @@ public final class LangChain4jAgents {
     }
 
     /**
-     * Chat memory for an AI Service served over AG-UI as well as other protocols: while an AG-UI
-     * run is in flight for a conversation, the AI Service sees that run's own conversation (AG-UI
-     * clients send the whole conversation on every run); otherwise, and for every other protocol,
-     * it uses {@code fallback}. Build the AI Service with it:
+     * Chat memory for one AI Service served over AG-UI as well as other protocols: while an AG-UI
+     * run of that service is in flight for a conversation, the AI Service sees that run's own
+     * conversation (AG-UI clients send the whole conversation on every run); otherwise, and for
+     * every other protocol, it uses {@code fallback}. Build the AI Service with it and give the same
+     * instance to the handler, so its runs never mix with another service's:
      *
      * <pre>{@code
-     * AiServices.builder(Assistant.class)
+     * FrontendHistory memory = LangChain4jAgents.chatMemory(id -> MessageWindowChatMemory.withMaxMessages(20));
+     * Assistant assistant = AiServices.builder(Assistant.class)
      *         .streamingChatModel(model)
-     *         .chatMemoryProvider(LangChain4jAgents.chatMemory(id -> MessageWindowChatMemory.withMaxMessages(20)))
+     *         .chatMemoryProvider(memory)
      *         .build();
+     * AgentHandler handler = LangChain4jAgents.streamingHandler(assistant::chat, memory);
      * }</pre>
      *
-     * <p>AG-UI runs leave {@code fallback}'s memory untouched.
+     * <p>AG-UI runs leave {@code fallback}'s memory untouched. Two AG-UI runs of one conversation
+     * cannot overlap: the second fails, because they would share one memory.
      */
-    public static ChatMemoryProvider chatMemory(ChatMemoryProvider fallback) {
-        return FrontendHistory.provider(fallback);
+    public static FrontendHistory chatMemory(ChatMemoryProvider fallback) {
+        return new FrontendHistory(fallback);
     }
 
     /** Makes an AG-UI run's conversation the memory for {@code id} while the run is in flight. */
-    private static FrontendHistory.Run begin(String id, AgentTaskContext task) {
+    private static FrontendHistory.Run begin(FrontendHistory memory, String id, AgentTaskContext task) {
         if (!AGUI) {
             return null;
         }
         java.util.Optional<List<dev.langchain4j.data.message.ChatMessage>> history = AgUiHistory.history(task);
-        return history.map(h -> FrontendHistory.begin(id, h)).orElse(null);
+        if (history.isEmpty()) {
+            return null;
+        }
+        if (memory == null) {
+            warnOnce("An AG-UI run used the AI Service's own chat memory and ignored the conversation the client "
+                    + "sent; build the AI Service with LangChain4jAgents.chatMemory(...) and pass it to the handler");
+            return null;
+        }
+        return memory.begin(id, history.get());
     }
 
-    private static void end(String id, FrontendHistory.Run run) {
+    private static void end(FrontendHistory memory, String id, FrontendHistory.Run run) {
         if (run == null) {
             return;
         }
-        FrontendHistory.end(id, run);
-        if (!run.used.get() && WARNED.compareAndSet(false, true)) {
-            LOG.log(System.Logger.Level.WARNING, "An AG-UI run used the AI Service's own chat memory and ignored the "
-                    + "conversation the client sent; build the AI Service with "
-                    + "chatMemoryProvider(LangChain4jAgents.chatMemory(...)) to use it");
+        memory.end(id, run);
+        if (!run.used.get()) {
+            warnOnce("An AG-UI run never read the conversation the client sent; the FrontendHistory given to the "
+                    + "handler is not the chat memory provider the AI Service was built with");
+        }
+    }
+
+    private static void warnOnce(String message) {
+        if (WARNED.compareAndSet(false, true)) {
+            LOG.log(System.Logger.Level.WARNING, message);
         }
     }
 

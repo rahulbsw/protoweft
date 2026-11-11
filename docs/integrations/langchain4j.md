@@ -127,19 +127,26 @@ The same handlers serve an AI Service to AG-UI frontends:
 `AgUiAgentServer.builder(AgUi.agent(LangChain4jAgents.streamingHandler(assistant::chat)))`.
 
 AG-UI clients send the whole conversation on every run. To let the AI Service use that
-conversation instead of its stored memory, build it with `LangChain4jAgents.chatMemory(...)`,
-wrapping the memory it would use otherwise:
+conversation instead of its stored memory, wrap the memory it would use otherwise with
+`LangChain4jAgents.chatMemory(...)`. Build the AI Service with the result, and give the same
+instance to the handler:
 
 ```java
+FrontendHistory memory = LangChain4jAgents.chatMemory(id -> MessageWindowChatMemory.withMaxMessages(20));
 Assistant assistant = AiServices.builder(Assistant.class)
         .streamingChatModel(model)
-        .chatMemoryProvider(LangChain4jAgents.chatMemory(id -> MessageWindowChatMemory.withMaxMessages(20)))
+        .chatMemoryProvider(memory)
         .build();
+AgentHandler handler = LangChain4jAgents.streamingHandler(assistant::chat, memory);
 ```
 
 While an AG-UI run is in flight for a conversation, the AI Service sees that run's conversation.
-The wrapped memory is left untouched, and A2A requests keep using it. Without the wrapper, AG-UI
-runs use the stored memory, and a warning is logged once.
+The wrapped memory is left untouched, and A2A requests keep using it.
+
+- Runs are scoped to that `FrontendHistory`, so two AI Services in one application never see each
+  other's runs, even with the same conversation id.
+- A second AG-UI run of a conversation that is still running fails instead of sharing its memory.
+- Without the wrapper, AG-UI runs use the stored memory, and a warning is logged once.
 
 With `streamingHandler`, tool calls the AI Service makes stream as AG-UI tool-call events with
 their results.

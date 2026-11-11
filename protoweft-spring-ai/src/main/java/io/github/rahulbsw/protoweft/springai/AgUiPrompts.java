@@ -135,10 +135,24 @@ final class AgUiPrompts {
         ApplicationTool(RunAgentInput.Tool tool, AgUiRun run) {
             this.tool = tool;
             this.run = run;
-            Object schema = tool.parameters() != null ? tool.parameters()
-                    : Map.of("type", "object", "properties", Map.of());
+            Object schema = schemaFor(tool.parameters());
             this.definition = ToolDefinition.builder().name(tool.name()).description(tool.description())
                     .inputSchema(JSON.writeValueAsString(schema)).build();
+        }
+
+        /**
+         * Model providers take an object schema for function parameters, so a boolean schema becomes
+         * its object equivalent: {@code false} (no arguments allowed) an object with no properties
+         * and no additional ones, {@code true} or none an unconstrained object.
+         */
+        private static Object schemaFor(Object parameters) {
+            if (parameters instanceof Map) {
+                return parameters;
+            }
+            if (Boolean.FALSE.equals(parameters)) {
+                return Map.of("type", "object", "properties", Map.of(), "additionalProperties", false);
+            }
+            return Map.of("type", "object", "properties", Map.of());
         }
 
         @Override

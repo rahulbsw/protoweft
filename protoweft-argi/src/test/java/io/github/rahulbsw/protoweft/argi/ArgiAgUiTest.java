@@ -95,6 +95,23 @@ class ArgiAgUiTest {
     }
 
     @Test
+    void textBeforeAToolCallDoesNotRepeatTheFinalAnswer() {
+        ToolRegistry bank = new ToolRegistry().register("bank", LocalTools.builder()
+                .tool("balance", "Current balance", Map.of("type", "object"), (args, caller) -> ToolOutcome.text("10"))
+                .build());
+        ScriptedChatModel model = new ScriptedChatModel(
+                ScriptedChatModel.sayThenCallTool("Let me look. ", "bank__balance", "{}"), answer("You have 10."));
+        ReactAgent agent = ReactAgent.builder().name("teller").model(model)
+                .toolCallbackProviders(ArgiTools.callbackProvider(bank)).saver(new MemorySaver()).build();
+        AgUiThread thread = thread(ArgiAgents.streamingHandler(agent));
+
+        AgUiThread.Turn turn = thread.send("balance?");
+
+        assertThat(turn.status()).isEqualTo(AgUiThread.Status.COMPLETED);
+        assertThat(turn.text()).isEqualTo("Let me look. You have 10.");   // the answer streamed once, not repeated
+    }
+
+    @Test
     void textAnswersWorkToo() {
         AgUiThread thread = thread(ArgiAgents.handler(agent()));
         AgUiEvent.Interrupt interrupt = thread.send("pay bob 10").interrupts().get(0);

@@ -12,16 +12,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Chat memory that, while an agent run served over a stateless protocol (AG-UI) is in flight for a
- * memory id, serves that run's own conversation instead of the stored one. The application's
- * memory is left untouched by such runs. See {@link LangChain4jAgents#chatMemory(ChatMemoryProvider)}.
+ * Chat memory for one AI Service served over a stateless protocol (AG-UI): while a run of that
+ * service is in flight for a conversation, its memory serves the conversation the client sent
+ * instead of the stored one; otherwise it delegates to the application's memory, which such runs
+ * never write. Create it with {@link LangChain4jAgents#chatMemory(ChatMemoryProvider)}, build the AI
+ * Service with it, and pass the same instance to the handler, so runs are scoped to that service.
  */
-final class FrontendHistory {
+public final class FrontendHistory implements ChatMemoryProvider {
 
-    /** Conversations of the runs in flight, by memory id. */
-    private static final Map<Object, Run> RUNS = new ConcurrentHashMap<>();
+    /** This service's runs in flight, by memory id. */
+    private final Map<Object, Run> runs = new ConcurrentHashMap<>();
+    private final ChatMemoryProvider fallback;
 
-    private FrontendHistory() {
+    FrontendHistory(ChatMemoryProvider fallback) {
+        this.fallback = Objects.requireNonNull(fallback, "fallback");
+    }
+
+    @Override
+    public ChatMemory get(Object memoryId) {
+        return new Memory(memoryId);
     }
 
     /** One run's conversation; {@code used} tells whether the AI Service read it. */
@@ -34,40 +43,41 @@ final class FrontendHistory {
         }
     }
 
-    static Run begin(Object memoryId, List<ChatMessage> history) {
+    /**
+     * Makes {@code history} the memory of {@code memoryId} for one run.
+     *
+     * @throws IllegalStateException if a run for that conversation is already in flight: the two
+     *                               would share one memory
+     */
+    Run begin(Object memoryId, List<ChatMessage> history) {
         Run run = new Run(history);
-        RUNS.put(memoryId, run);
+        if (runs.putIfAbsent(memoryId, run) != null) {
+            throw new IllegalStateException("another run for conversation " + memoryId + " is still in progress");
+        }
         return run;
     }
 
-    static void end(Object memoryId, Run run) {
-        RUNS.remove(memoryId, run);
-    }
-
-    static ChatMemoryProvider provider(ChatMemoryProvider fallback) {
-        Objects.requireNonNull(fallback, "fallback");
-        return id -> new Memory(id, fallback);
+    void end(Object memoryId, Run run) {
+        runs.remove(memoryId, run);
     }
 
     /** Delegates to the application's memory except while a run for its id is in flight. */
-    private static final class Memory implements ChatMemory {
+    private final class Memory implements ChatMemory {
         private final Object id;
-        private final ChatMemoryProvider fallbackProvider;
-        private volatile ChatMemory fallback;
+        private volatile ChatMemory stored;
 
-        Memory(Object id, ChatMemoryProvider fallbackProvider) {
+        Memory(Object id) {
             this.id = id;
-            this.fallbackProvider = fallbackProvider;
         }
 
-        private ChatMemory fallback() {
-            ChatMemory m = fallback;
+        private ChatMemory stored() {
+            ChatMemory m = stored;
             if (m == null) {
                 synchronized (this) {
-                    if (fallback == null) {
-                        fallback = fallbackProvider.get(id);
+                    if (stored == null) {
+                        stored = fallback.get(id);
                     }
-                    m = fallback;
+                    m = stored;
                 }
             }
             return m;
@@ -80,37 +90,37 @@ final class FrontendHistory {
 
         @Override
         public void add(ChatMessage message) {
-            Run run = RUNS.get(id);
+            Run run = runs.get(id);
             if (run != null) {
                 synchronized (run) {
                     run.messages.add(message);
                 }
             } else {
-                fallback().add(message);
+                stored().add(message);
             }
         }
 
         @Override
         public List<ChatMessage> messages() {
-            Run run = RUNS.get(id);
+            Run run = runs.get(id);
             if (run != null) {
                 run.used.set(true);
                 synchronized (run) {
                     return List.copyOf(run.messages);
                 }
             }
-            return fallback().messages();
+            return stored().messages();
         }
 
         @Override
         public void clear() {
-            Run run = RUNS.get(id);
+            Run run = runs.get(id);
             if (run != null) {
                 synchronized (run) {
                     run.messages.clear();
                 }
             } else {
-                fallback().clear();
+                stored().clear();
             }
         }
     }

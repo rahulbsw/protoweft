@@ -146,7 +146,7 @@ final class ArgiAgentHandler implements AgentHandler {
             return;
         }
         String answer = answer(output.get().state());
-        if (!answer.equals(streamed.toString())) {
+        if (!answer.strip().equals(streamed.toString().strip())) {
             // Not already streamed: the agent's output key, or a non-streaming run.
             task.artifact(ArgiAgents.ARTIFACT_NAME, List.of(new Content.Text(answer)));
         }
@@ -192,6 +192,9 @@ final class ArgiAgentHandler implements AgentHandler {
                     if (chunk != null) {
                         streamed.append(chunk);
                         task.textDelta(chunk);
+                    } else if (callsTools(out)) {
+                        // Text before a tool call is not the answer: only the final turn's text is.
+                        streamed.setLength(0);
                     }
                 } else if (event == COMPLETE) {
                     return Optional.ofNullable(interruption != null ? interruption : last);
@@ -203,6 +206,10 @@ final class ArgiAgentHandler implements AgentHandler {
         } finally {
             subscription.dispose();
         }
+    }
+
+    private static boolean callsTools(NodeOutput out) {
+        return out instanceof StreamingOutput<?> s && s.message() instanceof AssistantMessage m && m.hasToolCalls();
     }
 
     private static String chunk(NodeOutput out) {

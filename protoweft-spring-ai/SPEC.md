@@ -159,6 +159,8 @@ chat.prompt().user(q).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversa
       consecutive tool messages → one `ToolResponseMessage`; activity and reasoning skipped; the
       run's context entries as a trailing system message. Chat memory is not the source of
       history; a memory advisor on the AG-UI `ChatClient` would duplicate it (documented).
+    - A boolean tool schema becomes its object equivalent (`false`: no properties and no
+      additional ones; `true`: an unconstrained object), because providers take object schemas.
     - The application's tools become per-request `returnDirect` callbacks (`tools(...)`, the
       non-deprecated form) whose call emits the AG-UI tool call and returns `""`; Spring AI then
       ends the turn, and that placeholder generation (finish reason `returnDirect`, `toolName` one

@@ -109,7 +109,7 @@ Their handlers know when they are served over AG-UI:
 | | Conversation | Frontend tools | Tool calls shown | Approvals |
 |---|---|---|---|---|
 | [Spring AI](../integrations/spring-ai.md#agents-out-over-ag-ui) `ChatClient` | from each run | yes | Protoweft tools | — |
-| [LangChain4j](../integrations/langchain4j.md#over-ag-ui) AI Service | from each run, with `LangChain4jAgents.chatMemory(...)` | not yet | yes (streaming) | — |
+| [LangChain4j](../integrations/langchain4j.md#over-ag-ui) AI Service | from each run, with `LangChain4jAgents.chatMemory(...)` given to the AI Service and the handler | not yet | yes (streaming) | — |
 | [ARGI](../integrations/argi.md#agents-over-ag-ui-with-approvals-as-interrupts) agent | ARGI's checkpoint | not yet | — | as interrupts |
 
 ### Spring Boot

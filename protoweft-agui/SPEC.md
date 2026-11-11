@@ -117,7 +117,8 @@ contract has no words for (state, activity, reasoning, subagents, the applicatio
 
 - Spring AI: the frontend's conversation as the prompt, the application's tools as
   `returnDirect` callbacks, Protoweft tool calls reported (`protoweft-spring-ai`).
-- LangChain4j: the frontend's conversation through `LangChain4jAgents.chatMemory(...)`, tool calls
+- LangChain4j: the frontend's conversation through a `FrontendHistory` from
+  `LangChain4jAgents.chatMemory(...)`, shared by the AI Service and the handler; tool calls
   reported; the application's tools deferred (`protoweft-langchain4j`).
 - ARGI: approvals as `tool_approval` interrupts, resume entries as decisions; the application's
   tools deferred (`protoweft-argi`).

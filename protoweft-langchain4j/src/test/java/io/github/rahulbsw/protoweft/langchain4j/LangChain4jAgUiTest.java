@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** A LangChain4j AI Service served over AG-UI. */
 class LangChain4jAgUiTest {
@@ -70,18 +71,22 @@ class LangChain4jAgUiTest {
 
     private AgUiClient serve(boolean frontendHistory) {
         AiServices<Assistant> builder = AiServices.builder(Assistant.class).streamingChatModel(model).tools(new Tools());
-        builder = frontendHistory ? builder.chatMemoryProvider(LangChain4jAgents.chatMemory(id -> stored))
-                : builder.chatMemoryProvider(id -> stored);
+        FrontendHistory memory = LangChain4jAgents.chatMemory(id -> stored);
+        builder = frontendHistory ? builder.chatMemoryProvider(memory) : builder.chatMemoryProvider(id -> stored);
         Assistant assistant = builder.build();
-        server = AgUiAgentServer.builder(AgUi.agent(LangChain4jAgents.streamingHandler(assistant::chat))).build();
+        server = AgUiAgentServer.builder(AgUi.agent(frontendHistory
+                ? LangChain4jAgents.streamingHandler(assistant::chat, memory)
+                : LangChain4jAgents.streamingHandler(assistant::chat))).build();
         host = ProtoweftServer.builder().port(0).endpoints(server).start();
         return AgUiClient.builder(host.baseUrl() + "/agui").build();
     }
 
     @AfterEach
     void stop() {
-        host.close();
-        server.close();
+        if (host != null) {
+            host.close();
+            server.close();
+        }
     }
 
     @Test
@@ -112,6 +117,27 @@ class LangChain4jAgUiTest {
         assertThat(events).filteredOn(AgUiEvent.ToolCallResult.class::isInstance)
                 .extracting(e -> ((AgUiEvent.ToolCallResult) e).content()).containsExactly("42");
         assertThat(turn.lastRun().pendingToolCalls()).isEmpty();
+    }
+
+    @Test
+    void historiesAreScopedToTheirOwnServiceAndRunsCannotOverlap() {
+        MessageWindowChatMemory storedA = MessageWindowChatMemory.withMaxMessages(10);
+        MessageWindowChatMemory storedB = MessageWindowChatMemory.withMaxMessages(10);
+        storedB.add(dev.langchain4j.data.message.UserMessage.from("B's own history"));
+        FrontendHistory a = LangChain4jAgents.chatMemory(id -> storedA);
+        FrontendHistory b = LangChain4jAgents.chatMemory(id -> storedB);
+        FrontendHistory.Run run = a.begin("shared-id", List.of(dev.langchain4j.data.message.UserMessage.from("A's run")));
+
+        // Service B with the same conversation id sees and writes its own memory, not A's run.
+        assertThat(b.get("shared-id").messages()).extracting(ChatMessage::toString).singleElement().asString()
+                .contains("B's own history");
+        b.get("shared-id").add(AiMessage.from("B answered"));
+        assertThat(a.get("shared-id").messages()).hasSize(1);
+        assertThat(storedB.messages()).hasSize(2);
+        // A second run of the same conversation in the same service is refused, not overwritten.
+        assertThatThrownBy(() -> a.begin("shared-id", List.of())).isInstanceOf(IllegalStateException.class);
+        a.end("shared-id", run);
+        assertThat(a.get("shared-id").messages()).isEqualTo(storedA.messages());
     }
 
     @Test
