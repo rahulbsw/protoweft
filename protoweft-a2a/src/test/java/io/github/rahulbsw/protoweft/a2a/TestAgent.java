@@ -46,6 +46,13 @@ final class TestAgent implements AgentHandler {
                 task.artifact("data", List.of(new Content.Json(Map.of("rows", 2))));
                 task.complete("done");
             }
+            case "stream" -> {
+                task.textDelta("Hel");
+                task.textDelta("");
+                task.textDelta("lo");
+                task.toolCall("call-1", "lookup", "{}"); // no A2A form: ignored
+                task.complete();
+            }
             case "book" -> task.requireInput("For how many people?");
             case "login" -> task.requireAuth("Please sign in");
             case "slow" -> {

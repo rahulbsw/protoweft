@@ -11,7 +11,7 @@ as an **A2A** agent, using `protoweft-spring-ai`.
   - A `MessageChatMemoryAdvisor` keeps one conversation per A2A context.
   - The `AgentHandler` bean is `SpringAiAgents.streamingHandler(chatClient)`. The starter serves
     it over A2A (`protoweft.server.a2a.enabled: true`), and each answer chunk is streamed as a
-    `working` status.
+    chunk of the task's `response` artifact.
 - The model is Spring AI's OpenAI chat model, configured from the environment.
 
 | Endpoint | Protocol |

@@ -98,6 +98,26 @@ class A2aLifecycleTest {
     }
 
     @Test
+    void textDeltasStreamAsChunksOfOneArtifact() {
+        List<AgentEvent> events = new CopyOnWriteArrayList<>();
+        AgentReply reply = client.send(AgentMessage.user("stream"), events::add);
+
+        List<AgentEvent.ArtifactUpdate> chunks = events.stream()
+                .filter(AgentEvent.ArtifactUpdate.class::isInstance).map(AgentEvent.ArtifactUpdate.class::cast).toList();
+        assertThat(chunks).extracting(c -> ((Content.Text) c.artifact().parts().get(0)).text()).containsExactly("Hel", "lo", "Hello");
+        assertThat(chunks).extracting(AgentEvent.ArtifactUpdate::append).containsExactly(false, true, false);
+        assertThat(chunks).extracting(AgentEvent.ArtifactUpdate::lastChunk).containsExactly(false, false, true);
+        assertThat(chunks).extracting(c -> c.artifact().artifactId()).containsOnly(chunks.get(0).artifact().artifactId());
+        assertThat(reply.state()).isEqualTo(TaskState.COMPLETED);
+        // The stored task holds the whole text once, not one part per fragment.
+        assertThat(client.getTask(reply.taskId()).artifacts()).singleElement()
+                .satisfies(a -> {
+                    assertThat(a.name()).isEqualTo("response");
+                    assertThat(a.parts()).containsExactly(new Content.Text("Hello"));
+                });
+    }
+
+    @Test
     void streamingDirectMessageArrivesAsMessageEvent() {
         List<AgentEvent> events = new CopyOnWriteArrayList<>();
         AgentReply reply = client.send(AgentMessage.user("hello"), events::add);

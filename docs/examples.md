@@ -235,8 +235,8 @@ curl -s -X POST localhost:8080/a2a -H 'Content-Type: application/json' -H 'A2A-V
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"What is the weather in Paris?"}]}}}'
 ```
 
-The answer is the task's `response` artifact; `SendStreamingMessage` clients also receive each
-chunk as a `working` status. Send the next message with the returned `contextId` to continue the
+The answer is the task's `response` artifact; `SendStreamingMessage` clients receive it as it is
+generated, as chunks of that artifact. Send the next message with the returned `contextId` to continue the
 conversation. Every client under `protoweft.mcp.clients` (or `protoweft.utcp.manuals`,
 `protoweft.a2a.agents`) adds its tools to the registry, and the `ChatClient` sees them on its next
 request, for example `--args='--protoweft.mcp.clients.remote.url=http://localhost:3001'`.

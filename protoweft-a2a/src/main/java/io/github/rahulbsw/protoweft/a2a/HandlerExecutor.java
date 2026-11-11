@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Adapts an Protoweft {@link AgentHandler} to the SDK's {@link AgentExecutor} (lifecycle rules in SPEC.md). */
@@ -31,6 +32,9 @@ final class HandlerExecutor implements AgentExecutor {
 
     /** {@link ServerCallContext} state key holding the Protoweft {@link CallerIdentity}. */
     static final String CALLER_KEY = "io.github.rahulbsw.protoweft.caller";
+
+    /** Name of the artifact that carries text streamed with {@code textDelta}. */
+    static final String STREAMED_ARTIFACT_NAME = "response";
 
     private static final Logger LOG = LoggerFactory.getLogger(HandlerExecutor.class);
 
@@ -133,6 +137,9 @@ final class HandlerExecutor implements AgentExecutor {
         private boolean replied;
         private boolean closed;
         private volatile boolean cancelled;
+        /** The artifact receiving streamed text, or {@code null} when none is open. */
+        private String streamId;
+        private final StringBuilder streamed = new StringBuilder();
 
         TaskContext(String taskId, String contextId, AgentEmitter emitter, boolean existing, Message incoming) {
             this.taskId = taskId;
@@ -172,6 +179,35 @@ final class HandlerExecutor implements AgentExecutor {
             }
         }
 
+        /**
+         * Each fragment is appended to one artifact; when the task finishes or pauses, the whole
+         * text replaces it as the last chunk, so the stored task holds one text part, not one per
+         * fragment.
+         */
+        @Override
+        public synchronized void textDelta(String delta) {
+            if (delta == null || delta.isEmpty() || !open()) {
+                return;
+            }
+            boolean append = streamId != null;
+            if (!append) {
+                streamId = UUID.randomUUID().toString();
+            }
+            streamed.append(delta);
+            emitter.addArtifact(List.of(A2aMapping.toPart(new Content.Text(delta))), streamId,
+                    STREAMED_ARTIFACT_NAME, null, append, false);
+        }
+
+        /** Closes the streamed artifact, if one is open, with its whole text. */
+        private void closeStream() {
+            if (streamId != null) {
+                emitter.addArtifact(List.of(A2aMapping.toPart(new Content.Text(streamed.toString()))), streamId,
+                        STREAMED_ARTIFACT_NAME, null, false, true);
+                streamId = null;
+                streamed.setLength(0);
+            }
+        }
+
         @Override
         public synchronized void artifact(AgentArtifact artifact) {
             if (open()) {
@@ -182,6 +218,7 @@ final class HandlerExecutor implements AgentExecutor {
         @Override
         public synchronized void requireInput(String question) {
             if (open()) {
+                closeStream();
                 closed = true;
                 emitter.requiresInput(agentMessage(question));
             }
@@ -190,6 +227,7 @@ final class HandlerExecutor implements AgentExecutor {
         @Override
         public synchronized void requireAuth(String reason) {
             if (open()) {
+                closeStream();
                 closed = true;
                 emitter.requiresAuth(agentMessage(reason));
             }
@@ -198,6 +236,7 @@ final class HandlerExecutor implements AgentExecutor {
         @Override
         public synchronized void complete(String message) {
             if (open()) {
+                closeStream();
                 closed = true;
                 emitter.complete(agentMessage(message));
             }
@@ -206,6 +245,7 @@ final class HandlerExecutor implements AgentExecutor {
         @Override
         public synchronized void fail(String reason) {
             if (open()) {
+                closeStream();
                 closed = true;
                 emitter.fail(agentMessage(reason));
             }
@@ -214,6 +254,7 @@ final class HandlerExecutor implements AgentExecutor {
         @Override
         public synchronized void reject(String reason) {
             if (open()) {
+                closeStream();
                 closed = true;
                 emitter.reject(agentMessage(reason));
             }

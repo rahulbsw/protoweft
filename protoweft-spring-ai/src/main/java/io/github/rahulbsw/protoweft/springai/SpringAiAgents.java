@@ -38,7 +38,8 @@ import java.util.function.BiConsumer;
  * parameter {@link ChatMemory#CONVERSATION_ID}, so a memory advisor follows the protocol's
  * conversation, and the caller is passed as tool-context entry
  * {@link ProtoweftToolCallbacks#CALLER_KEY}, so Protoweft tools are called on the caller's
- * behalf. The answer becomes an artifact named {@value #ARTIFACT_NAME} and the task completes;
+ * behalf. The blocking handler's answer becomes an artifact named {@value #ARTIFACT_NAME}; the
+ * streaming handler streams it with {@link AgentTaskContext#textDelta}. Then the task completes;
  * an exception fails the task with its message.
  */
 public final class SpringAiAgents {
@@ -82,9 +83,9 @@ public final class SpringAiAgents {
     }
 
     /**
-     * Serves a {@code ChatClient} streaming: each chunk is reported as a {@code working} status
-     * carrying that fragment, then the whole answer becomes the task's artifact. All task calls
-     * are made on the handler's thread; a cancelled task disposes the subscription, which stops
+     * Serves a {@code ChatClient} streaming: each chunk is reported with
+     * {@link AgentTaskContext#textDelta}, then the task completes. All task calls are made on the
+     * handler's thread; a cancelled task disposes the subscription, which stops
      * the stream.
      */
     public static AgentHandler streamingHandler(ChatClient chatClient) {
@@ -110,17 +111,13 @@ public final class SpringAiAgents {
                 task.fail(message(e));
                 return;
             }
-            StringBuilder answer = new StringBuilder();
             try {
                 while (!task.isCancelled()) {
                     Object event = events.poll(POLL_MILLIS, TimeUnit.MILLISECONDS);
                     if (event instanceof String chunk) {
-                        if (!chunk.isEmpty()) {
-                            answer.append(chunk);
-                            task.working(chunk);
-                        }
+                        task.textDelta(chunk);
                     } else if (event == COMPLETE) {
-                        finish(task, answer.toString());
+                        task.complete();
                         return;
                     } else if (event instanceof Throwable error) {
                         task.fail(message(error));

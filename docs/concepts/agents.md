@@ -63,6 +63,8 @@ AgentHandler travel = (request, task) -> {
 |---|---|
 | `reply(message)` / `reply(text)` | Answer with a single message and create no task. Must be the only call, and can't answer a resumed task: use `complete(message)` there. |
 | `working(status)` | Mark the task in progress, with an optional status message (`null` for none). |
+| `textDelta(text)` | Stream the next fragment of the answer as the model produces it. The fragments are the answer; don't also send it as an artifact. |
+| `toolCall(id, name, arguments)` / `toolResult(id, outcome)` | Report a tool the agent runs itself, so clients that can show tool calls do. Informational only. |
 | `artifact(artifact)` / `artifact(name, parts)` | Add a result to the task. |
 | `requireInput(question)` | Pause until the caller sends another message on the task. |
 | `requireAuth(reason)` | Pause until the caller authenticates. |

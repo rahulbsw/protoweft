@@ -137,6 +137,8 @@ The handler API is described in [Agents](../concepts/agents.md#serving-an-agent)
 | `task.reply(message)` on new work | A `Message` result; no task is created. |
 | The first other call (`working`, `artifact`, …) | Creates the task, with the request message in its history. |
 | `working(status)` | `TASK_STATE_WORKING` status update. |
+| `textDelta(text)` | An artifact update appending the fragment to one `response` artifact; when the task finishes or pauses, the whole text replaces it as the last chunk, so the stored task holds it once. |
+| `toolCall(...)` / `toolResult(...)` | Nothing; A2A has no tool-call events. |
 | `artifact(...)` | An artifact update. |
 | `requireInput(question)` / `requireAuth(reason)` | `TASK_STATE_INPUT_REQUIRED` / `TASK_STATE_AUTH_REQUIRED`, with the text as status message. |
 | `complete(...)`, `fail(...)`, `reject(...)` | `TASK_STATE_COMPLETED`, `FAILED`, `REJECTED`. |
