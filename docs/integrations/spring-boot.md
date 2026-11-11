@@ -464,6 +464,7 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 |---|---|---|---|
 | `url` | string | — (required) | The agent's endpoint URL (where runs are POSTed). Offered as the tool `<name>.ask`. |
 | `response-timeout` | duration | 60 s | How long to wait for a run's response to start; the stream itself may run longer. |
+| `protobuf` | boolean | `false` | Ask the agent for AG-UI's [Protobuf binding](../protocols/agui.md#the-protobuf-binding); needs protobuf-java. Either binding is read. |
 
 ### RAP connectors: `protoweft.rap.servers.<name>.*`
 
@@ -519,6 +520,7 @@ Set exactly one of `url` and `file`. `<name>` is also the UTCP manual name.
 | `protoweft.server.agui.allowed-origins` | list | `[]` | Browser origins allowed to call the agent cross-origin (`*` for any); empty means no CORS. |
 | `protoweft.server.agui.name` | string | — | Agent name in the capabilities document. |
 | `protoweft.server.agui.description` | string | — | Agent description in the capabilities document. |
+| `protoweft.server.agui.protobuf` | boolean | `true` | Answer in AG-UI's [Protobuf binding](../protocols/agui.md#the-protobuf-binding) when a client asks for it; takes effect only with protobuf-java on the classpath. |
 | `protoweft.server.agui.from-chat-client` | boolean | `false` | With `protoweft-spring-ai` and no `AgentHandler` bean, serve the application's `ChatClient` over AG-UI (streaming). |
 | `protoweft.server.rap.enabled` | boolean | `false` | Serve tools over RAP. |
 | `protoweft.server.rap.base-path` | string | `/rap` | Path the RAP routes are mounted under; `/` mounts them at the root. |
