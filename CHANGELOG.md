@@ -21,6 +21,10 @@ All notable changes to Protoweft are documented here. The format follows
     `InboundAuthenticator` with `CallerIdentity` and `WWW-Authenticate` challenges,
     `ObservationHandler`, and `ProtoweftException` with `ErrorCategory`.
 - **AG-UI (`protoweft-agui`, Agent–User Interaction protocol, implemented from spec 1.0).**
+  `AgUiClient`, `AgUiThread` and `AgUiClientConnector` call remote AG-UI agents: the spec's consumer
+  pipeline (unknown material dropped with warnings, chunks expanded, sequence verified),
+  conversations with state and interrupts, and an opt-in bridge that offers Protoweft tools to the
+  agent and runs its calls (read-only tools automatically, others only with approval).
   `AgUiAgentServer` serves an agent to AG-UI frontends over HTTP + SSE: all 31 event types,
   interrupts, frontend tool calls, version negotiation, opt-in CORS and a capabilities document
   at `GET <path>/capabilities`. Every event is checked against the spec's sequence rules before it

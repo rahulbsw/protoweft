@@ -10,8 +10,9 @@ people. Frontends such as [CopilotKit](https://github.com/CopilotKit/CopilotKit)
 
 - **Server:** `AgUiAgentServer` serves a Java agent to any AG-UI frontend over the HTTP + SSE
   binding.
-- **Client:** coming next (calling remote AG-UI agents from Java, with registry tools offered to
-  them).
+- **Client:** `AgUiClient`, `AgUiThread` and `AgUiClientConnector` call remote AG-UI agents
+  (LangGraph, CrewAI, Mastra, Google ADK, Pydantic AI, …) from Java, and can offer them Protoweft
+  tools (MCP, UTCP, RAP, local `@AgentTool` methods) to call.
 
 AG-UI's first-party SDKs are TypeScript, Python and .NET. Protoweft implements
 [specification 1.0](https://docs.ag-ui.com/spec/1.0) directly, with **no runtime dependency
@@ -147,16 +148,125 @@ cross-origin: browser clients send an `Authorization` header. Preflights pass th
     other AG-UI implementations will not look for this endpoint. Declare only what the agent does;
     an omitted field means "not declared", not "unsupported".
 
+## Calling an agent
+
+### One run: `AgUiClient`
+
+```java
+AgUiClient agent = AgUiClient.builder("https://agents.example.com/agent")
+        .credentials(credentials)            // or .authorizer(oauthClient)
+        .build();
+
+RunResult result = agent.run(RunAgentInput.of(threadId, runId, messages), event -> {
+    if (event instanceof AgUiEvent.TextMessageContent text) {
+        System.out.print(text.delta());
+    }
+});
+```
+
+Every stream goes through the specification's consumer pipeline before your listener sees an
+event:
+
+- Event types and fields the client does not recognise are **dropped and stripped**, each reported
+  as a warning (`RunResult.warnings()`, and the builder's `warnings` callback).
+- **Chunk events** (`TEXT_MESSAGE_CHUNK`, …) arrive expanded into start, content and end events.
+- The sequence is **verified**. A malformed value or a sequence violation fails the call with a
+  `ProtoweftException` (`PROTOCOL`).
+
+`RunResult` says how the run ended: `succeeded()`, `interrupted()` with `interrupts()`,
+`cancelled()`, `error()` (the agent's `RUN_ERROR`), or `truncated()`. Truncated means the stream
+ended without an outcome, which is never reported as success. `pendingToolCalls()` lists the calls
+the application must answer. `call(input)` returns a `Call` you can `cancel()` from another thread,
+and `publisher(input, executor)` offers the run as a `Flow.Publisher` with backpressure. Outgoing
+input never carries activity messages and always declares a protocol version.
+
+### A conversation: `AgUiThread`
+
+AG-UI servers keep nothing between runs, so the client holds the conversation. `AgUiThread`
+assembles messages from the events (tool calls attached to their message, encrypted reasoning
+stored where it belongs, `MESSAGES_SNAPSHOT` reconciled by id), keeps the shared state (snapshots
+and JSON Patch deltas, applied atomically), and sends both back on every run:
+
+```java
+AgUiThread thread = AgUiThread.builder(agent)
+        .tools(registry, spec -> spec.name().startsWith("weather."))   // offer Protoweft tools
+        .approval(call -> ui.confirm(call.tool().name(), call.arguments()))
+        .build();
+
+AgUiThread.Turn turn = thread.send("Will it rain in Oslo tomorrow?");
+switch (turn.status()) {
+    case COMPLETED -> show(turn.text());
+    case INTERRUPTED -> thread.resume(Map.of(turn.interrupts().get(0).id(), ui.ask(turn.interrupts().get(0))));
+    case AWAITING_TOOL_RESULTS -> { /* answer(...) the application's calls, then continueRun() */ }
+    default -> showProblem(turn);
+}
+```
+
+A turn can span several runs: when the agent leaves calls to offered tools pending, the thread runs
+them and continues by itself (at most `maxAutomaticRuns`, default 10).
+
+### Offering Protoweft tools to the agent
+
+`tools(source, filter)` offers tools from any `ToolSource` (a `ToolRegistry` of MCP servers, UTCP
+manuals, RAP tool servers, A2A agents, local `@AgentTool` methods) as the run's application tools.
+A Python LangGraph agent can then call tools only the Java side can reach.
+
+- **Names** are adapted for model providers: `weather.forecast` is offered as
+  `weather__forecast`.
+- **Consent.** A tool marked `readOnly` runs automatically. Any other tool runs only if the
+  `approval` callback approves the call. Without an approval step, the agent is told the call
+  needs approval and nothing runs.
+- **Untrusted arguments.** Arguments are model output. They must be a JSON object and pass a
+  structural check against the tool's schema (required members, types, enums) before approval is
+  asked or the tool runs. A failed check answers the call with an error.
+- Results go back as tool messages (a failure carries `error`). Tool subscriptions are dropped:
+  AG-UI has no channel for later events.
+- Calls to tools you declared yourself with `clientTools(tools, handler)` (for example UI actions)
+  go to `handler`. If it has no answer, the turn stops with `AWAITING_TOOL_RESULTS` until you
+  `answer(...)` and `continueRun()`.
+
+### Interrupts
+
+An interrupted run returns `INTERRUPTED`. Continue with `resume(answers)`, or abandon an
+interrupt with a `ResumeEntry` of status `cancelled`. The thread checks before sending that every
+open interrupt is covered exactly once, and refuses to resolve one whose `expiresAt` has passed (it
+can still be abandoned). Sending a new message while interrupts are open is refused.
+
+### As a Protoweft agent: `AgUiClientConnector`
+
+```java
+AgUiClientConnector remote = AgUiClientConnector.builder("https://agents.example.com/agent")
+        .conversations(b -> b.tools(registry, spec -> true).approval(approval))
+        .build();
+remote.start();
+AgentReply reply = remote.send(AgentMessage.user("Plan my trip"));
+registry.register("planner", remote);   // offers one tool, "ask"
+```
+
+| AG-UI | `AgentReply` |
+|---|---|
+| finished | `COMPLETED`, the assistant's text as the message |
+| interrupted | `INPUT_REQUIRED`, the interrupts' messages. Reply on the same task: the text answers a single interrupt; a JSON part `{interruptId: answer}` answers several. |
+| tool calls the client does not run | `INPUT_REQUIRED`; the next message's text answers them |
+| `RUN_ERROR` | `FAILED` |
+| cancelled run / stream ended early | `CANCELED` / `UNKNOWN` |
+
+The conversation id is both the task id and the context id. `getTask` is unsupported (AG-UI has no
+tasks); `cancel` closes the stream of the run in flight; `thread(taskId)` gives the `AgUiThread`.
+While streaming, the assistant's text arrives as chunks of a `response` artifact.
+
 ## Coverage
 
-| | Server |
-|---|---|
-| HTTP + SSE binding | yes |
-| HTTP + Protobuf binding | no |
-| All 31 event types, all eight families | yes |
-| Interrupt and resume, frontend tool calls | yes |
-| Version negotiation (`protocolVersion`) | yes |
-| Capabilities document | yes, at `GET <path>/capabilities` |
-| Client role | not yet |
+| | Server | Client |
+|---|---|---|
+| HTTP + SSE binding | yes | yes |
+| HTTP + Protobuf binding | no | no |
+| All 31 event types, all eight families | yes | yes |
+| Chunk events | never sent | expanded |
+| Interrupt and resume | yes | yes, with coverage and expiry checks |
+| Frontend (application) tool calls | yes | yes, with the tool bridge |
+| Version negotiation (`protocolVersion`) | yes | yes |
+| Capabilities document | `GET <path>/capabilities` | read when the server has that endpoint |
 
-`AgUiAgentServer.compliance()` reports this with the feature ids in `AgUiFeatures`.
+`compliance()` on `AgUiAgentServer`, `AgUiClient` and `AgUiClientConnector` reports this with the
+feature ids in `AgUiFeatures`.

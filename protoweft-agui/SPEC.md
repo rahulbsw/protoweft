@@ -14,8 +14,9 @@ Speaks AG-UI, the agent ↔ user-facing-application protocol, in both roles:
 
 - **Server (built):** serves an agent to any AG-UI frontend (CopilotKit, chat platforms, terminal
   clients) over the HTTP + SSE binding. Agents are native `AgUiAgent`s or any core `AgentHandler`.
-- **Client (next):** calls remote AG-UI agents from Java, with an opt-in bridge that offers
-  registry tools to them. Not built yet; see "Deviations and gaps".
+- **Client (built):** calls remote AG-UI agents from Java (`AgUiClient` per run, `AgUiThread` per
+  conversation, `AgUiClientConnector` behind the neutral `AgentConnector`), with an opt-in bridge
+  that offers Protoweft tools to them.
 
 ## Boundary
 
@@ -112,6 +113,60 @@ Speaks AG-UI, the agent ↔ user-facing-application protocol, in both roles:
 `AgUi.run(task)` returns the `AgUiRun` behind a task served this way, for features the neutral
 contract has no words for (state, activity, reasoning, subagents, the application's tools).
 
+### Client
+
+- **Pipeline** (`ConsumerPipeline`), in the spec's order: decode (drop unrecognised events, strip
+  unrecognised members, each a warning in `RunResult.warnings()` and the builder's callback) →
+  expand chunks (`ChunkExpander`) → verify (`StreamVerifier`) → application. A malformed value or
+  a sequence violation fails the call with `ProtoweftException(PROTOCOL)`; an agent's
+  `RUN_ERROR` is a normal `RunResult`. A stream ending without a terminal event is
+  `truncated` and never success; no `RUN_FINISHED` is synthesized. A `RUN_ERROR` after
+  `RUN_FINISHED` makes the run failed.
+- **SSE reading** accepts the full grammar (LF, CR, CRLF, comments, multi-line `data`) and ignores
+  other fields; a line over `maxEventBytes` (8 MiB) fails the stream.
+- **Chunks:** one lane per owner (parent or subagent) with at most one open chunk stream; a new id
+  in the lane, a message/tool/step/state/custom/reasoning event in the lane, a run-level event or
+  the owner's subagent ending closes it (`RAW`, activity, encrypted values and `SUBAGENT_STARTED`
+  stand aside). An id-less continuation goes to the tagged owner, else the parent, else the only
+  open stream of its kind; two candidates are an ambiguity error. First chunks must carry their id
+  (and a tool name); conflicting repeats are errors. A metadata-only continuation becomes an
+  empty content event so its metadata reaches the item. Synthesized events carry the chunk's
+  metadata and raw event, not its timestamp.
+- **Outgoing:** activity messages stripped; `protocolVersion` declared when the input has none.
+  `pendingToolCalls()` uses the stated `pendingToolCallIds`, else every call the run left
+  unanswered (absence never means "nothing pending").
+- **HTTP:** JDK `HttpClient`, redirects off (a run must not be replayed elsewhere), credentials
+  and `HttpAuthorizer` applied as in RAP with one retry after a challenge. 401/403 →
+  `AUTHENTICATION`; 400/413/415 → `INVALID_ARGUMENTS`.
+- **Conversation** (`AgUiThread`, `Transcript`): messages assembled from events (tool calls on
+  their parent assistant message, or a new one; tool results as tool messages; reasoning as
+  reasoning messages; activity create/replace/patch with `replace: false`); metadata merged key
+  by key into the item each event builds; encrypted values stored on the named message or call
+  (unknown → warning); state snapshots replace and deltas apply atomically (a failing patch is
+  warned about and skipped); `MESSAGES_SNAPSHOT` replaces in place by id, appends new messages, and
+  drops absent ones except activity and reasoning messages when the snapshot carries none of that
+  role.
+- **Interrupts:** `resume` must cover every open interrupt exactly once, checked before sending; a
+  resolved answer to an interrupt whose `expiresAt` (ISO 8601) has passed is refused, abandoning
+  it is allowed. A new message while interrupts are open is refused.
+- **Tool bridge** (`ToolBridge`, decided with the user): offered tools are named for model
+  providers (`.` → `__`, other characters outside `[A-Za-z0-9_-]` → `_`, ≤ 64). A call runs when
+  the tool is `readOnly`, or `ToolApproval` approves it; otherwise the agent gets an error result
+  saying approval is required (no approval step) or that the user declined. Arguments must be a
+  JSON object and pass `SchemaCheck` (required members, declared types and enums,
+  `additionalProperties: false`) before approval is asked; this is structural, not full JSON
+  Schema, because a full validator would be a new runtime dependency. Subscriptions are dropped.
+  Calls to the application's own tools go to its `ClientToolHandler`; unanswered, the turn stops
+  (`AWAITING_TOOL_RESULTS`) and the thread refuses to continue until they are answered. A turn
+  runs at most `maxAutomaticRuns` (10) runs by itself.
+- **Connector:** conversation id = task id = context id; threads kept in memory per connector.
+  Turn statuses map to `TaskState` (interrupt and unanswered calls → `INPUT_REQUIRED`, truncated
+  → `UNKNOWN`). The next message answers: text for a single interrupt, a JSON part
+  `{interruptId: answer}` for several; text for unanswered tool calls. `getTask` is `UNSUPPORTED`;
+  `cancel` closes the stream. `ask` tool (`message`, `conversation_id`). Streaming events:
+  `WORKING`, text deltas as `response` artifact chunks, final status. The descriptor comes from
+  the builder or the capabilities document's `identity`.
+
 ## Spec rules implemented
 
 Event model and envelope; run input (all fields); metadata kept open; streaming triads with
@@ -123,14 +178,18 @@ processing model on input; subagent attribution and lifecycle.
 ## Deviations and gaps
 
 - `GET <path>/capabilities` (above).
-- Not built: the client role, chunk expansion (`*_CHUNK` is decoded but the server never emits it),
-  the HTTP + Protobuf binding, SSE keep-alive comments.
+- Not built: the HTTP + Protobuf binding, SSE keep-alive comments from the server, the
+  downgrade path for peers older than 1.0 (no translation shims; such peers' streams are judged by
+  1.0 rules).
+- The tool bridge's argument check is structural, not a full JSON Schema validator.
+- Conversations live in memory; a restarted client starts a new thread unless the application
+  restores `messages` and `state`.
 
 ## Coverage
 
-`AgUiFeatures` lists the feature ids; the server reports every event family, interrupts, frontend
-tools, version negotiation, CORS and the capabilities endpoint as supported, and
-`binding/http-protobuf` as unsupported. Tests assert it.
+`AgUiFeatures` lists the feature ids. The server reports every event family, interrupts, frontend
+tools, version negotiation, CORS and the capabilities endpoint as supported; the client adds chunk
+expansion and the tool bridge. Both report `binding/http-protobuf` as unsupported. Tests assert it.
 
 ## Verification
 
@@ -141,7 +200,16 @@ tools, version negotiation, CORS and the capabilities endpoint as supported, and
 - The `AgentHandler` adapter: streaming, history, interrupt then resume, failures, artifacts,
   `AgUi.run`, `onCancel`.
 - RFC 6902 Appendix A examples and atomicity; `StreamVerifier` rule by rule.
-- Jazzer fuzz targets for the run-input and event parsers and for JSON Patch, with regression
+- The client against a Protoweft server and a scripted server: dropped and stripped material with
+  warnings, chunk expansion, outgoing stripping and version, endings (error, truncation, pending
+  calls), malformed streams and HTTP refusals, cancellation, the publisher, capabilities. SSE
+  grammar and chunk rules as unit tests.
+- Conversations against a scripted Protoweft server: history and state round trips, interrupt
+  coverage and expiry, read-only tools run, approval required / declined / given, argument
+  checks, application tools handed to the application, the connector (states, resume, `ask`),
+  `MESSAGES_SNAPSHOT` reconciliation.
+- Jazzer fuzz targets for the run-input and event parsers, the client's whole reading path (raw
+  bytes through SSE, decoding, chunk expansion, verification) and JSON Patch, with regression
   seeds (including the fuzzer's finds: huge numbers, token counts beyond 2^53−1), in the CI fuzz
   job.
 

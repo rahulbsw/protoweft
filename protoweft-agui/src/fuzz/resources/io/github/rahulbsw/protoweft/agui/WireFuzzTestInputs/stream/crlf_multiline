@@ -1,0 +1,6 @@
+: keep-alive
+data: {"type":"RUN_STARTED",
+data: "threadId":"t","runId":"r"}
+
+data: {"type":"HOLOGRAM"}
+

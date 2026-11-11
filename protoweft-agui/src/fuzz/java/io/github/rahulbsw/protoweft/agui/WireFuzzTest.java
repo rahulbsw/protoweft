@@ -63,6 +63,31 @@ class WireFuzzTest {
         check(errors.isEmpty(), "accepted event violates the schema: " + errors);
     }
 
+    /**
+     * The client's whole reading path on arbitrary bytes: SSE framing, decoding, chunk expansion and
+     * sequence verification. A stream is read to its end or rejected with
+     * {@link AgUiFormatException} (or an over-long line); every delivered event re-encodes to JSON
+     * the official schema accepts.
+     */
+    @DictionaryFile(resourcePath = "json.dict")
+    @FuzzTest(maxDuration = "2m")
+    void stream(byte[] input) {
+        java.util.List<String> warnings = new ArrayList<>();
+        ConsumerPipeline pipeline = new ConsumerPipeline(warnings);
+        SseReader reader = new SseReader(new java.io.ByteArrayInputStream(input), 64 * 1024);
+        try {
+            String data;
+            while ((data = reader.next()) != null) {
+                for (AgUiEvent event : pipeline.accept(data)) {
+                    List<String> errors = OfficialSchema.errors("Event", EventCodec.encode(event));
+                    check(errors.isEmpty(), "delivered event violates the schema: " + errors);
+                }
+            }
+        } catch (AgUiFormatException | java.io.IOException rejected) {
+            // malformed: the run fails
+        }
+    }
+
     private static void check(boolean condition, String what) {
         if (!condition) {
             throw new IllegalStateException(what);

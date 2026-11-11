@@ -40,6 +40,21 @@ public final class AgUiFeatures {
     private AgUiFeatures() {
     }
 
+    /** The client runs the application's calls to offered Protoweft tools, with consent. */
+    public static final String TOOL_BRIDGE = "protoweft/tool-bridge";
+    /** Chunk events expanded into start/content/end on receipt. */
+    public static final String CHUNKS = "chunk-expansion";
+
+    static final Set<String> CLIENT_SUPPORTED = Set.of(BINDING_SSE, RUNS, TEXT, TOOL_CALLS, REASONING, STATE,
+            ACTIVITY, SUBAGENTS, PASSTHROUGH, INTERRUPTS, CLIENT_TOOLS, VERSION_NEGOTIATION, CHUNKS, TOOL_BRIDGE,
+            CAPABILITIES_ENDPOINT);
+    static final Set<String> CLIENT_UNSUPPORTED = Set.of(BINDING_PROTOBUF);
+
+    static ComplianceReport clientReport() {
+        return new ComplianceReport(ProtocolId.AGUI, "none", ModuleVersion.VALUE, List.of(AgUiProtocol.VERSION),
+                AgUiProtocol.VERSION, CLIENT_SUPPORTED, CLIENT_UNSUPPORTED);
+    }
+
     static ComplianceReport serverReport() {
         return new ComplianceReport(ProtocolId.AGUI, "none", ModuleVersion.VALUE, List.of(AgUiProtocol.VERSION),
                 AgUiProtocol.VERSION, SERVER_SUPPORTED, SERVER_UNSUPPORTED);

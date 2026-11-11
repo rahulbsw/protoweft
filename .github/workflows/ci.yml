@@ -92,6 +92,7 @@ jobs:
             protoweft-rap:io.github.rahulbsw.protoweft.rap.ToolsetFuzzTest.manifest \
             protoweft-agui:io.github.rahulbsw.protoweft.agui.WireFuzzTest.runInput \
             protoweft-agui:io.github.rahulbsw.protoweft.agui.WireFuzzTest.event \
+            protoweft-agui:io.github.rahulbsw.protoweft.agui.WireFuzzTest.stream \
             protoweft-agui:io.github.rahulbsw.protoweft.agui.JsonPatchFuzzTest.patch \
             protoweft-utcp:io.github.rahulbsw.protoweft.utcp.ManualFuzzTest.manual \
             protoweft-utcp:io.github.rahulbsw.protoweft.utcp.UrlSecurityFuzzTest.urls \
