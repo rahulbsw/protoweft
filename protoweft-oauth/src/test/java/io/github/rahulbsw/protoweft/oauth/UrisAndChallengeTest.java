@@ -16,6 +16,10 @@ class UrisAndChallengeTest {
         assertThat(Challenge.parse("Bearer scope=\"\u2003\"").scope()).isNull();
         assertThat(Challenge.parse("Bearer scope=\"\u0001\"").scope()).isNull();
         assertThat(Challenge.parse("Bearer scope=\"  \"").scope()).isNull();
+        // Found by CI fuzzing: a mix that neither isBlank() (NUL isn't whitespace) nor trim()
+        // (keeps U+2003) caught on its own.
+        assertThat(Challenge.parse("Bearer scope=\"\u0000\u0000\u2003\"").scope()).isNull();
+        assertThat(Challenge.parse("Bearer scope=\"\u2003\u0001files:read\u00a0\"").scope()).isEqualTo("files:read");
         assertThat(Challenge.parse("Bearer scope=\" files:read \"").scope()).isEqualTo("files:read");
     }
 

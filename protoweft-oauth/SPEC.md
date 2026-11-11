@@ -138,8 +138,11 @@ steps up against the real filter.
   can't send to (no host, non-ASCII host) escaped `handleUnauthorized` as
   `IllegalArgumentException` — `Http` now reports it as `AUTHENTICATION`; an IPv6 literal with an
   over-long IPv4 part escaped `Challenge.parse` as JDK 17's `NumberFormatException` — `Uris.parse`
-  treats it as unparseable; a `scope` of control characters became `""` instead of absent (blank is
-  now judged after `trim()`, so selection falls back to `scopes_supported`); a `null` PRM document
+  treats it as unparseable; a `scope` of control characters became `""` instead of absent. A blank
+  scope is now judged after stripping control characters *and* Unicode whitespace from both ends
+  (`Challenge.trimmed`), so selection falls back to `scopes_supported`; `trim()` alone keeps U+2003
+  and `isBlank()` alone ignores NUL, and CI fuzzing found the mix (NULs then U+2003) that slipped
+  past both; a `null` PRM document
   or `null` array entry threw `NullPointerException` from `fromJson` — now `PROTOCOL`, surfaced by
   discovery as `AUTHENTICATION`.
 
