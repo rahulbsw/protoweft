@@ -35,9 +35,10 @@ import java.util.concurrent.TimeUnit;
  * }</pre>
  *
  * <p>The conversation id passed to the agent is the request's {@code contextId} (falling back to
- * its {@code taskId}), so LangChain4j chat memory follows the protocol's conversation. Every task
- * ends with the answer as an artifact named {@value #ARTIFACT_NAME} and completes; an exception
- * fails the task with its message.
+ * its {@code taskId}), so LangChain4j chat memory follows the protocol's conversation. The blocking
+ * handler's answer becomes an artifact named {@value #ARTIFACT_NAME}; the streaming handler
+ * streams it with {@link AgentTaskContext#textDelta}. Then the task completes; an exception fails
+ * the task with its message.
  */
 public final class LangChain4jAgents {
 
@@ -77,9 +78,10 @@ public final class LangChain4jAgents {
     }
 
     /**
-     * Serves a streaming agent: each partial response is reported as a {@code working} status
-     * carrying that fragment, then the full answer becomes the task's artifact. All task calls are
-     * made on the handler's thread; a cancelled task stops listening to the stream.
+     * Serves a streaming agent: each partial response is reported with
+     * {@link AgentTaskContext#textDelta}, then the task completes. If the model streamed nothing,
+     * the complete response's text becomes the {@value #ARTIFACT_NAME} artifact instead. All task
+     * calls are made on the handler's thread; a cancelled task stops listening to the stream.
      */
     public static AgentHandler streamingHandler(StreamingConversation conversation) {
         Objects.requireNonNull(conversation, "conversation");
@@ -95,12 +97,18 @@ public final class LangChain4jAgents {
                 task.fail(message(e));
                 return;
             }
+            boolean streamed = false;
             while (!task.isCancelled()) {
                 Object event = events.poll(POLL_MILLIS, TimeUnit.MILLISECONDS);
                 if (event instanceof String partial) {
-                    task.working(partial);
+                    streamed |= !partial.isEmpty();
+                    task.textDelta(partial);
                 } else if (event instanceof ChatResponse response) {
-                    finish(task, response.aiMessage() == null ? null : response.aiMessage().text());
+                    if (streamed) {
+                        task.complete();
+                    } else {
+                        finish(task, response.aiMessage() == null ? null : response.aiMessage().text());
+                    }
                     return;
                 } else if (event instanceof Throwable error) {
                     task.fail(message(error));

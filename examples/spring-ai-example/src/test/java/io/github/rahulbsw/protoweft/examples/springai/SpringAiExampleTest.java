@@ -125,19 +125,20 @@ class SpringAiExampleTest {
 
     @Test
     void streamingReportsFragmentsAndCallerReachesTools() {
-        List<String> working = new CopyOnWriteArrayList<>();
+        List<String> chunks = new CopyOnWriteArrayList<>();
         try (A2aAgentConnector agent = agent()) {
             assertThat(agent.streams()).isTrue();
 
             AgentReply reply = agent.send(AgentMessage.user("Who am I?"), event -> {
-                if (event instanceof AgentEvent.StatusUpdate s && s.state() == TaskState.WORKING && s.message() != null) {
-                    working.add(s.message().text());
+                // Streamed text arrives as chunks of the "response" artifact.
+                if (event instanceof AgentEvent.ArtifactUpdate a && !a.lastChunk()) {
+                    chunks.add(((Content.Text) a.artifact().parts().get(0)).text());
                 }
             });
 
             assertThat(reply.state()).isEqualTo(TaskState.COMPLETED);
             assertThat(reply.text()).contains("The tool said anonymous");
-            assertThat(working).contains("The ", "tool ");
+            assertThat(chunks).contains("The ", "tool ");
         }
     }
 

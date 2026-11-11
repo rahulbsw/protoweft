@@ -101,8 +101,11 @@ Dependency rules, enforced by module boundaries:
     progress, contexts)`. `LocalTools` injects any `@AgentTool` parameter whose type extends
     `ToolContext`; where the serving protocol offers none, the tool gets a stand-in whose
     `available()` is false. RAP's `RapCallContext` is the first; core never depends on a protocol.
-- **Agents.** `AgentHandler` with `AgentTaskContext` (reply; working; artifact; require input or
-  auth; complete, fail or reject; cancellation) is the server-side contract. `AgentMessage`,
+- **Agents.** `AgentHandler` with `AgentTaskContext` (reply; working; streamed text
+  `textDelta`; informational `toolCall`/`toolResult` for tools the agent runs itself; artifact;
+  require input or auth; complete, fail or reject; cancellation) is the server-side contract.
+  Streaming entered core because A2A and AG-UI both carry it; each protocol maps it to its own
+  streaming form, and one without a form for tool calls ignores them. `AgentMessage`,
   `AgentReply`, `AgentEvent`, `AgentDescriptor` and `TaskState` are the neutral data model. A2A is
   its first protocol.
 - **Cross-cutting.**

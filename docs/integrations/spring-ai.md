@@ -218,8 +218,8 @@ A2aAgentServer server = A2aAgentServer.builder(handler, card).publicUrl("https:/
     also serves a `ChatClient` over A2A. Its `DefaultAgentExecutor` calls a handler that returns
     the whole answer as one `String`, adds it as a single artifact and completes the task; it
     sends no partial output while the model generates, so streaming fragments need a custom
-    `AgentExecutor`. `SpringAiAgents.streamingHandler` streams each chunk as a `working` status
-    and cancels generation when the task is cancelled.
+    `AgentExecutor`. `SpringAiAgents.streamingHandler` streams each chunk with `textDelta` (over
+    A2A: chunks of the `response` artifact) and cancels generation when the task is cancelled.
 
 ## Tools out: Spring AI `@Tool` methods over MCP and UTCP
 

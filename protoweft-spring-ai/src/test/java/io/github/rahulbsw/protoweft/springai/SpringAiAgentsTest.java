@@ -43,6 +43,7 @@ class SpringAiAgentsTest {
         @Override public String contextId() { return "ctx-1"; }
         @Override public void reply(AgentMessage message) { record("reply:" + message.text()); }
         @Override public void working(String status) { record("working:" + status); }
+        @Override public void textDelta(String delta) { record("delta:" + delta); }
         @Override public void artifact(AgentArtifact artifact) {
             record("artifact:" + artifact.name() + ":" + ((Content.Text) artifact.parts().get(0)).text());
         }
@@ -128,14 +129,13 @@ class SpringAiAgentsTest {
     }
 
     @Test
-    void streamingReportsChunksThenArtifactOnHandlerThread() throws Exception {
+    void streamingReportsChunksAsTextDeltasOnHandlerThread() throws Exception {
         ScriptedChatModel model = new ScriptedChatModel(ScriptedChatModel.answer("Hello big world"));
         FakeTask task = new FakeTask();
 
         SpringAiAgents.streamingHandler(withMemory(model)).handle(request("hi", "t", "c"), task);
 
-        assertThat(task.events).containsExactly("working:Hello ", "working:big ", "working:world",
-                "artifact:response:Hello big world", "complete");
+        assertThat(task.events).containsExactly("delta:Hello ", "delta:big ", "delta:world", "complete");
         assertThat(task.threads).allMatch(name -> name.equals(Thread.currentThread().getName()));
     }
 
@@ -157,8 +157,7 @@ class SpringAiAgentsTest {
                 false, List.of(), CallerIdentity.of("bob")), task);
 
         assertThat(callers).containsExactly("bob");
-        assertThat(task.events).containsExactly("working:result: ", "working:bob", "artifact:response:result: bob",
-                "complete");
+        assertThat(task.events).containsExactly("delta:result: ", "delta:bob", "complete");
     }
 
     @Test

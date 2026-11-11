@@ -145,8 +145,8 @@ chat.prompt().user(q).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversa
     replayed, because the memory owns the conversation.
   - **Results.** The answer becomes one text artifact `response`, then the task is completed. An
     exception, or a message with no text (Spring AI rejects blank user text), fails the task.
-  - **Streaming.** `stream().content()` chunks become one `working` status each, carrying that
-    fragment, and the accumulated text becomes the artifact. Events are queued and handled on the
+  - **Streaming.** `stream().content()` chunks are sent with `textDelta`, one call each, and no
+    final artifact is added: the fragments are the answer. Events are queued and handled on the
     handler's thread, so `AgentTaskContext` is called from one thread.
   - **Cancellation.** It disposes the subscription, which cancels the upstream `Flux`. This is
     different from LangChain4j, whose stream couldn't be aborted.
@@ -213,7 +213,7 @@ scripted `ChatModel` returns tool-call `AssistantMessage`s, then text, and drive
   - The caller reaches tools, both blocking and streaming.
   - The customizer applies.
   - Failures, including blank text, fail the task.
-  - Streaming: chunks become `working` statuses on the handler thread.
+  - Streaming: chunks become `textDelta` calls on the handler thread.
   - A stream error fails the task.
   - Cancellation disposes the upstream.
 - **`SpringAiToolsTest` (6).**

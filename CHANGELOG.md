@@ -15,6 +15,8 @@ All notable changes to Protoweft are documented here. The format follows
   - `ToolProgress` and `ProgressAwareToolHandler` for progress and log messages from running
     tools.
   - Agents: `AgentHandler`/`AgentTaskContext` for the full task lifecycle, and `AgentConnector`.
+    `AgentTaskContext.textDelta` streams answer text, and `toolCall`/`toolResult` report tools
+    the agent runs itself; each protocol carries them in its own streaming form.
   - Cross-cutting: `ComplianceReport`, `CredentialProvider`, `HttpAuthorizer`,
     `InboundAuthenticator` with `CallerIdentity` and `WWW-Authenticate` challenges,
     `ObservationHandler`, and `ProtoweftException` with `ErrorCategory`.
@@ -87,6 +89,12 @@ All notable changes to Protoweft are documented here. The format follows
   documentation site (Zensical, GitHub Pages), and contribution and security guides. Maven
   Central publishing through a gated release workflow, a CycloneDX SBOM with attestations,
   Gradle dependency verification, SHA-pinned actions and OpenSSF Scorecard.
+
+### Changed
+- Streaming agents no longer report answer tokens as `working` status text. The Spring AI and
+  LangChain4j streaming handlers send them with `textDelta`, which the A2A server streams as
+  chunks of one appended `response` artifact, replaced by the whole text as the last chunk; they
+  no longer add a separate final `response` artifact.
 
 ### Fixed
 - The discovery search meta-tool offers models only `query` and `limit`. Its former `protocols`,

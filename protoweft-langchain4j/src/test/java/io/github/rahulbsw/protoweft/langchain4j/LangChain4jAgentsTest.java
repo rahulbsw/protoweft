@@ -50,6 +50,7 @@ class LangChain4jAgentsTest {
         @Override public String contextId() { return "ctx-1"; }
         @Override public void reply(AgentMessage message) { record("reply:" + message.text()); }
         @Override public void working(String status) { record("working:" + status); }
+        @Override public void textDelta(String delta) { record("delta:" + delta); }
         @Override public void artifact(AgentArtifact artifact) {
             record("artifact:" + artifact.name() + ":" + ((Content.Text) artifact.parts().get(0)).text());
         }
@@ -111,7 +112,7 @@ class LangChain4jAgentsTest {
     }
 
     @Test
-    void streamingReportsPartialsThenArtifact() throws Exception {
+    void streamingReportsPartialsAsTextDeltas() throws Exception {
         StreamingChatModel streaming = new StreamingChatModel() {
             @Override
             public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
@@ -130,8 +131,27 @@ class LangChain4jAgentsTest {
 
         LangChain4jAgents.streamingHandler(assistant::chat).handle(request("hi", "t", "c"), task);
 
-        assertThat(task.events).containsExactly("working:Hel", "working:lo", "artifact:response:Hello", "complete");
+        assertThat(task.events).containsExactly("delta:Hel", "delta:lo", "complete");
         assertThat(task.threads).allMatch(name -> name.equals(Thread.currentThread().getName()));
+    }
+
+    @Test
+    void streamingWithoutPartialsSendsTheAnswerAsArtifact() throws Exception {
+        StreamingChatModel streaming = new StreamingChatModel() {
+            @Override
+            public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
+                handler.onCompleteResponse(ChatResponse.builder().aiMessage(AiMessage.from("Hello")).build());
+            }
+        };
+        StreamingAssistant assistant = AiServices.builder(StreamingAssistant.class)
+                .streamingChatModel(streaming)
+                .chatMemoryProvider(id -> MessageWindowChatMemory.withMaxMessages(10))
+                .build();
+        FakeTask task = new FakeTask();
+
+        LangChain4jAgents.streamingHandler(assistant::chat).handle(request("hi", "t", "c"), task);
+
+        assertThat(task.events).containsExactly("artifact:response:Hello", "complete");
     }
 
     @Test

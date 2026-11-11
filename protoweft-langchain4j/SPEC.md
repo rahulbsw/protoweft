@@ -131,7 +131,8 @@ AgentDescriptor card = LangChain4jAgents.descriptor("Assistant", "Answers questi
   conversation.
 - **Agent results.** The answer becomes one text artifact (`response`), then the task is
   completed. An exception fails the task with its message. While streaming, each partial
-  response becomes one `working` status carrying that fragment, not the accumulated text. Stream
+  response is sent with `textDelta` and no final artifact is added (the fragments are the answer);
+  if the model streamed nothing, the complete response's text becomes the `response` artifact. Stream
   callbacks are queued and replayed on the handler's thread, so `AgentTaskContext` is only called
   from one thread. Cancellation stops listening, but LangChain4j's stream isn't aborted.
 

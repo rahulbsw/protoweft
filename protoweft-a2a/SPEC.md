@@ -83,6 +83,12 @@ Both A2A roles over the **JSON-RPC binding of A2A spec 1.0**, built on the offic
   is completed; one that throws fails with the exception message. Cancel sets `isCancelled()`,
   calls `onCancel`, and emits `canceled`; later emissions of that run are ignored.
   `AgentRequest.history` excludes the message being delivered.
+- **Streamed text.** `textDelta` fragments become artifact updates on one `response` artifact
+  (first `append=false`, then `append=true`, `lastChunk=false`). Before the task finishes or
+  pauses, the whole text is sent again with `append=false`, `lastChunk=true`, which the SDK's
+  `appendArtifactToTask` treats as a replacement, so the stored task holds the text as one part
+  rather than one part per fragment. `toolCall`/`toolResult` are ignored: A2A has no tool-call
+  events.
 - **Push notifications** use the SDK's `BasePushNotificationSender` with its default URL policy
   (`https`, public addresses); `insecurePushTargets(true)` allows `http` and private hosts for
   development.

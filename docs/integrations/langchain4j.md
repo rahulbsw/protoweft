@@ -115,8 +115,9 @@ A2aAgentServer server = A2aAgentServer.builder(handler, card).publicUrl("https:/
 - **Results.** The answer becomes one text artifact named `response`
   (`LangChain4jAgents.ARTIFACT_NAME`) and the task completes. An exception fails the task with its
   message.
-- **Streaming.** Each partial response becomes one `working` status carrying that fragment (not
-  the accumulated text). Callbacks are replayed on the handler's thread. Cancelling stops
+- **Streaming.** Each partial response is streamed with `textDelta` (over A2A: a chunk of the
+  `response` artifact), and no separate final artifact is added; if the model streamed nothing,
+  the complete response's text becomes the artifact. Callbacks are replayed on the handler's thread. Cancelling stops
   listening, but LangChain4j's stream itself isn't aborted.
 
 ## `@Tool` methods out
