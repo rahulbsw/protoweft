@@ -19,7 +19,7 @@ public record Challenge(URI resourceMetadata, String scope, String error, String
     public static final Challenge NONE = new Challenge(null, null, null, null);
 
     public Challenge {
-        scope = scope == null || scope.trim().isEmpty() ? null : scope.trim();
+        scope = scope == null || scope.isBlank() || scope.trim().isEmpty() ? null : scope.trim();
     }
 
     /**
