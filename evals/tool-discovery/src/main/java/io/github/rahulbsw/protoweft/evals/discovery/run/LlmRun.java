@@ -2,7 +2,10 @@ package io.github.rahulbsw.protoweft.evals.discovery.run;
 
 import io.github.rahulbsw.protoweft.evals.discovery.arms.Arm;
 import io.github.rahulbsw.protoweft.evals.discovery.arms.ArmResult;
+import io.github.rahulbsw.protoweft.evals.discovery.arms.MultiTurn;
 import io.github.rahulbsw.protoweft.evals.discovery.arms.SelectedCall;
+import io.github.rahulbsw.protoweft.evals.discovery.fixtures.FixtureStore;
+import io.github.rahulbsw.protoweft.evals.discovery.fixtures.MockResultProvider;
 import io.github.rahulbsw.protoweft.evals.discovery.cost.BudgetExceededException;
 import io.github.rahulbsw.protoweft.evals.discovery.cost.CostGuard;
 import io.github.rahulbsw.protoweft.evals.discovery.cost.GuardedModelClient;
@@ -49,17 +52,29 @@ public final class LlmRun {
      * @param distractors          {@code own}, {@code toolret} or {@code both}
      * @param maxConsecutiveErrors abort a (model, arm, N) cell after this many consecutive call errors
      * @param settings             model settings for the report header (temperature, effort, …)
+     * @param multiTurn            multi-turn mocked-execution config, or {@code null} for single-turn
      */
     public record Config(List<String> datasets, List<String> arms, List<String> models, List<Integer> catalogSizes,
                          int trials, int tasks, long seed, int maxOutputTokens, int maxTurns, String catalogScope,
                          String distractors, int maxConsecutiveErrors, boolean dryRun, Map<String, Object> settings,
-                         Path mcpDir, Path toolretDir, Path outDir, Path repoDir) {
+                         Path mcpDir, Path toolretDir, Path outDir, Path repoDir, MultiTurnConfig multiTurn) {
     }
 
-    /** Builds an arm from its spec. */
+    /**
+     * Multi-turn mocked-execution settings (opt-in {@code --multiturn}). A selected tool call is
+     * answered with a mocked result and the loop continues, so result and history tokens are
+     * exercised and counted.
+     *
+     * @param resultFixtures JSONL file or directory of recorded {@link io.github.rahulbsw.protoweft.evals.discovery.fixtures.ResultFixture}s
+     * @param fallbackTokens target result size for a fixture miss when no fixtures were recorded
+     */
+    public record MultiTurnConfig(Path resultFixtures, int fallbackTokens) {
+    }
+
+    /** Builds an arm from its spec; {@code multiTurn} is {@code null} for single-turn runs. */
     @FunctionalInterface
     public interface ArmBuilder {
-        Arm build(String spec, Map<String, String> defaults, TokenEstimator estimator);
+        Arm build(String spec, Map<String, String> defaults, TokenEstimator estimator, MultiTurn multiTurn);
     }
 
     private final Config config;
@@ -67,20 +82,42 @@ public final class LlmRun {
     private final CostGuard guard;
     private final PriceTable prices;
     private final ArmBuilder armBuilder;
+    private final io.github.rahulbsw.protoweft.evals.discovery.metrics.LlmJudge judge;
+    private final String judgeKey;
     private final TokenEstimator estimator = TokenEstimator.o200k();
 
-    /**
-     * @param clients    model spec → client (real, scripted, or estimating for dry runs)
-     * @param guard      the cost guard; ignored for dry runs, required otherwise
-     * @param prices     prices for cost columns (may be empty)
-     */
     public LlmRun(Config config, Map<String, ModelClient> clients, CostGuard guard, PriceTable prices,
                   ArmBuilder armBuilder) {
+        this(config, clients, guard, prices, armBuilder, null);
+    }
+
+    /**
+     * @param clients     model spec → client (real, scripted, or estimating for dry runs)
+     * @param guard       the cost guard; ignored for dry runs, required otherwise
+     * @param prices      prices for cost columns (may be empty)
+     * @param judgeClient optional model client that grades free-text final answers, or {@code null}
+     */
+    public LlmRun(Config config, Map<String, ModelClient> clients, CostGuard guard, PriceTable prices,
+                  ArmBuilder armBuilder, ModelClient judgeClient) {
         this.config = Objects.requireNonNull(config, "config");
         this.clients = new LinkedHashMap<>(clients);
         this.guard = config.dryRun() ? null : Objects.requireNonNull(guard, "guard");
         this.prices = prices == null ? PriceTable.empty() : prices;
         this.armBuilder = Objects.requireNonNull(armBuilder, "armBuilder");
+        this.judge = judgeClient == null ? null
+                : new io.github.rahulbsw.protoweft.evals.discovery.metrics.LlmJudge(
+                        config.dryRun() ? judgeClient : new GuardedModelClient(judgeClient, guard, estimator));
+        this.judgeKey = judgeClient == null ? null : judgeClient.key();
+    }
+
+    private MultiTurn buildMultiTurn() {
+        MultiTurnConfig mt = config.multiTurn();
+        if (mt == null) {
+            return null;
+        }
+        FixtureStore store = FixtureStore.load(mt.resultFixtures());
+        MockResultProvider provider = new MockResultProvider(store, estimator, mt.fallbackTokens(), config.seed());
+        return new MultiTurn(provider, config.maxTurns());
     }
 
     /** Runs and returns the results directory. */
@@ -105,7 +142,8 @@ public final class LlmRun {
         }
         Map<String, String> armDefaults = Map.of("maxOutputTokens", String.valueOf(config.maxOutputTokens()),
                 "maxTurns", String.valueOf(config.maxTurns()), "seed", String.valueOf(config.seed()));
-        List<Arm> arms = config.arms().stream().map(s -> armBuilder.build(s, armDefaults, estimator)).toList();
+        MultiTurn multiTurn = buildMultiTurn();
+        List<Arm> arms = config.arms().stream().map(s -> armBuilder.build(s, armDefaults, estimator, multiTurn)).toList();
         Map<String, ModelClient> guarded = new LinkedHashMap<>();
         clients.forEach((spec, c) -> guarded.put(spec, config.dryRun() ? c : new GuardedModelClient(c, guard, estimator)));
 
@@ -145,8 +183,24 @@ public final class LlmRun {
                                 }
                                 Map<String, Object> row = row(task, catalog, n, trial, m.getValue(), result,
                                         exactCount(clients.get(m.getKey())));
+                                // Judge after the agent row is built: if judging exhausts the budget,
+                                // keep the completed agent row and clean-stop like an agent call does.
+                                boolean budgetStop = false;
+                                if (judge != null && result.error() == null) {
+                                    try {
+                                        var verdict = judge.judge(task, result.finalText());
+                                        row.put("judgedSuccess", verdict.pass());
+                                        row.put("judgeReason", verdict.reason());
+                                    } catch (BudgetExceededException e) {
+                                        stopReason = e.getMessage();
+                                        budgetStop = true;
+                                    }
+                                }
                                 out.row(row);
                                 report.add(cell, row);
+                                if (budgetStop) {
+                                    break outer;
+                                }
                                 if (result.error() != null) {
                                     int errs = consecutiveErrors.merge(cell, 1, Integer::sum);
                                     if (errs >= config.maxConsecutiveErrors()) {
@@ -233,6 +287,10 @@ public final class LlmRun {
         row.put("callCorrect", s.callCorrect());
         row.put("argKeysCorrect", s.argKeysCorrect());
         row.put("argumentMismatches", s.argumentMismatches());
+        row.put("reFetches", s.reFetches());
+        row.put("goldToolsCovered", s.goldToolsCovered());
+        row.put("requiredFactsPresent", s.requiredFactsPresent());
+        row.put("taskSuccess", s.taskSuccess());
         row.put("discoveryCalls", r.discoveryCalls());
         row.put("modelCalls", r.modelCalls());
         row.put("toolsOffered", r.toolsOffered());
@@ -241,6 +299,19 @@ public final class LlmRun {
         row.put("cachedInputTokens", r.usage().cachedInputTokens());
         row.put("cacheWriteTokens", r.usage().cacheWriteTokens());
         row.put("toolPayloadTokensEst", r.toolPayloadTokens());
+        row.put("estDefinitionTokens", r.estimated().definitions());
+        row.put("estResultTokens", r.estimated().results());
+        row.put("estHistoryTokens", r.estimated().history());
+        row.put("estSystemTokens", r.estimated().system());
+        row.put("estInputTokens", r.estimated().total());
+        row.put("estDefinitionTokensPerCall", r.definitionTokensPerCall());
+        row.put("reconciliationResidual", r.reconciliationResidual());
+        row.put("reconciliationResidualPerCall", r.reconciliationResidualPerCall());
+        row.put("perRequest", r.perRequest().stream()
+                .map(rt -> Map.of("realInput", rt.realInput(), "est", rt.estimate().total(),
+                        "def", rt.estimate().definitions(), "res", rt.estimate().results(),
+                        "hist", rt.estimate().history(), "residual", rt.residual()))
+                .toList());
         row.put("exactInputTokens", exactInput);
         row.put("latencyMs", r.latencyMillis());
         row.put("costUsd", prices.price(client.key()).map(p -> p.cost(r.usage())).orElse(null));
@@ -270,6 +341,13 @@ public final class LlmRun {
         m.put("catalogScope", config.catalogScope());
         m.put("distractors", config.distractors());
         m.put("dryRun", config.dryRun());
+        if (judgeKey != null) {
+            m.put("judgeModel", judgeKey);
+        }
+        if (config.multiTurn() != null) {
+            m.put("multiTurn", Map.of("resultFixtures", String.valueOf(config.multiTurn().resultFixtures()),
+                    "fallbackTokens", config.multiTurn().fallbackTokens()));
+        }
         m.put("modelSettings", config.settings());
         return m;
     }

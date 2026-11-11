@@ -99,13 +99,13 @@ final class DiscoveryArmSupport {
                             Map<String, Object> extras) {
         List<SelectedCall> calls = o.realCalls().stream().map(mapper).toList();
         return new ArmResult(arm, task.id(), calls, o.discoveryCalls(), o.responses().size(), o.usage(),
-                o.latencyMillis(), o.toolsOffered(), o.toolPayloadTokens(), o.finalText(), o.hitMaxTurns(), o.error(),
-                extras);
+                o.latencyMillis(), o.toolsOffered(), o.toolPayloadTokens(), o.estimated(), o.perRequest(), o.finalText(),
+                o.hitMaxTurns(), o.error(), extras);
     }
 
     /** A result for a model of the wrong provider: no model call is made. */
     static ArmResult wrongProvider(String arm, EvalTask task, String provider, String expected) {
-        return new ArmResult(arm, task.id(), List.of(), 0, 0, null, 0, 0, 0, "", false,
+        return new ArmResult(arm, task.id(), List.of(), 0, 0, null, 0, 0, 0, null, List.of(), "", false,
                 arm + " needs a " + expected + " model, got " + provider + " (pass --models " + expected + ":<model>)",
                 Map.of());
     }

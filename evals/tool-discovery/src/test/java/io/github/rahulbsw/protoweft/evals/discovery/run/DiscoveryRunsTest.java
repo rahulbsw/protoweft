@@ -93,7 +93,7 @@ class DiscoveryRunsTest {
         LlmRun.Config c = new LlmRun.Config(List.of("mcptoolbench"),
                 List.of("generic-search:retriever=catalog-bm25,embedding-cache=" + cache), List.of(model), List.of(10),
                 1, 0, 42, 128, 4, "shared", "both", 3, false, Map.of(), Fixtures.mcp(), Fixtures.toolret(), out,
-                Path.of("."));
+                Path.of("."), null);
         Path dir = new LlmRun(c, Map.of(model, searchingModel()), guard, prices, Arms::create).run();
         List<Map<String, Object>> rows = Json.readJsonl(dir.resolve("calls.jsonl"));
         assertThat(rows).hasSize(4).allSatisfy(r -> {

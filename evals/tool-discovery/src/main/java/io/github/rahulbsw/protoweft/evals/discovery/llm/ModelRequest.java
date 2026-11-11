@@ -19,9 +19,12 @@ import java.util.Objects;
  *                        {@code tools} (for example Anthropic {@code defer_loading} tools or an
  *                        OpenAI {@code tool_search} tool); empty for provider-neutral arms. Only
  *                        the client of the matching provider understands them.
+ * @param forbidTools     send {@code tool_choice: none} so the model must answer in text, not call a
+ *                        tool — used for the final synthesis turn (tools stay in the payload, since
+ *                        providers reject an empty tool set after tool_use/tool_result history)
  */
 public record ModelRequest(String system, List<Turn> conversation, List<ToolSpec> tools, int maxOutputTokens,
-                           List<Map<String, Object>> rawTools) {
+                           List<Map<String, Object>> rawTools, boolean forbidTools) {
 
     public ModelRequest {
         conversation = List.copyOf(Objects.requireNonNull(conversation, "conversation"));
@@ -33,7 +36,12 @@ public record ModelRequest(String system, List<Turn> conversation, List<ToolSpec
         }
     }
 
+    public ModelRequest(String system, List<Turn> conversation, List<ToolSpec> tools, int maxOutputTokens,
+                        List<Map<String, Object>> rawTools) {
+        this(system, conversation, tools, maxOutputTokens, rawTools, false);
+    }
+
     public ModelRequest(String system, List<Turn> conversation, List<ToolSpec> tools, int maxOutputTokens) {
-        this(system, conversation, tools, maxOutputTokens, List.of());
+        this(system, conversation, tools, maxOutputTokens, List.of(), false);
     }
 }

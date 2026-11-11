@@ -125,10 +125,107 @@ Paired differences from tuning, same tasks and arms, before (`021a2f3`) → afte
 - **Provider-native tool search** (Anthropic `defer_loading` + `tool_reference`, OpenAI
   `tool_search`). Through this proxy, 40 tools marked deferred cost as many input tokens as 40
   loaded tools for both providers, so deferral was not reaching the model and those arms would
-  have measured all-tools under another name. They need direct provider endpoints.
-- More trials, more tasks, smaller models, multi-tool tasks, and an LLM judge for free-text
-  arguments (paraphrases fail the exact call-correct match, which is why that column sits near
-  50% for every arm).
+  have measured all-tools under another name. They need direct provider endpoints. Retested later
+  against a corporate LiteLLM gateway with the same result and the cause pinned: 40 `defer_loading`
+  tools cost **6,256** input tokens against **5,896** loaded (more, not fewer), and the hosted
+  `tool_search_tool` returns a 400, because LiteLLM normalizes Anthropic Messages to OpenAI
+  chat-completions and drops both. Still needs a direct Anthropic/OpenAI endpoint.
+- **Result and history bloat at per-turn scale.** The single-turn, never-executed harness above
+  cannot see tool-result or conversation-history tokens. The multi-turn study below adds them.
+- **Tool outputs are mocked, not executed.** The study feeds recorded/synthetic results, so results
+  shape the token accounting faithfully but their *content* is not a real server's.
+  Synthetic-fallback payloads read as filler, which depresses task success below what real outputs
+  would give.
+
+## Multi-turn result shaping (milestone 4)
+
+The single-turn arms above only ever measure tool **definitions** (tools are never executed). This
+section adds a multi-turn loop that feeds **mocked results** back and shapes them, so the
+**result** and **history** halves of context — which dominate real agent loops — become measurable.
+
+!!! warning "What this run shows and doesn't"
+    Token magnitudes are large and low-variance: on heavy-tailed, real-sized results, **results are
+    ~89% of input** and result shaping cuts input **73–83%**. The task-success and re-fetch
+    differences are **directional only** — 3 tasks × 3 trials (n = 9 per arm), wide intervals, and
+    success is depressed by mocked-result fidelity (the model distrusts synthetic filler). Read the
+    token split as the result; read success/re-fetch as a hypothesis-shaped signal, not a verdict.
+
+### Setup
+
+| | |
+|---|---|
+| Code | multi-turn mode (`--multiturn`) with a final synthesis turn (`tool_choice: none`); dirty worktree |
+| Model | agent `claude-sonnet-5-5`, judge `claude-haiku-5-5`, via a corporate LiteLLM proxy |
+| Tasks | `study/tasks.json`: **eight** 8-call, data-dependent tasks with `required_facts`, **3 trials** (n = 24 per arm) |
+| Catalog | the tasks' 8 tools (`--catalog-sizes 8`) |
+| Fixtures | `scripts/build_study_fixtures.py` — real repo file contents (heavy-tailed: 7 to 5,590 tokens, median 495); misses draw a synthetic payload sized from that distribution |
+| Arms | exposure {`all-tools`, `generic-search`} with result {raw, truncate=256, byref} and history {full, clear-stale}, a subset of the full factorial |
+| Metrics | estimated input split (definitions/results/history, cumulative); real input and per-request reconciliation; state-based `task_success` and judged `judged_success`; `re_fetches` |
+
+### Results
+
+Means over 24 runs per arm (8 tasks × 3 trials); every run made the full 8 tool calls (batched into
+~2 parallel turns) plus a synthesis turn. Brackets are 95% bootstrap (tokens) / Wilson (rates).
+
+| arm | est input [95%] | results | re-fetch | task success [Wilson] | est input vs all-tools |
+|---|---|---|---|---|---|
+| all-tools (raw, full) | 15,632 [13,439–18,117] | 13,978 | 2.6 | 0.08 [0.02–0.26] | — |
+| all-tools byref | **2,732 [2,578–2,926]** | 1,111 | 2.2 | 0.12 [0.04–0.31] | **−83%** |
+| all-tools truncate=256 | **4,432 [4,160–4,783]** | 2,742 | 2.2 | 0.21 [0.09–0.40] | **−72%** |
+| all-tools clear-stale | 10,568 [8,846–12,535] | 8,973 | 3.2 | 0.00 [0.00–0.14] | **−32%** |
+| generic-search (raw, full) | 19,098 [17,022–21,326] | 16,309 | 2.1 | 0.12 [0.04–0.31] | **+22%** |
+
+### What the numbers say
+
+- **Results dominate on realistic outputs — significantly.** With raw results, `results` are
+  **89%** of estimated input (13,978 of 15,632); definitions are a few hundred tokens. This is the
+  opposite of the single-call runs (results 0 by construction) and holds only once fixtures are
+  heavy-tailed — an earlier run with ~180-token fixtures put results at ~10% and would have hidden it.
+- **Result shaping is a large, statistically clear token win.** `byref` (−83%) and `truncate` (−72%)
+  have input CIs nowhere near the baseline's. `clear-stale` saves only −32% and its CI, while below
+  baseline, is far above the result-shaping arms: shaping the result beats clearing history.
+- **On a small catalog, on-demand discovery costs *more*.** `generic-search` input is **+22%**
+  (CI entirely above baseline): the discovery round-trips and their results outweigh the few hundred
+  tokens of tool definitions all-tools would have sent. Discovery earns its keep at large catalogs
+  (the single-turn arms above), not here. (In this run, before a later fix, discovery calls received
+  distribution-sized *synthetic* results rather than the recorded fixtures; the +22% is driven by
+  the discovery round-trips, which the fix does not change, and the result sizes were matched, so
+  the conclusion holds. Re-run after the fix to replace the synthetic result content.)
+- **Completion is not separable at this scale.** Task-success Wilson intervals all overlap
+  (0.00–0.21, intervals spanning ~0.02–0.40); no shaping arm is distinguishable from the baseline on
+  success. `clear-stale` is the only directional signal (0.00, highest re-fetch at 3.2), consistent
+  with stubbed history removing context the model needed. Treat success as not-yet-measurable here,
+  not as evidence that shaping is free.
+- **Why success is low and noisy.** Mocked results read as filler to the model (it says so in its
+  answers), which depresses success; and the final-answer turn is unreliable through this stack —
+  even with `tool_choice: none`, the SDK/Bedrock path often returns an empty answer on the large-
+  context raw arm, so `task_success` and the LLM judge frequently score "no final answer". Measuring
+  completion credibly needs real tool execution (or a direct provider endpoint), not mocked results
+  through a proxy. The judge (`judged_success`) is wired and reported but inherits the same limit.
+- **Chains were 8 tool calls but ~2 model turns** (parallel tool-calling), so history compounding is
+  understated versus a sequential 8-turn chain.
+
+Bottom line: the **token magnitudes are the significant result** (result shaping −72–83%, history
+clearing −32%, on-demand discovery +22% on a small catalog); the **completion tradeoff is not yet
+measurable** in a mocked, proxy-mediated setup.
+
+### Reconciliation, per request
+
+The o200k estimate is only approximate for Claude. Reconciled **per request** on a single-turn
+9-tool call: real input 1,126 against a 435 estimate — a **691-token** gap, growing to 935 by the
+third turn as results and history accumulate. Definitions are counted once per call (362, flat); the
+earlier cumulative-only column (1,086 = 3 × 362) read as a double-count but was correct. The residual
+is genuine Anthropic tokenizer + framing overhead, now reported per call as well as cumulatively.
+
+### Deferred
+
+Credible completion measurement — real tool execution or a direct provider endpoint where the
+synthesis turn reliably yields an answer, so `task_success`/`judged_success` become usable. Also
+real-server fixture capture (vs. real-file-derived), longer **sequential** chains (8+ turns), a
+larger catalog so the exposure axis is non-degenerate (`top-k` equals `all-tools` at 8 tools), and
+more tasks/trials to separate completion. The single-turn arms also still want more trials, more tasks,
+smaller models, multi-tool tasks, and an LLM judge for free-text arguments (paraphrases fail the
+exact call-correct match, which is why that column sits near 50% for every arm).
 
 ## Tuning
 
@@ -388,3 +485,23 @@ JAVA_OPTS=-Xmx8g build/install/tool-discovery-eval/bin/tool-discovery-eval run-l
   --models anthropic:<model> --models openai:<model> \
   --tasks 50 --catalog-sizes 50,200,1000 --distractors both
 ```
+
+The multi-turn result-shaping study (needs keys; heavy-tailed fixtures from real repo files):
+
+```bash
+python3 evals/tool-discovery/scripts/build_study_fixtures.py   # -> build/fixtures-study/fx.jsonl
+cd evals/tool-discovery
+../../gradlew :evals:tool-discovery:run --args="run-llm \
+  --datasets mcptoolbench --mcptoolbench-dir study --catalog-sizes 8 --tasks 3 --trials 3 \
+  --distractors own --multiturn --result-fixtures build/fixtures-study --mock-fallback-tokens 400 \
+  --models anthropic:<model> --budget-usd 25 --allow-unpriced --max-calls 800 \
+  --arm all-tools \
+  --arm all-tools:result=truncate=256 \
+  --arm all-tools:result=byref \
+  --arm all-tools:history=clear-stale \
+  --arm all-tools:result=truncate=256,history=clear-stale"
+```
+
+Result policies are `raw`, `truncate=<n>`, `project`, `byref`; history policies are `full` and
+`clear-stale`. Per-task rows carry the definitions/results/history split, the per-request
+reconciliation array, `re_fetches`, and state-based `task_success`.

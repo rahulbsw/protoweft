@@ -18,9 +18,11 @@ public interface ArmFactory {
     /**
      * Builds an arm.
      *
-     * @param kind    one of {@link #kinds()}
-     * @param options parsed from the arm spec {@code kind:key=value,key=value}, plus
-     *                {@code maxOutputTokens}, {@code maxTurns} and {@code seed}
+     * @param kind      one of {@link #kinds()}
+     * @param options   parsed from the arm spec {@code kind:key=value,key=value}, plus
+     *                  {@code maxOutputTokens}, {@code maxTurns} and {@code seed}; result/history
+     *                  shaping rides in as {@code result=}/{@code history=}
+     * @param multiTurn the run-wide multi-turn context, or {@code null} for single-turn
      */
-    Arm create(String kind, Map<String, String> options, TokenEstimator estimator);
+    Arm create(String kind, Map<String, String> options, TokenEstimator estimator, MultiTurn multiTurn);
 }

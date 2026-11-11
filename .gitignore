@@ -1,6 +1,11 @@
 .gradle/
 build/
 .kotlin/
+
+# Local environment: API keys, proxy endpoints — never commit
+.env
+.env.*
+
 .idea/
 *.iml
 out/

@@ -6,10 +6,14 @@ import io.github.rahulbsw.protoweft.evals.discovery.data.EvalCatalog;
 import io.github.rahulbsw.protoweft.evals.discovery.data.EvalTask;
 import io.github.rahulbsw.protoweft.evals.discovery.data.EvalTool;
 import io.github.rahulbsw.protoweft.evals.discovery.data.GoldCall;
+import io.github.rahulbsw.protoweft.evals.discovery.fixtures.NormalizedArgs;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Scores one {@link ArmResult} against the task's gold labels. Definitions (per task):
@@ -32,10 +36,25 @@ public final class CallScorer {
     private CallScorer() {
     }
 
-    /** Per-task scores; see the class comment. */
+    /**
+     * Per-task scores; see the class comment. State-based fields (for multi-step tasks):
+     * <ul>
+     *   <li><b>re-fetches</b>: real calls that repeat an earlier call's tool <em>and</em> normalized
+     *       arguments — the cost a result-shaping policy pays when the model re-asks for the same
+     *       result it was shown trimmed. Calling the same tool with different arguments (reading
+     *       three different files) is normal progress, not a re-fetch;</li>
+     *   <li><b>gold tools covered</b>: every gold tool id appears among the real calls;</li>
+     *   <li><b>required facts present</b>: the final answer contains every required fact
+     *       (case-insensitive), or {@code null} when the task declares none;</li>
+     *   <li><b>task success</b>: gold tools covered <em>and</em> required facts present (vacuously
+     *       true when none declared) — a completion proxy that does not depend on exact arguments.</li>
+     * </ul>
+     */
     public record TaskScore(String firstToolId, boolean noCall, boolean selectionCorrect,
                             boolean selectionCorrectStrict, int realCalls, int wrongCalls, Boolean callCorrect,
-                            Boolean argKeysCorrect, List<String> argumentMismatches) {
+                            Boolean argKeysCorrect, List<String> argumentMismatches,
+                            int reFetches, boolean goldToolsCovered, Boolean requiredFactsPresent,
+                            boolean taskSuccess) {
     }
 
     public static TaskScore score(EvalTask task, EvalCatalog catalog, ArmResult result) {
@@ -52,8 +71,43 @@ public final class CallScorer {
             callCorrect = matchAll(task.goldCalls(), calls, catalog, true, mismatches);
             keysCorrect = matchAll(task.goldCalls(), calls, catalog, false, new ArrayList<>());
         }
+        int reFetches = reFetches(calls);
+        boolean covered = goldToolsCovered(task, calls);
+        Boolean factsPresent = requiredFactsPresent(task, result.finalText());
+        boolean success = covered && (factsPresent == null || factsPresent);
         return new TaskScore(first, noCall, correct, strict, calls.size(), wrong, callCorrect, keysCorrect,
-                List.copyOf(mismatches));
+                List.copyOf(mismatches), reFetches, covered, factsPresent, success);
+    }
+
+    /** Real calls that repeat an earlier call's tool <em>and</em> normalized arguments. */
+    private static int reFetches(List<SelectedCall> calls) {
+        Set<String> seen = new LinkedHashSet<>();
+        int repeats = 0;
+        for (SelectedCall c : calls) {
+            String tool = c.toolId() != null ? c.toolId() : c.name();
+            if (tool != null && !seen.add(NormalizedArgs.key(tool, c.arguments()))) {
+                repeats++;
+            }
+        }
+        return repeats;
+    }
+
+    private static boolean goldToolsCovered(EvalTask task, List<SelectedCall> calls) {
+        List<String> gold = task.goldToolIds();
+        if (gold.isEmpty()) {
+            return false;
+        }
+        Set<String> called = new LinkedHashSet<>();
+        calls.forEach(c -> called.add(c.toolId()));
+        return called.containsAll(gold);
+    }
+
+    private static Boolean requiredFactsPresent(EvalTask task, String finalText) {
+        if (task.requiredFacts().isEmpty()) {
+            return null;
+        }
+        String hay = finalText == null ? "" : finalText.toLowerCase(Locale.ROOT);
+        return task.requiredFacts().stream().allMatch(f -> hay.contains(f.toLowerCase(Locale.ROOT)));
     }
 
     private static boolean matchAll(List<GoldCall> gold, List<SelectedCall> calls, EvalCatalog catalog,

@@ -12,6 +12,9 @@ import io.github.rahulbsw.protoweft.evals.discovery.data.EvalCatalog;
 import io.github.rahulbsw.protoweft.evals.discovery.data.EvalTask;
 import io.github.rahulbsw.protoweft.evals.discovery.data.EvalTool;
 import io.github.rahulbsw.protoweft.evals.discovery.data.GoldCall;
+import io.github.rahulbsw.protoweft.evals.discovery.fixtures.FixtureStore;
+import io.github.rahulbsw.protoweft.evals.discovery.fixtures.MockResultProvider;
+import io.github.rahulbsw.protoweft.evals.discovery.fixtures.ResultFixture;
 import io.github.rahulbsw.protoweft.evals.discovery.llm.ModelRequest;
 import io.github.rahulbsw.protoweft.evals.discovery.llm.ModelResponse;
 import io.github.rahulbsw.protoweft.evals.discovery.llm.ScriptedModelClient;
@@ -97,6 +100,35 @@ class DiscoveryArmsTest {
         assertThat(r.toolPayloadTokens()).isPositive();
         assertThat(r.extras()).containsEntry("goldFound", true).containsEntry("described", List.of("g:geo"));
         assertThat((List<?>) r.extras().get("searches")).hasSize(1);
+    }
+
+    @Test
+    void multiTurnDiscoveryReplaysFixturesForTheResolvedCapability(@TempDir Path cache) {
+        // A fixture recorded for the real tool + args; a discovery call must replay it, not miss.
+        FixtureStore store = FixtureStore.empty();
+        store.record(new ResultFixture("geocode", Map.of("q", "Paris"), "RECORDED-GEOCODE", 3));
+        MultiTurn multiTurn = new MultiTurn(new MockResultProvider(store, EST, 500, 7), 8);
+
+        ScriptedModelClient fake = new ScriptedModelClient("fake", "m", req -> {
+            if (req.forbidTools()) {
+                return ScriptedModelClient.text("done", Usage.ZERO);
+            }
+            long steps = req.conversation().stream()
+                    .filter(t -> t instanceof Turn.Assistant a && !a.toolCalls().isEmpty()).count();
+            return switch ((int) steps) {
+                case 0 -> ScriptedModelClient.callTool(DiscoveryTools.SEARCH, Map.of("query", "geocode"), Usage.ZERO);
+                case 1 -> ScriptedModelClient.callTool(DiscoveryTools.DESCRIBE,
+                        Map.of("names", List.of("test.geocode")), Usage.ZERO);
+                default -> ScriptedModelClient.callTool(DiscoveryTools.CALL,
+                        Map.of("name", "test.geocode", "arguments", Map.of("q", "Paris")), Usage.ZERO);
+            };
+        });
+        Arm arm = Arms.create("generic-search", opts(cache), EST, multiTurn);
+        arm.run(TASK, CATALOG, fake);
+
+        // The synthesis request (forbidTools) carries the mocked result — it must be the fixture.
+        ModelRequest synthesis = fake.requests().stream().filter(ModelRequest::forbidTools).findFirst().orElseThrow();
+        assertThat(toolResultText(synthesis)).isEqualTo("RECORDED-GEOCODE");
     }
 
     @Test

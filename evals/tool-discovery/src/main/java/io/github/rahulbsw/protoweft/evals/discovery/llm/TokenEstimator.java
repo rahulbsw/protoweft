@@ -78,26 +78,39 @@ public final class TokenEstimator {
     }
 
     /**
-     * System prompt + every turn's text, arguments and tool results + tool definitions (neutral
-     * and raw). A raw tool result counts its {@code content} (what it expands to in context), or its
-     * JSON when the content is empty.
+     * The segmented estimate for one request: system prompt, tool definitions (neutral and raw),
+     * tool results, and conversation history (user turns plus assistant text and tool-call
+     * name/arguments). A raw tool result counts its {@code content} (what it expands to in context),
+     * or its JSON when the content is empty.
      */
-    public long request(ModelRequest request) {
-        long total = text(request.system()) + tools(request.tools()) + rawTools(request.rawTools());
+    public TokenBreakdown breakdown(ModelRequest request) {
+        long system = text(request.system());
+        long definitions = tools(request.tools()) + rawTools(request.rawTools());
+        long results = 0;
+        long history = 0;
         for (Turn turn : request.conversation()) {
             if (turn instanceof Turn.User u) {
-                total += text(u.text());
+                history += text(u.text());
             } else if (turn instanceof Turn.Assistant a) {
-                total += text(a.text());
+                history += text(a.text());
                 for (ToolCall c : a.toolCalls()) {
-                    total += text(c.name()) + text(Json.write(c.arguments()));
+                    history += text(c.name()) + text(Json.write(c.arguments()));
                 }
             } else if (turn instanceof Turn.ToolResults r) {
                 for (ToolResult res : r.results()) {
-                    total += !res.content().isEmpty() || res.raw() == null ? text(res.content()) : text(Json.write(res.raw()));
+                    results += !res.content().isEmpty() || res.raw() == null
+                            ? text(res.content()) : text(Json.write(res.raw()));
                 }
             }
         }
-        return total;
+        return new TokenBreakdown(system, definitions, results, history);
+    }
+
+    /**
+     * System prompt + every turn's text, arguments and tool results + tool definitions (neutral
+     * and raw); the sum of {@link #breakdown(ModelRequest)}.
+     */
+    public long request(ModelRequest request) {
+        return breakdown(request).total();
     }
 }

@@ -2,6 +2,8 @@ package io.github.rahulbsw.protoweft.evals.discovery.arms;
 
 import io.github.rahulbsw.protoweft.evals.discovery.llm.TokenEstimator;
 import io.github.rahulbsw.protoweft.evals.discovery.retrieval.Retrievers;
+import io.github.rahulbsw.protoweft.evals.discovery.shaping.HistoryPolicy;
+import io.github.rahulbsw.protoweft.evals.discovery.shaping.ResultPolicy;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -19,6 +21,16 @@ public final class Arms {
     }
 
     public static Arm create(String spec, Map<String, String> defaults, TokenEstimator estimator) {
+        return create(spec, defaults, estimator, null);
+    }
+
+    /**
+     * As {@link #create(String, Map, TokenEstimator)}, with an optional {@link MultiTurn} context
+     * (opt-in {@code --multiturn}). It is applied by the provider-neutral baseline arms
+     * ({@code all-tools}, {@code top-k}); other arm kinds ignore it and stay single-turn.
+     */
+    public static Arm create(String spec, Map<String, String> defaults, TokenEstimator estimator,
+                             MultiTurn multiTurn) {
         int colon = spec.indexOf(':');
         String kind = colon < 0 ? spec.strip() : spec.substring(0, colon).strip();
         Map<String, String> options = new LinkedHashMap<>(defaults);
@@ -32,20 +44,32 @@ public final class Arms {
             }
         }
         int maxOut = Integer.parseInt(options.getOrDefault("maxOutputTokens", "4096"));
+        ResultPolicy resultPolicy = ResultPolicy.parse(options.getOrDefault("result", "raw"));
+        HistoryPolicy historyPolicy = HistoryPolicy.parse(options.getOrDefault("history", "full"));
         switch (kind) {
             case "all-tools":
-                return new AllToolsArm(maxOut, estimator);
+                return new AllToolsArm(maxOut, estimator, multiTurn, resultPolicy, historyPolicy);
             case "top-k":
                 return new TopKInjectedArm(Retrievers.create(options.getOrDefault("retriever", "oracle"), options),
-                        Integer.parseInt(options.getOrDefault("k", "5")), maxOut, estimator);
+                        Integer.parseInt(options.getOrDefault("k", "5")), maxOut, estimator, multiTurn,
+                        resultPolicy, historyPolicy);
             default:
                 for (ArmFactory f : ServiceLoader.load(ArmFactory.class)) {
                     if (f.kinds().contains(kind)) {
-                        return f.create(kind, options, estimator);
+                        return f.create(kind, options, estimator, multiTurn);
                     }
                 }
                 throw new IllegalArgumentException("unknown arm '" + kind + "'; available: " + available());
         }
+    }
+
+    /** A name suffix naming non-default shaping, e.g. {@code [truncate=256,clear-stale]}; empty otherwise. */
+    static String shapingSuffix(MultiTurn multiTurn, ResultPolicy resultPolicy, HistoryPolicy historyPolicy) {
+        if (multiTurn == null
+                || ("raw".equals(resultPolicy.name()) && "full".equals(historyPolicy.name()))) {
+            return "";
+        }
+        return "[" + resultPolicy.name() + "," + historyPolicy.name() + "]";
     }
 
     public static Set<String> available() {
