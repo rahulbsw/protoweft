@@ -7,19 +7,20 @@ title: Protoweft — interoperable agent & tool protocols for Java
 
 # Protoweft
 
-*The protocol backbone for Java agents: MCP, A2A, UTCP and RAP behind one protocol-neutral API, in both
-directions, plugged into LangChain4j, Spring AI, ARGI, Spring Boot or plain Java.*
+*The protocol backbone for Java agents: MCP, A2A, UTCP, RAP and AG-UI behind one protocol-neutral API,
+in both directions, plugged into LangChain4j, Spring AI, ARGI, Spring Boot or plain Java.*
 
 ## Goal
 
-Be the go-to Java layer for agent and tool interoperability, the way LangChain became the go-to layer
-for composing LLM applications. The scope is protocols, not model orchestration.
+Be the go-to Java layer for agent interoperability: with tools, with other agents, and with the
+user-facing applications people use agents through. The way LangChain became the go-to layer for
+composing LLM applications. The scope is protocols, not model orchestration.
 
 Java applications speak the emerging interoperability protocols through one protocol-neutral
 programming model instead of coupling to any one protocol's SDK and wire format:
 
 - **Consume** tools and agents over whichever protocol the other side speaks.
-- **Publish** their own tools and agents.
+- **Publish** their own tools and agents, including to user-facing frontends.
 - **Discover** the right capability among thousands without flooding the model's context.
 
 A plain Java app, a bespoke agent framework, a LangChain4j, Spring AI or ARGI agent, or a Spring Boot
@@ -38,9 +39,13 @@ agents:
 - **Reactive Agent Protocol (RAP)** — the Hydro project's (AWS and UC Berkeley) fire-and-forget
   tool calls over HTTP, whose results, subscription events and user prompts are posted back to a
   callback URL, so a waiting agent holds no connection.
+- **Agent–User Interaction protocol (AG-UI)** — the agent ↔ user-facing-application layer: one run
+  input in, one ordered stream of typed events out (text, tool calls, reasoning, shared state,
+  progress), as frontends such as CopilotKit and agent frameworks such as LangGraph, CrewAI and Google
+  ADK speak it.
 
 Today a Java team wanting more than one of these must pull in each protocol's SDK directly (and for
-UTCP and RAP, there is no official Java SDK at all), learn several different domain models, and scatter
+UTCP, RAP and AG-UI, there is no official Java SDK at all), learn several different domain models, and scatter
 protocol-specific types, auth, and error handling through their application. Version confusion makes
 it worse: MCP alone carries two independent version axes — the date-based wire revision and the Java
 SDK major version — that are routinely conflated. There is no neutral Java seam that lets an
@@ -53,7 +58,8 @@ clients. None does it across protocols with permission and availability filterin
 
 ## Target users
 
-- **Java application developers** adding tool/agent connectivity to an existing service or CLI.
+- **Java application developers** adding tool/agent connectivity to an existing service or CLI, or
+  putting a Java agent behind a web frontend.
 - **Agent-framework authors** who want protocol connectors they can embed without inheriting a
   Spring (or any other framework) dependency.
 - **Spring Boot developers** who want the same capabilities as idiomatic auto-configured beans.
@@ -110,6 +116,10 @@ What Protoweft provides:
   - **RAP**: a client that receives results on a mounted or built-in callback endpoint, and a
     tool server for the app's own tools, with subscriptions (event streams), OAuth and user-choice
     prompts, cancellation, thread closure, and state that can survive a restart.
+  - **AG-UI**: an agent server that serves any agent to AG-UI frontends (every event family, shared
+    state, interrupts, the frontend's own tools, opt-in CORS), and a client that holds AG-UI
+    conversations with remote agents and can offer them Protoweft tools, running only read-only ones
+    without the application's approval.
 - **Hosting:** the same endpoints in embedded Jetty or Spring Boot, each behind the same
   authentication hook.
 - **Tool discovery:**
@@ -119,18 +129,21 @@ What Protoweft provides:
   - Generic search meta-tools for any model.
   - Native tool-search request parts for Anthropic and OpenAI.
 - **Integrations:**
-  - **LangChain4j:** Protoweft tools in AI services, AI services served as A2A agents, `@Tool`
-    methods served over MCP and UTCP, and catalog-backed tool search.
+  - **LangChain4j:** Protoweft tools in AI services, AI services served as A2A and AG-UI agents,
+    `@Tool` methods served over MCP and UTCP, and catalog-backed tool search.
   - **Spring AI:** Protoweft tools as `ToolCallback`s, the catalog as Spring AI's tool-search
-    index, a `ChatClient` served as a streaming A2A agent, and Spring AI tools served over MCP and
-    UTCP.
+    index, a `ChatClient` served as a streaming A2A or AG-UI agent (over AG-UI with the frontend's
+    own tools), and Spring AI tools served over MCP and UTCP.
   - **ARGI:** Protoweft tools in ARGI agents, catalog-based tool selection without an extra model
-    call, and ARGI agents served over A2A with human-in-the-loop approvals as `input-required`.
+    call, and ARGI agents served over A2A and AG-UI with human-in-the-loop approvals as
+    `input-required` or AG-UI interrupts.
   - **Spring Boot 4 starter:** connectors from configuration, opt-in endpoints, Spring Security,
     Micrometer and Actuator, and opt-in Spring AI wiring.
 - **Explicit, tested compatibility reporting** per connector, checked in CI against the official
   MCP conformance suite and the A2A TCK, with every expected failure tied to a declared
-  unsupported feature or a named bug.
+  unsupported feature or a named bug. For AG-UI, which has no official suite: an AG-UI conformance
+  checker anyone can run against any agent, and interop with the official TypeScript and Python
+  SDKs.
 - **An evaluation harness** that measures discovery against an all-tools baseline.
 - **Runnable examples, starter templates, a JBang demo** and a documentation site.
 
@@ -140,8 +153,10 @@ What Protoweft provides:
   a planner, memory store, prompt-chaining library or RAG framework. LangChain4j, Spring AI and ARGI
   are the model and agent-runtime layers that Protoweft plugs into.
 - **Not a reimplementation of the protocol SDKs.** Where an official Java SDK exists (MCP, A2A),
-  Protoweft wraps it rather than re-deriving the wire format. (UTCP and RAP have no official Java
-  SDK, so their connectors are implemented directly from the specifications.)
+  Protoweft wraps it rather than re-deriving the wire format. (UTCP, RAP and AG-UI have no official
+  Java SDK, so their connectors are implemented directly from the specifications. AG-UI has a
+  community Java SDK; it is not used, to keep third-party runtime dependencies out of users'
+  applications.)
 - **Not a lowest-common-denominator façade.** The core does not force the protocols into a single
   unified model where their domains genuinely differ (e.g. A2A tasks vs. tool calls).
 - **No guarantee of full feature coverage** for any protocol; coverage is declared per connector.

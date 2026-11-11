@@ -1,9 +1,9 @@
 # Protoweft
 
-**The protocol backbone for Java agents.** Protoweft puts the agent and tool interoperability
-protocols — [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org),
-[UTCP](https://www.utcp.io) and [RAP](https://infinity.hydro.run/docs/rap/what-is-rap) — behind one
-protocol-neutral Java 17 API, in both the client and the
+**The protocol backbone for Java agents.** Protoweft puts the agent interoperability protocols
+— [MCP](https://modelcontextprotocol.io), [A2A](https://a2a-protocol.org),
+[UTCP](https://www.utcp.io), [RAP](https://infinity.hydro.run/docs/rap/what-is-rap) and
+[AG-UI](https://docs.ag-ui.com) — behind one protocol-neutral Java 17 API, in both the client and the
 server role, with optional LangChain4j, Spring AI, ARGI and Spring Boot 4 integrations.
 
 ```java
@@ -27,11 +27,11 @@ System.out.println(mcp.invoke(ToolInvocation.of("temperature", Map.of("city", "O
 
 ## Features
 
-- **One API, four protocols.** Application code depends on `ToolSource`, `ToolConnector` and
+- **One API, five protocols.** Application code depends on `ToolSource`, `ToolConnector` and
   `AgentConnector`; only the builder call names a protocol.
-- **Client and server for every protocol.** Consume MCP servers, UTCP manuals, RAP tool servers and
-  A2A agents; publish tools over MCP, UTCP and RAP and agents over A2A, all behind one
-  `InboundAuthenticator`.
+- **Client and server for every protocol.** Consume MCP servers, UTCP manuals, RAP tool servers, A2A
+  agents and AG-UI agents; publish tools over MCP, UTCP and RAP and agents over A2A and AG-UI (to
+  frontends such as CopilotKit), all behind one `InboundAuthenticator`.
 - **One tool registry.** `ToolRegistry` namespaces local methods, MCP servers, UTCP manuals, RAP
   tool servers and A2A agents (as an `ask` tool) as `<source>.<tool>`.
 - **Subscriptions.** A tool call can keep streaming events after its first result
