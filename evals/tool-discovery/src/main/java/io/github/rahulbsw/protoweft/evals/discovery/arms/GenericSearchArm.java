@@ -16,6 +16,8 @@ import io.github.rahulbsw.protoweft.evals.discovery.llm.ToolCall;
 import io.github.rahulbsw.protoweft.evals.discovery.llm.ToolResult;
 import io.github.rahulbsw.protoweft.evals.discovery.retrieval.CatalogBridge;
 import io.github.rahulbsw.protoweft.evals.discovery.retrieval.CatalogRetriever;
+import io.github.rahulbsw.protoweft.evals.discovery.shaping.HistoryPolicy;
+import io.github.rahulbsw.protoweft.evals.discovery.shaping.ResultPolicy;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -50,6 +52,9 @@ public final class GenericSearchArm implements Arm {
     private final int maxTurns;
     private final TokenEstimator estimator;
     private final int defaultLimit;
+    private final MultiTurn multiTurn;
+    private final ResultPolicy resultPolicy;
+    private final HistoryPolicy historyPolicy;
 
     public GenericSearchArm(CatalogRetriever retriever, int inlineSchemas, boolean load, int maxOutputTokens,
                             int maxTurns, TokenEstimator estimator) {
@@ -59,6 +64,13 @@ public final class GenericSearchArm implements Arm {
 
     public GenericSearchArm(CatalogRetriever retriever, int inlineSchemas, boolean load, int defaultLimit,
                             int maxOutputTokens, int maxTurns, TokenEstimator estimator) {
+        this(retriever, inlineSchemas, load, defaultLimit, maxOutputTokens, maxTurns, estimator, null,
+                ResultPolicy.raw(), HistoryPolicy.full());
+    }
+
+    public GenericSearchArm(CatalogRetriever retriever, int inlineSchemas, boolean load, int defaultLimit,
+                            int maxOutputTokens, int maxTurns, TokenEstimator estimator, MultiTurn multiTurn,
+                            ResultPolicy resultPolicy, HistoryPolicy historyPolicy) {
         this.defaultLimit = defaultLimit;
         this.retriever = Objects.requireNonNull(retriever, "retriever");
         if (inlineSchemas < 0) {
@@ -69,13 +81,17 @@ public final class GenericSearchArm implements Arm {
         this.maxOutputTokens = maxOutputTokens;
         this.maxTurns = maxTurns;
         this.estimator = estimator;
+        this.multiTurn = multiTurn;
+        this.resultPolicy = resultPolicy;
+        this.historyPolicy = historyPolicy;
     }
 
     @Override
     public String name() {
         return "generic-search(" + retriever.name() + ",inline=" + inlineSchemas + ",fallback="
                 + DiscoveryArmSupport.fallbackName(retriever) + (load ? ",load" : "")
-                + (defaultLimit == io.github.rahulbsw.protoweft.discovery.DiscoveryTools.DEFAULT_LIMIT ? "" : ",limit=" + defaultLimit) + ")";
+                + (defaultLimit == io.github.rahulbsw.protoweft.discovery.DiscoveryTools.DEFAULT_LIMIT ? "" : ",limit=" + defaultLimit) + ")"
+                + Arms.shapingSuffix(multiTurn, resultPolicy, historyPolicy);
     }
 
     @Override
@@ -86,12 +102,15 @@ public final class GenericSearchArm implements Arm {
         ProviderToolNames names = new ProviderToolNames();
         DiscoveryArmSupport.SearchLog log = new DiscoveryArmSupport.SearchLog(built, task);
         List<String> described = new ArrayList<>();
+        ToolLoop.MockMode mock = multiTurn == null ? null : multiTurn.mode(task, resultPolicy, historyPolicy);
+        // Discovery spends extra turns searching/describing, so budget two turns per selection.
+        int turns = multiTurn == null ? maxTurns : Math.max(maxTurns, 2 * multiTurn.goldCalls(task) + 2);
         ToolLoop.Outcome o = ToolLoop.run(client, Prompts.SYSTEM + SYSTEM_SUFFIX, Prompts.user(task), tools.listTools(),
-                maxOutputTokens, maxTurns, (call, turn) -> switch (call.name()) {
+                List.of(), maxOutputTokens, turns, (call, turn) -> switch (call.name()) {
                     case DiscoveryTools.SEARCH -> search(call, tools, log, described, names);
                     case DiscoveryTools.DESCRIBE -> describe(call, call.arguments(), tools, described, names, "");
                     default -> ToolLoop.Decision.select(); // call_capability, or a direct call
-                }, estimator);
+                }, estimator, mock);
         Map<String, Object> extras = new LinkedHashMap<>();
         log.extras(extras);
         extras.put("described", described.stream().map(built::toolId).toList());

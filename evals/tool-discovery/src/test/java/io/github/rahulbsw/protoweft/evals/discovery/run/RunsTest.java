@@ -58,7 +58,7 @@ class RunsTest {
     private static LlmRun.Config config(Path out, List<Integer> sizes, boolean dryRun) {
         return new LlmRun.Config(List.of("mcptoolbench"), List.of("all-tools", "top-k:k=2,retriever=oracle"),
                 List.of(MODEL), sizes, 1, 0, 42, 128, 4, "shared", "both", 3, dryRun, Map.of(),
-                Fixtures.mcp(), Fixtures.toolret(), out, Path.of("."));
+                Fixtures.mcp(), Fixtures.toolret(), out, Path.of("."), null);
     }
 
     private static List<Map<String, Object>> rows(Path dir) {
@@ -132,7 +132,7 @@ class RunsTest {
     void perTaskCatalogsAreSeededPerTask(@TempDir Path out) {
         LlmRun.Config c = config(out, List.of(6), false);
         LlmRun.Config perTask = new LlmRun.Config(c.datasets(), List.of("all-tools"), c.models(), c.catalogSizes(), 1, 0,
-                42, 128, 4, "per-task", "both", 3, false, Map.of(), c.mcpDir(), c.toolretDir(), out, c.repoDir());
+                42, 128, 4, "per-task", "both", 3, false, Map.of(), c.mcpDir(), c.toolretDir(), out, c.repoDir(), null);
         CostGuard guard = new CostGuard(PRICES, 10, 0, SpendLedger.inMemory(), 1.3, 0, false);
         Path dir = new LlmRun(perTask, Map.of(MODEL, perfectModel()), guard, PRICES, Arms::create).run();
         List<Map<String, Object>> rows = rows(dir);

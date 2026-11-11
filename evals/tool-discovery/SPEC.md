@@ -58,6 +58,16 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 - `llm`:
   - `ModelClient { provider(); model(); send(ModelRequest) }`, with `Turn`
     (User / Assistant(providerState) / ToolResults), `ToolCall`, `ToolResult`, `Usage`.
+  - `TokenBreakdown(system, definitions, results, history)` with `total()`/`plus()`; produced by
+    `TokenEstimator.breakdown(ModelRequest)` (and `request()` is its `total()`). Accumulated
+    cumulatively across a loop's turns, it reports where input tokens go; residual against provider
+    `usage.inputTokens` is `ArmResult.reconciliationResidual()`. `ToolLoop.RequestTokens` holds one
+    `(realInput, estimate)` per model call so the report reconciles **per request** as well
+    (`ArmResult.definitionTokensPerCall()` stays flat; `reconciliationResidualPerCall()` isolates
+    provider framing/tokenizer overhead from cumulative re-send effects).
+  - `shaping`: `ResultPolicy` (`raw`, `truncate=<n>`, `project`, `byref`) shapes each mocked result;
+    `HistoryPolicy` (`full`, `clear-stale`) shapes the conversation re-sent each turn. Both parse
+    from arm options `result=`/`history=` and are the study's factorial axes.
   - Provider-specific parts: `ModelRequest.rawTools` (raw tool JSON) and `ToolResult.raw` (a raw
     `tool_result` block or input item); `OpenAiModelClient.TOOL_SEARCH_CALL` names parsed
     client-executed `tool_search_call`s.
@@ -65,13 +75,30 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
     `AnthropicTokenCounter`, `TokenEstimator` (jtokkit), `ScriptedModelClient` and
     `EstimatingModelClient`.
 - `arms`:
-  - `Arm { name(); run(task, catalog, client) }` → `ArmResult`.
-  - `ToolLoop`: a select/respond loop with a max-turns limit and discovery counting.
+  - `Arm { name(); run(task, catalog, client) }` → `ArmResult` (carries the cumulative
+    `TokenBreakdown` and the per-request `RequestTokens`; arm names gain a `[result,history]` suffix
+    when shaping is non-default).
+  - `ToolLoop`: a select/respond loop with a max-turns limit and discovery counting, plus an
+    opt-in `MockMode(provider, maxRealCalls)` for multi-turn mocked execution.
+  - `MultiTurn(provider, maxTurns)`: the run-wide multi-turn context (opt-in `--multiturn`),
+    applied by the provider-neutral baseline arms.
   - Built-in arms `AllToolsArm` and `TopKInjectedArm`, plus the `ArmFactory` SPI.
+- `fixtures`: `FixtureStore` (JSONL record/replay keyed on tool + `NormalizedArgs` of the
+  arguments), `ResultFixture`, `SizeDistribution`, `SyntheticPayload` and `MockResultProvider`
+  (fixture replay on hit; a distribution-sized synthetic JSON payload on miss).
   - Discovery arms `GenericSearchArm`, `NativeAnthropicArm`, `NativeOpenAiArm`, registered by
-    `DiscoveryArmFactory` as `generic-search`, `native-anthropic`, `native-openai`.
-- `metrics`: `RetrievalMetrics`, `ArgumentMatcher`, `CallScorer` and `Stats`.
+    `DiscoveryArmFactory` as `generic-search`, `native-anthropic`, `native-openai`. The `ArmFactory`
+    SPI takes the `MultiTurn` context, so `generic-search` also runs multi-turn with shaping (native
+    arms ignore it).
+- `metrics`: `RetrievalMetrics`, `ArgumentMatcher`, `CallScorer` (selection/call-correctness plus
+  state-based `goldToolsCovered`/`requiredFactsPresent`/`taskSuccess` and `reFetches`), `LlmJudge`
+  (an optional model-based grader of the free-text final answer, wired as `--judge-model`) and
+  `Stats`.
 - `cost`: `PriceTable`, `CostGuard`, `SpendLedger` and `GuardedModelClient`.
+- `EvalTask.requiredFacts` (loaded from a `required_facts` row field) drives state-based success.
+- `study/tasks.json` (8-call data-dependent tasks) and `scripts/build_study_fixtures.py`
+  (heavy-tailed fixtures from real repo files) are the committed milestone-4 study inputs; the
+  recorded fixtures land in gitignored `build/`.
 
 ## Decisions
 
@@ -85,6 +112,39 @@ guard stops runs before they exceed the budget. How-to and full metric tables ar
 - **Call correctness** is a deterministic AST match: gold keys must be equal after normalization,
   required keys must be present, and extra keys must be declared properties. It is a labeled proxy
   for task completion, because tools are never executed. Arg-keys correctness is the upper bound.
+- **Mocked execution (opt-in `--multiturn`).** By default a selected call ends the loop and tools
+  are never executed. With `--multiturn`, a selected call is instead answered with a mocked result
+  (`MockResultProvider`: a recorded `ResultFixture` replayed on a tool + normalized-argument match,
+  or on a miss a synthetic JSON payload sized from the fixtures' observed `SizeDistribution`, so a
+  miss is not a token-free stub) and the loop continues until the task's gold-call count (its
+  reference trajectory) is reached, the model stops, or `maxTurns`. Each mocked result is shaped by
+  the arm's `ResultPolicy`, and the conversation re-sent each turn by its `HistoryPolicy` (the
+  factorial axes); the token accounting reflects the shaped request. After the trajectory bound a
+  final synthesis turn runs with `ModelRequest.forbidTools` (`tool_choice: none`) so the model emits
+  the text answer that `taskSuccess`/`LlmJudge` score; tools stay in the payload because providers
+  reject an empty tool set after tool_use/tool_result history. Eliciting that answer is unreliable
+  through a proxy/Bedrock stack, so completion metrics are weak with mocked results — the measured
+  result is the token split, not the completion rate.
+- **State-based success.** `taskSuccess` = every gold tool was called (`goldToolsCovered`) and the
+  final answer contains every `required_facts` string (vacuously true when none declared). It does
+  not depend on exact arguments, so it does not sit near 50% the way the call-correct proxy does.
+  `reFetches` counts real calls to an already-called tool — the cost a result policy pays when the
+  model re-asks for what was trimmed.
+- **Native deferral is unmeasurable through a LiteLLM proxy (confirmed).** Against the corporate
+  LiteLLM gateway, 40 `defer_loading:true` tools cost *more* input than 40 loaded (6,256 vs 5,896),
+  and the hosted `tool_search_tool` 400s, because LiteLLM normalizes Anthropic Messages to OpenAI
+  chat-completions and drops both. The native arms need a direct Anthropic/OpenAI endpoint; this
+  reproduces the evaluation page's caveat with direct evidence. `ToolSpec` has no output schema,
+  so synthetic payloads are well-formed JSON sized to a target, not validated against an output
+  contract. The default single-turn behaviour and its published numbers are unchanged. Still
+  deferred: the 30–100 multi-step task corpus and real-server recording that make the results/history
+  split non-trivial (MCPToolBench++ is mostly single-call, so maxRealCalls is 1 and no result is
+  resent); state-based success and an LLM judge; the shaping/history arms; and the paid baseline run.
+  Discovery and native arms stay single-turn until that baseline-run milestone.
+- **Token accounting is segmented.** `TokenBreakdown` splits each request's jtokkit estimate into
+  system/definitions/results/history and is summed cumulatively over the loop, so a result of R
+  tokens at turn t is counted on every later turn (the R×(T−t) compounding). Provider `usage` stays
+  the source of truth; the reconciliation residual (provider minus estimate) is reported per task.
 - **Confidence intervals**:
   - Wilson for single-trial proportions;
   - percentile bootstrap over tasks otherwise (2,000 resamples, fixed seed);

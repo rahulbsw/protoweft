@@ -21,10 +21,12 @@ import java.util.Set;
  * @param alternativeTools tool ids the dataset also accepts as a correct tool choice
  *                         (MCPToolBench++ {@code similar_tools}); never relevant for retrieval
  *                         metrics and never used for argument matching
+ * @param requiredFacts    strings the final answer must contain for state-based success (multi-step
+ *                         tasks); empty when the dataset has none
  */
 public record EvalTask(String id, String dataset, String query, String instruction,
                        Map<String, Integer> goldRelevance, List<GoldCall> goldCalls,
-                       Set<String> alternativeTools) {
+                       Set<String> alternativeTools, List<String> requiredFacts) {
 
     public EvalTask {
         Objects.requireNonNull(id, "id");
@@ -34,6 +36,13 @@ public record EvalTask(String id, String dataset, String query, String instructi
                 : java.util.Collections.unmodifiableMap(new LinkedHashMap<>(goldRelevance));
         goldCalls = goldCalls == null ? List.of() : List.copyOf(goldCalls);
         alternativeTools = alternativeTools == null ? Set.of() : Set.copyOf(alternativeTools);
+        requiredFacts = requiredFacts == null ? List.of() : List.copyOf(requiredFacts);
+    }
+
+    /** Back-compatible constructor for tasks without required facts. */
+    public EvalTask(String id, String dataset, String query, String instruction,
+                    Map<String, Integer> goldRelevance, List<GoldCall> goldCalls, Set<String> alternativeTools) {
+        this(id, dataset, query, instruction, goldRelevance, goldCalls, alternativeTools, List.of());
     }
 
     /** Gold tool ids (relevance &gt; 0), in label order. */

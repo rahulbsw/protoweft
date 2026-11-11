@@ -1,6 +1,8 @@
 package io.github.rahulbsw.protoweft.evals.discovery.arms;
 
 import io.github.rahulbsw.protoweft.evals.discovery.llm.TokenEstimator;
+import io.github.rahulbsw.protoweft.evals.discovery.shaping.HistoryPolicy;
+import io.github.rahulbsw.protoweft.evals.discovery.shaping.ResultPolicy;
 
 import java.util.Map;
 import java.util.Set;
@@ -23,16 +25,18 @@ public final class DiscoveryArmFactory implements ArmFactory {
     }
 
     @Override
-    public Arm create(String kind, Map<String, String> options, TokenEstimator estimator) {
+    public Arm create(String kind, Map<String, String> options, TokenEstimator estimator, MultiTurn multiTurn) {
         int maxOut = Integer.parseInt(options.getOrDefault("maxOutputTokens", "4096"));
         int maxTurns = Integer.parseInt(options.getOrDefault("maxTurns", "6"));
+        ResultPolicy resultPolicy = ResultPolicy.parse(options.getOrDefault("result", "raw"));
+        HistoryPolicy historyPolicy = HistoryPolicy.parse(options.getOrDefault("history", "full"));
         return switch (kind) {
             case GENERIC -> new GenericSearchArm(DiscoveryArmSupport.retriever(options),
                     Integer.parseInt(options.getOrDefault("inlineSchemas", "0")),
                     Boolean.parseBoolean(options.getOrDefault("load", "false")),
                     Integer.parseInt(options.getOrDefault("limit",
                             String.valueOf(io.github.rahulbsw.protoweft.discovery.DiscoveryTools.DEFAULT_LIMIT))),
-                    maxOut, maxTurns, estimator);
+                    maxOut, maxTurns, estimator, multiTurn, resultPolicy, historyPolicy);
             case NATIVE_ANTHROPIC -> new NativeAnthropicArm(DiscoveryArmSupport.retriever(options), maxOut, maxTurns,
                     estimator);
             case NATIVE_OPENAI -> new NativeOpenAiArm(DiscoveryArmSupport.retriever(options),

@@ -111,6 +111,9 @@ public final class OpenAiModelClient implements ModelClient {
         } else {
             request.tools().forEach(t -> b.addTool(toFunctionTool(t)));
         }
+        if (request.forbidTools()) {
+            b.putAdditionalBodyProperty("tool_choice", JsonValue.from("none"));
+        }
         b.inputOfResponse(inputItems(request.conversation()));
         long t0 = System.nanoTime();
         Response response;

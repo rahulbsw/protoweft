@@ -1,0 +1,171 @@
+[
+  {
+    "uuid": "study-release-audit",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Audit the acme/widgets repo for the next release. List the open issues, open the highest-priority one, read the CHANGELOG, find open TODOs in the code, list the first 120 users, check the latest Protoweft release notes online by fetching the top search result, read the architecture doc, then save a summary note. Mention the highest-priority issue id in your final answer.",
+    "required_facts": ["142"],
+    "mcp_tools_dict": {"study": ["list_issues", "get_issue", "read_file", "grep_code", "run_sql", "web_search", "fetch_url", "save_note"]},
+    "tools": [
+      {"name": "list_issues", "description": "List open issues in a repository.", "input_schema": {"type": "object", "properties": {"repo": {"type": "string"}, "state": {"type": "string"}}, "required": ["repo"]}},
+      {"name": "get_issue", "description": "Get the full details of one issue by id.", "input_schema": {"type": "object", "properties": {"issue_id": {"type": "string"}}, "required": ["issue_id"]}},
+      {"name": "read_file", "description": "Read a text file from the workspace.", "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+      {"name": "grep_code", "description": "Search the codebase for a pattern.", "input_schema": {"type": "object", "properties": {"pattern": {"type": "string"}}, "required": ["pattern"]}},
+      {"name": "run_sql", "description": "Run a read-only SQL query and return rows.", "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
+      {"name": "web_search", "description": "Search the web and return ranked results.", "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}, "required": ["q"]}},
+      {"name": "fetch_url", "description": "Fetch a URL and return its readable text.", "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
+      {"name": "save_note", "description": "Save a titled note.", "input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "body": {"type": "string"}}, "required": ["title", "body"]}}
+    ],
+    "function_call_label": [
+      {"name": "list_issues", "mcp_server": "study", "step": 1, "id": "s1", "input": {"repo": "acme/widgets", "state": "open"}},
+      {"name": "get_issue", "mcp_server": "study", "step": 2, "id": "s2", "input": {"issue_id": "142"}},
+      {"name": "read_file", "mcp_server": "study", "step": 3, "id": "s3", "input": {"path": "CHANGELOG.md"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 4, "id": "s4", "input": {"pattern": "TODO"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 5, "id": "s5", "input": {"query": "SELECT id, email, status FROM users LIMIT 120"}},
+      {"name": "web_search", "mcp_server": "study", "step": 6, "id": "s6", "input": {"q": "Protoweft latest release notes"}},
+      {"name": "fetch_url", "mcp_server": "study", "step": 7, "id": "s7", "input": {"url": "https://example.com/protoweft/releases/latest"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "Release audit", "body": "The highest-priority open issue is 142 (checkout fails on expired card)."}}
+    ]
+  },
+  {
+    "uuid": "study-user-metrics",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Produce a user metrics brief. Read config/db.yaml, count the users, list the first 120 users, search the code for TODOs, open issue 139, read the CHANGELOG and the architecture doc for context, then save a note. State the exact user count in your final answer.",
+    "required_facts": ["1284"],
+    "mcp_tools_dict": {"study": ["list_issues", "get_issue", "read_file", "grep_code", "run_sql", "web_search", "fetch_url", "save_note"]},
+    "tools": [
+      {"name": "list_issues", "description": "List open issues in a repository.", "input_schema": {"type": "object", "properties": {"repo": {"type": "string"}, "state": {"type": "string"}}, "required": ["repo"]}},
+      {"name": "get_issue", "description": "Get the full details of one issue by id.", "input_schema": {"type": "object", "properties": {"issue_id": {"type": "string"}}, "required": ["issue_id"]}},
+      {"name": "read_file", "description": "Read a text file from the workspace.", "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+      {"name": "grep_code", "description": "Search the codebase for a pattern.", "input_schema": {"type": "object", "properties": {"pattern": {"type": "string"}}, "required": ["pattern"]}},
+      {"name": "run_sql", "description": "Run a read-only SQL query and return rows.", "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
+      {"name": "web_search", "description": "Search the web and return ranked results.", "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}, "required": ["q"]}},
+      {"name": "fetch_url", "description": "Fetch a URL and return its readable text.", "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
+      {"name": "save_note", "description": "Save a titled note.", "input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "body": {"type": "string"}}, "required": ["title", "body"]}}
+    ],
+    "function_call_label": [
+      {"name": "read_file", "mcp_server": "study", "step": 1, "id": "s1", "input": {"path": "config/db.yaml"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 2, "id": "s2", "input": {"query": "SELECT count(*) FROM users"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 3, "id": "s3", "input": {"query": "SELECT id, email, status FROM users LIMIT 120"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 4, "id": "s4", "input": {"pattern": "TODO"}},
+      {"name": "get_issue", "mcp_server": "study", "step": 5, "id": "s5", "input": {"issue_id": "139"}},
+      {"name": "read_file", "mcp_server": "study", "step": 6, "id": "s6", "input": {"path": "CHANGELOG.md"}},
+      {"name": "read_file", "mcp_server": "study", "step": 7, "id": "s7", "input": {"path": "architecture.md"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "User metrics", "body": "There are 1284 users."}}
+    ]
+  },
+  {
+    "uuid": "study-research-brief",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Write a research brief on the Protoweft project. Search for its latest release notes, fetch the top result, read the README and the goal-and-requirements doc, read the architecture doc, search the code for TODOs, list the open issues of acme/widgets, then save a note. Name the project in your final answer.",
+    "required_facts": ["Protoweft"],
+    "mcp_tools_dict": {"study": ["list_issues", "get_issue", "read_file", "grep_code", "run_sql", "web_search", "fetch_url", "save_note"]},
+    "tools": [
+      {"name": "list_issues", "description": "List open issues in a repository.", "input_schema": {"type": "object", "properties": {"repo": {"type": "string"}, "state": {"type": "string"}}, "required": ["repo"]}},
+      {"name": "get_issue", "description": "Get the full details of one issue by id.", "input_schema": {"type": "object", "properties": {"issue_id": {"type": "string"}}, "required": ["issue_id"]}},
+      {"name": "read_file", "description": "Read a text file from the workspace.", "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+      {"name": "grep_code", "description": "Search the codebase for a pattern.", "input_schema": {"type": "object", "properties": {"pattern": {"type": "string"}}, "required": ["pattern"]}},
+      {"name": "run_sql", "description": "Run a read-only SQL query and return rows.", "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
+      {"name": "web_search", "description": "Search the web and return ranked results.", "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}, "required": ["q"]}},
+      {"name": "fetch_url", "description": "Fetch a URL and return its readable text.", "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
+      {"name": "save_note", "description": "Save a titled note.", "input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "body": {"type": "string"}}, "required": ["title", "body"]}}
+    ],
+    "function_call_label": [
+      {"name": "web_search", "mcp_server": "study", "step": 1, "id": "s1", "input": {"q": "Protoweft latest release notes"}},
+      {"name": "fetch_url", "mcp_server": "study", "step": 2, "id": "s2", "input": {"url": "https://example.com/protoweft/releases/latest"}},
+      {"name": "read_file", "mcp_server": "study", "step": 3, "id": "s3", "input": {"path": "README.md"}},
+      {"name": "read_file", "mcp_server": "study", "step": 4, "id": "s4", "input": {"path": "goal-and-requirements.md"}},
+      {"name": "read_file", "mcp_server": "study", "step": 5, "id": "s5", "input": {"path": "architecture.md"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 6, "id": "s6", "input": {"pattern": "TODO"}},
+      {"name": "list_issues", "mcp_server": "study", "step": 7, "id": "s7", "input": {"repo": "acme/widgets", "state": "open"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "Protoweft brief", "body": "Protoweft is a protocol-neutral agent/tool interoperability library."}}
+    ]
+  },
+  {
+    "uuid": "study-incident-review",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Review the acme/widgets incident backlog. List open issues, open the highest-priority one, search the code for TODOs, read the CHANGELOG, count the users, read the architecture doc, check the latest Protoweft release notes online, then save a note. Name the highest-priority issue id in your final answer.",
+    "required_facts": ["142"],
+    "function_call_label": [
+      {"name": "list_issues", "mcp_server": "study", "step": 1, "id": "s1", "input": {"repo": "acme/widgets", "state": "open"}},
+      {"name": "get_issue", "mcp_server": "study", "step": 2, "id": "s2", "input": {"issue_id": "142"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 3, "id": "s3", "input": {"pattern": "TODO"}},
+      {"name": "read_file", "mcp_server": "study", "step": 4, "id": "s4", "input": {"path": "CHANGELOG.md"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 5, "id": "s5", "input": {"query": "SELECT count(*) FROM users"}},
+      {"name": "read_file", "mcp_server": "study", "step": 6, "id": "s6", "input": {"path": "architecture.md"}},
+      {"name": "web_search", "mcp_server": "study", "step": 7, "id": "s7", "input": {"q": "Protoweft latest release notes"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "Incident review", "body": "Highest-priority open issue: 142."}}
+    ]
+  },
+  {
+    "uuid": "study-db-health",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Produce a database health brief. Read config/db.yaml, count the users, list the first 120 users, search the code for TODOs, open issue 139, read the README and the goal doc, then save a note. State the exact user count in your final answer.",
+    "required_facts": ["1284"],
+    "function_call_label": [
+      {"name": "read_file", "mcp_server": "study", "step": 1, "id": "s1", "input": {"path": "config/db.yaml"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 2, "id": "s2", "input": {"query": "SELECT count(*) FROM users"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 3, "id": "s3", "input": {"query": "SELECT id, email, status FROM users LIMIT 120"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 4, "id": "s4", "input": {"pattern": "TODO"}},
+      {"name": "get_issue", "mcp_server": "study", "step": 5, "id": "s5", "input": {"issue_id": "139"}},
+      {"name": "read_file", "mcp_server": "study", "step": 6, "id": "s6", "input": {"path": "README.md"}},
+      {"name": "read_file", "mcp_server": "study", "step": 7, "id": "s7", "input": {"path": "goal-and-requirements.md"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "DB health", "body": "There are 1284 users."}}
+    ]
+  },
+  {
+    "uuid": "study-doc-digest",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Write a digest of the Protoweft docs. Read the README, the goal doc, the architecture doc, and the CHANGELOG, search the web for its release notes and fetch the top result, search the code for TODOs, then save a note. Name the project in your final answer.",
+    "required_facts": ["Protoweft"],
+    "function_call_label": [
+      {"name": "read_file", "mcp_server": "study", "step": 1, "id": "s1", "input": {"path": "README.md"}},
+      {"name": "read_file", "mcp_server": "study", "step": 2, "id": "s2", "input": {"path": "goal-and-requirements.md"}},
+      {"name": "read_file", "mcp_server": "study", "step": 3, "id": "s3", "input": {"path": "architecture.md"}},
+      {"name": "read_file", "mcp_server": "study", "step": 4, "id": "s4", "input": {"path": "CHANGELOG.md"}},
+      {"name": "web_search", "mcp_server": "study", "step": 5, "id": "s5", "input": {"q": "Protoweft latest release notes"}},
+      {"name": "fetch_url", "mcp_server": "study", "step": 6, "id": "s6", "input": {"url": "https://example.com/protoweft/releases/latest"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 7, "id": "s7", "input": {"pattern": "TODO"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "Docs digest", "body": "Protoweft is the protocol backbone for Java agents."}}
+    ]
+  },
+  {
+    "uuid": "study-triage-deep",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Do a deep triage of acme/widgets. List open issues, open issues 142 and 139, search the code for TODOs, read the CHANGELOG, count the users, check the latest Protoweft release notes online, then save a note. Name the highest-priority issue id in your final answer.",
+    "required_facts": ["142"],
+    "function_call_label": [
+      {"name": "list_issues", "mcp_server": "study", "step": 1, "id": "s1", "input": {"repo": "acme/widgets", "state": "open"}},
+      {"name": "get_issue", "mcp_server": "study", "step": 2, "id": "s2", "input": {"issue_id": "142"}},
+      {"name": "get_issue", "mcp_server": "study", "step": 3, "id": "s3", "input": {"issue_id": "139"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 4, "id": "s4", "input": {"pattern": "TODO"}},
+      {"name": "read_file", "mcp_server": "study", "step": 5, "id": "s5", "input": {"path": "CHANGELOG.md"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 6, "id": "s6", "input": {"query": "SELECT count(*) FROM users"}},
+      {"name": "web_search", "mcp_server": "study", "step": 7, "id": "s7", "input": {"q": "Protoweft latest release notes"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "Deep triage", "body": "Highest-priority open issue: 142."}}
+    ]
+  },
+  {
+    "uuid": "study-release-readiness",
+    "category": "multi_step",
+    "call_type": "multi",
+    "query": "Assess release readiness for acme/widgets. Read the CHANGELOG, search the code for TODOs, count the users, list the open issues, open the top one, read the architecture doc, fetch the latest Protoweft release notes, then save a note. State the exact user count in your final answer.",
+    "required_facts": ["1284"],
+    "function_call_label": [
+      {"name": "read_file", "mcp_server": "study", "step": 1, "id": "s1", "input": {"path": "CHANGELOG.md"}},
+      {"name": "grep_code", "mcp_server": "study", "step": 2, "id": "s2", "input": {"pattern": "TODO"}},
+      {"name": "run_sql", "mcp_server": "study", "step": 3, "id": "s3", "input": {"query": "SELECT count(*) FROM users"}},
+      {"name": "list_issues", "mcp_server": "study", "step": 4, "id": "s4", "input": {"repo": "acme/widgets", "state": "open"}},
+      {"name": "get_issue", "mcp_server": "study", "step": 5, "id": "s5", "input": {"issue_id": "142"}},
+      {"name": "read_file", "mcp_server": "study", "step": 6, "id": "s6", "input": {"path": "architecture.md"}},
+      {"name": "fetch_url", "mcp_server": "study", "step": 7, "id": "s7", "input": {"url": "https://example.com/protoweft/releases/latest"}},
+      {"name": "save_note", "mcp_server": "study", "step": 8, "id": "s8", "input": {"title": "Release readiness", "body": "There are 1284 users."}}
+    ]
+  }
+]

@@ -65,7 +65,7 @@ public final class NativeAnthropicArm implements Arm {
         try {
             raw.addAll(payloads.deferredTools(DiscoveryQuery.builder("").build()));
         } catch (IllegalStateException e) { // more than 10,000 deferred tools
-            return new ArmResult(name(), task.id(), List.of(), 0, 0, null, 0, 0, 0, "", false, e.getMessage(), Map.of());
+            return new ArmResult(name(), task.id(), List.of(), 0, 0, null, 0, 0, 0, null, List.of(), "", false, e.getMessage(), Map.of());
         }
         DiscoveryArmSupport.SearchLog log = new DiscoveryArmSupport.SearchLog(built, task);
         List<String> loaded = new ArrayList<>();

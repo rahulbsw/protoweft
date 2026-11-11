@@ -139,6 +139,9 @@ public final class AnthropicModelClient implements ModelClient {
                 b.addTool(tool);
             }
         }
+        if (request.forbidTools()) {
+            b.putAdditionalBodyProperty("tool_choice", JsonValue.from(java.util.Map.of("type", "none")));
+        }
         messages(request.conversation()).forEach(b::addMessage);
         long t0 = System.nanoTime();
         Message message;

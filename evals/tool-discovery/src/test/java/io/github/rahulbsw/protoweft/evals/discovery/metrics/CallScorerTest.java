@@ -30,7 +30,18 @@ class CallScorerTest {
     }
 
     private static ArmResult result(SelectedCall... calls) {
-        return new ArmResult("arm", "task", List.of(calls), 0, 1, Usage.ZERO, 0, 3, 0, "", false, null, Map.of());
+        return resultWithText("", calls);
+    }
+
+    private static ArmResult resultWithText(String finalText, SelectedCall... calls) {
+        return new ArmResult("arm", "task", List.of(calls), 0, 1, Usage.ZERO, 0, 3, 0, null, List.of(), finalText,
+                false, null, Map.of());
+    }
+
+    private static EvalTask multiStepTask() {
+        return new EvalTask("t", "test", "q", null, Map.of("t:gold", 1, "t:alt", 1),
+                List.of(new GoldCall("t:gold", Map.of()), new GoldCall("t:alt", Map.of())), Set.of(),
+                List.of("142"));
     }
 
     private static SelectedCall call(String id, String address) {
@@ -82,6 +93,36 @@ class CallScorerTest {
                 new GoldCall("t:gold", Map.of("address", "B"))));
         assertThat(CallScorer.score(t, CATALOG, result(call("t:gold", "A"))).callCorrect()).isFalse();
         assertThat(CallScorer.score(t, CATALOG, result(call("t:gold", "B"), call("t:gold", "A"))).callCorrect()).isTrue();
+    }
+
+    @Test
+    void reFetchesCountRepeatedTools() {
+        EvalTask t = task(List.of(new GoldCall("t:gold", Map.of("address", "A"))));
+        CallScorer.TaskScore s = CallScorer.score(t, CATALOG,
+                result(call("t:gold", "A"), call("t:gold", "A"), call("t:gold", "B")));
+        assertThat(s.reFetches()).isEqualTo(2);
+    }
+
+    @Test
+    void stateBasedSuccessNeedsCoverageAndRequiredFacts() {
+        EvalTask t = multiStepTask();
+        // Covers both gold tools and the final answer contains the required fact "142".
+        CallScorer.TaskScore ok = CallScorer.score(t, CATALOG,
+                resultWithText("Posted a comment on issue 142.", call("t:gold", "x"), call("t:alt", "y")));
+        assertThat(ok.goldToolsCovered()).isTrue();
+        assertThat(ok.requiredFactsPresent()).isTrue();
+        assertThat(ok.taskSuccess()).isTrue();
+        // Missing the required fact fails success even though coverage holds.
+        CallScorer.TaskScore noFact = CallScorer.score(t, CATALOG,
+                resultWithText("Done.", call("t:gold", "x"), call("t:alt", "y")));
+        assertThat(noFact.goldToolsCovered()).isTrue();
+        assertThat(noFact.requiredFactsPresent()).isFalse();
+        assertThat(noFact.taskSuccess()).isFalse();
+        // Missing a gold tool fails coverage and success.
+        CallScorer.TaskScore partial = CallScorer.score(t, CATALOG,
+                resultWithText("Issue 142 handled.", call("t:gold", "x")));
+        assertThat(partial.goldToolsCovered()).isFalse();
+        assertThat(partial.taskSuccess()).isFalse();
     }
 
     @Test

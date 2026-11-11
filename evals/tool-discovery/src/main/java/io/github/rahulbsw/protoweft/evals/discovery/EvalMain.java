@@ -159,7 +159,13 @@ public final class EvalMain {
                 Path.of(cli.string("mcptoolbench-dir", data.resolve("mcptoolbench").toString())),
                 toolret,
                 Path.of(cli.string("out", "build/eval-results")),
-                Path.of(cli.string("repo-dir", ".")));
+                Path.of(cli.string("repo-dir", ".")),
+                cli.flag("multiturn")
+                        ? new LlmRun.MultiTurnConfig(
+                                Path.of(cli.string("result-fixtures", "build/fixtures")),
+                                cli.integer("mock-fallback-tokens", 256))
+                        : null);
+        String judgeSpec = cli.string("judge-model", null);
         cli.rejectUnknown();
         TokenEstimator estimator = TokenEstimator.o200k();
         Map<String, ModelClient> clients = new LinkedHashMap<>();
@@ -181,7 +187,8 @@ public final class EvalMain {
                 clients.put(m, ModelClients.create(m, settings));
             }
         }
-        Path dir = new LlmRun(config, clients, guard, prices, Arms::create).run();
+        ModelClient judgeClient = judgeSpec == null || dryRun ? null : ModelClients.create(judgeSpec, settings);
+        Path dir = new LlmRun(config, clients, guard, prices, Arms::create, judgeClient).run();
         System.out.println("results: " + dir.resolve("report.md"));
         return 0;
     }

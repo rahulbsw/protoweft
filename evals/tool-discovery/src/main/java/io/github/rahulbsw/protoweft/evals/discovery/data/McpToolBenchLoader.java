@@ -117,7 +117,9 @@ public final class McpToolBenchLoader {
             return null;
         }
         alternatives.removeAll(relevance.keySet());
+        List<String> requiredFacts = Json.asList(row.get("required_facts")).stream()
+                .map(String::valueOf).toList();
         return new EvalTask(DATASET + ":" + uuid, DATASET + "/" + category, query.toString(), null,
-                relevance, calls, alternatives);
+                relevance, calls, alternatives, requiredFacts);
     }
 }
