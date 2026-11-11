@@ -208,6 +208,23 @@ class AgUiThreadTest {
     }
 
     @Test
+    void theConnectorDoesNotReportATurnStoppedByTheRunLimitAsCompleted() {
+        AgUiClientConnector connector = AgUiClientConnector.builder(host.baseUrl() + "/agui")
+                .conversations(b -> b.tools(tools, spec -> true).maxAutomaticRuns(1)).build();
+        connector.start();
+        AgentReply stopped = connector.send(AgentMessage.user("weather"));
+        assertThat(stopped.state()).isEqualTo(TaskState.WORKING);
+        assertThat(stopped.text()).contains("automatic-run limit");
+        assertThat(tools.calls).containsExactly("weather.forecast{city=Oslo}");   // ran, result not yet seen
+        AgentReply finished = connector.send(AgentMessage.userReply(stopped.taskId(), stopped.contextId(), "go on"));
+        assertThat(finished.state()).isEqualTo(TaskState.COMPLETED);
+        assertThat(finished.text()).isEqualTo("tool said rain");
+        assertThat(connector.thread(stopped.taskId()).messages()).extracting(AgUiMessage::role)
+                .containsExactly("user", "assistant", "tool", "assistant");   // "go on" was not added
+        connector.close();
+    }
+
+    @Test
     void messagesSnapshotReconcilesById() {
         Transcript t = new Transcript(List.of(UserMessage.text("u1", "hi"), AssistantMessage.text("a1", "old"),
                 new ActivityMessage("act", "progress", Map.of(), null, null), AssistantMessage.text("gone", "x")),

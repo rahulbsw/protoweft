@@ -123,7 +123,11 @@ contract has no words for (state, activity, reasoning, subagents, the applicatio
   `truncated` and never success; no `RUN_FINISHED` is synthesized. A `RUN_ERROR` after
   `RUN_FINISHED` makes the run failed.
 - **SSE reading** accepts the full grammar (LF, CR, CRLF, comments, multi-line `data`) and ignores
-  other fields; a line over `maxEventBytes` (8 MiB) fails the stream.
+  other fields. A line, or an event's `data` lines together, over `maxEventBytes` (8 MiB) fails
+  the stream, so many short lines can't exhaust memory either.
+- **Publisher:** each subscription reads its stream on a dedicated daemon thread and delivers on
+  the caller's executor. A single-thread executor would otherwise deadlock against the reader once
+  the buffer fills. `cancel()` closes the HTTP stream immediately, rather than at the next event.
 - **Chunks:** one lane per owner (parent or subagent) with at most one open chunk stream; a new id
   in the lane, a message/tool/step/state/custom/reasoning event in the lane, a run-level event or
   the owner's subagent ending closes it (`RAW`, activity, encrypted values and `SUBAGENT_STARTED`
@@ -160,8 +164,11 @@ contract has no words for (state, activity, reasoning, subagents, the applicatio
   (`AWAITING_TOOL_RESULTS`) and the thread refuses to continue until they are answered. A turn
   runs at most `maxAutomaticRuns` (10) runs by itself.
 - **Connector:** conversation id = task id = context id; threads kept in memory per connector.
-  Turn statuses map to `TaskState` (interrupt and unanswered calls → `INPUT_REQUIRED`, truncated
-  → `UNKNOWN`). The next message answers: text for a single interrupt, a JSON part
+  Turn statuses map to `TaskState`:
+  - interrupt and unanswered calls → `INPUT_REQUIRED`;
+  - truncated → `UNKNOWN`;
+  - the automatic-run limit reached with work left → `WORKING`, and the next message on the task
+    continues that turn (`continueRun`) instead of adding a message. The next message answers: text for a single interrupt, a JSON part
   `{interruptId: answer}` for several; text for unanswered tool calls. `getTask` is `UNSUPPORTED`;
   `cancel` closes the stream. `ask` tool (`message`, `conversation_id`). Streaming events:
   `WORKING`, text deltas as `response` artifact chunks, final status. The descriptor comes from

@@ -228,6 +228,86 @@ class AgUiClientTest {
     }
 
     @Test
+    void aSingleThreadExecutorCannotDeadlockALongStream() throws Exception {
+        StringBuilder body = new StringBuilder(frames("{\"type\":\"RUN_STARTED\",\"threadId\":\"t\",\"runId\":\"r\"}",
+                "{\"type\":\"TEXT_MESSAGE_START\",\"messageId\":\"m\"}"));
+        for (int i = 0; i < 3 * Flow.defaultBufferSize(); i++) {
+            body.append(frames("{\"type\":\"TEXT_MESSAGE_CONTENT\",\"messageId\":\"m\",\"delta\":\"x\"}"));
+        }
+        body.append(frames("{\"type\":\"TEXT_MESSAGE_END\",\"messageId\":\"m\"}",
+                "{\"type\":\"RUN_FINISHED\",\"threadId\":\"t\",\"runId\":\"r\"}"));
+        scripted.body = body.toString();
+        var executor = Executors.newSingleThreadExecutor();
+        CompletableFuture<Integer> done = new CompletableFuture<>();
+        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger();
+        client("/scripted", new CopyOnWriteArrayList<>()).publisher(hello(), executor).subscribe(new Flow.Subscriber<>() {
+            public void onSubscribe(Flow.Subscription s) {
+                s.request(Long.MAX_VALUE);
+            }
+
+            public void onNext(AgUiEvent item) {
+                count.incrementAndGet();
+            }
+
+            public void onError(Throwable t) {
+                done.completeExceptionally(t);
+            }
+
+            public void onComplete() {
+                done.complete(count.get());
+            }
+        });
+        assertThat(done.get(20, TimeUnit.SECONDS)).isEqualTo(3 * Flow.defaultBufferSize() + 4);
+        executor.shutdown();
+    }
+
+    @Test
+    void cancellingTheSubscriptionClosesAQuietStream() throws Exception {
+        stop();
+        agui = AgUiAgentServer.builder((in, run) -> {
+            run.say("thinking…");
+            Thread.sleep(15_000);   // then nothing for a long time
+        }).build();
+        host = ProtoweftServer.builder().port(0).endpoints(agui).start();
+        var executor = Executors.newCachedThreadPool();
+        CompletableFuture<Void> cancelled = new CompletableFuture<>();
+        client("/agui", new CopyOnWriteArrayList<>()).publisher(hello(), executor).subscribe(new Flow.Subscriber<>() {
+            Flow.Subscription s;
+
+            public void onSubscribe(Flow.Subscription s) {
+                this.s = s;
+                s.request(Long.MAX_VALUE);
+            }
+
+            public void onNext(AgUiEvent item) {
+                if (item instanceof AgUiEvent.TextMessageEnd) {
+                    s.cancel();   // no further event is coming for a while
+                    cancelled.complete(null);
+                }
+            }
+
+            public void onError(Throwable t) {
+            }
+
+            public void onComplete() {
+            }
+        });
+        cancelled.get(10, TimeUnit.SECONDS);
+        // The reader was blocked on a silent stream; cancelling must close it now, not at the next event.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (readerAlive() && System.nanoTime() < deadline) {
+            Thread.sleep(50);
+        }
+        assertThat(readerAlive()).isFalse();
+        executor.shutdown();
+    }
+
+    private static boolean readerAlive() {
+        return Thread.getAllStackTraces().keySet().stream()
+                .anyMatch(t -> t.isAlive() && t.getName().equals("protoweft-agui-reader"));
+    }
+
+    @Test
     void capabilitiesFromAProtoweftServer() {
         assertThat(client("/agui", List.of()).capabilities()).hasValueSatisfying(doc ->
                 assertThat(doc).containsKey("transport"));

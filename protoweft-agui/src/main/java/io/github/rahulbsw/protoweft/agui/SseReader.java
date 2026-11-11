@@ -8,8 +8,9 @@ import java.nio.charset.StandardCharsets;
 /**
  * Reads Server-Sent Events, returning each event's {@code data} payload. Accepts the full SSE
  * grammar (LF, CR and CRLF line endings, comments, multi-line {@code data}); every field other than
- * {@code data} is ignored, as the AG-UI binding requires. Lines longer than {@code maxLineBytes}
- * fail the stream, so a hostile peer cannot exhaust memory.
+ * {@code data} is ignored, as the AG-UI binding requires. A line, or an event's {@code data} lines
+ * together, longer than {@code maxLineBytes} fails the stream, so a hostile peer cannot exhaust
+ * memory with one long line or with many short ones.
  */
 final class SseReader {
 
@@ -17,6 +18,8 @@ final class SseReader {
     private final int maxLineBytes;
     private boolean pendingCr;
     private boolean eof;
+    /** UTF-8 size of the line {@link #line()} returned last. */
+    private int lineBytes;
 
     SseReader(InputStream in, int maxLineBytes) {
         this.in = in;
@@ -26,6 +29,7 @@ final class SseReader {
     /** The next event's data, or {@code null} at the end of the stream. */
     String next() throws IOException {
         StringBuilder data = null;
+        long dataBytes = 0;
         while (true) {
             String line = line();
             if (line == null) {
@@ -48,6 +52,11 @@ final class SseReader {
             String value = colon < 0 ? "" : line.substring(colon + 1);
             if (value.startsWith(" ")) {
                 value = value.substring(1);
+            }
+            // The field name, colon and optional space before the value are ASCII: one byte each.
+            dataBytes += lineBytes - (line.length() - value.length()) + (data == null ? 0 : 1);
+            if (dataBytes > maxLineBytes) {
+                throw new IOException("SSE event larger than " + maxLineBytes + " bytes");
             }
             if (data == null) {
                 data = new StringBuilder(value);
@@ -89,7 +98,8 @@ final class SseReader {
         }
     }
 
-    private static String decode(ByteArrayOutputStream buf) {
+    private String decode(ByteArrayOutputStream buf) {
+        lineBytes = buf.size();
         return buf.toString(StandardCharsets.UTF_8);
     }
 }

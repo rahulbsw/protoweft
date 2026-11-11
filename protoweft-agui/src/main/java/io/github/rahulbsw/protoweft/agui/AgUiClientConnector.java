@@ -45,6 +45,8 @@ import java.util.function.UnaryOperator;
  *       text answers each of them.</li>
  *   <li>{@code RUN_ERROR} is {@code FAILED}; a cancelled run {@code CANCELED}; a stream that ended
  *       without an outcome {@code UNKNOWN}.</li>
+ *   <li>A turn that hit the automatic-run limit with work left is {@code WORKING}; the next message
+ *       on the task continues that turn instead of being sent as a new message.</li>
  *   <li>Streaming: {@code WORKING} first, then the assistant's text as chunks of a {@code response}
  *       artifact, then the final status.</li>
  *   <li>{@link #getTask} is unsupported (AG-UI has no tasks); {@link #cancel} closes the stream of
@@ -56,6 +58,8 @@ public final class AgUiClientConnector implements AgentConnector, ToolConnector 
     private final AgUiClient client;
     private final UnaryOperator<AgUiThread.Builder> threads;
     private final Map<String, AgUiThread> conversations = new ConcurrentHashMap<>();
+    /** Conversations whose last turn hit the automatic-run limit; the next message continues it. */
+    private final Set<String> stopped = ConcurrentHashMap.newKeySet();
     private AgentDescriptor descriptor;
     private volatile boolean started;
 
@@ -127,6 +131,9 @@ public final class AgUiClientConnector implements AgentConnector, ToolConnector 
                 }
             };
             turn = next(thread, message, forward);
+            if (turn.status() == AgUiThread.Status.STOPPED) {
+                stopped.add(threadId);
+            }
         }
         AgentReply reply = reply(threadId, turn);
         events.accept(new AgentEvent.StatusUpdate(threadId, reply.state(), reply.message()));
@@ -134,6 +141,10 @@ public final class AgUiClientConnector implements AgentConnector, ToolConnector 
     }
 
     private AgUiThread.Turn next(AgUiThread thread, AgentMessage message, Consumer<AgUiEvent> forward) {
+        if (stopped.remove(thread.threadId())) {
+            // The turn hit the automatic-run limit with work left: finish it rather than add a message.
+            return thread.continueRun(forward);
+        }
         List<Interrupt> open = thread.openInterrupts();
         if (!open.isEmpty()) {
             Map<String, Object> answers = answers(message, open);
@@ -179,7 +190,13 @@ public final class AgUiClientConnector implements AgentConnector, ToolConnector 
         TaskState state;
         String text = turn.text();
         switch (turn.status()) {
-            case COMPLETED, STOPPED -> state = TaskState.COMPLETED;
+            case COMPLETED -> state = TaskState.COMPLETED;
+            case STOPPED -> {
+                state = TaskState.WORKING;
+                text = (text == null || text.isEmpty() ? "" : text + "\n\n")
+                        + "The agent reached the automatic-run limit before finishing; send another message on this "
+                        + "conversation to let it continue.";
+            }
             case INTERRUPTED -> {
                 state = TaskState.INPUT_REQUIRED;
                 text = turn.interrupts().stream().map(i -> i.message() != null ? i.message() : i.reason())

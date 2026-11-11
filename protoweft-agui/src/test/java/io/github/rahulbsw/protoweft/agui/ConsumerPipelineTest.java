@@ -36,6 +36,10 @@ class ConsumerPipelineTest {
         assertThat(sse("data: unterminated", 100)).containsExactly("unterminated");
         assertThat(sse("\n\n: only comments\n\n", 100)).isEmpty();
         assertThatThrownBy(() -> sse("data: " + "x".repeat(200) + "\n\n", 100)).isInstanceOf(IOException.class);
+        // Many short data lines are limited as one event, not line by line.
+        assertThatThrownBy(() -> sse("data: x\n".repeat(60) + "\n", 100)).isInstanceOf(IOException.class)
+                .hasMessageContaining("event larger");
+        assertThat(sse("data: x\n".repeat(20) + "\n", 100)).singleElement().asString().hasSize(39);
     }
 
     private static List<AgUiEvent> expand(AgUiEvent... events) {

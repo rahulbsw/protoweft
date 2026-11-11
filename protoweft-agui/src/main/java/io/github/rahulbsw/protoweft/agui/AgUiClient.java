@@ -119,24 +119,25 @@ public final class AgUiClient {
     }
 
     /**
-     * The run as a cold {@link Flow.Publisher}: subscribing starts it on {@code executor}. Events
-     * arrive with backpressure; the publisher completes after the run's terminal event, fails with
-     * {@link ProtoweftException} on a malformed or truncated stream, and cancelling the subscription
-     * closes the stream.
+     * The run as a cold {@link Flow.Publisher}: each subscription starts its own run. The stream is
+     * read on a dedicated daemon thread and events are delivered on {@code executor}, so a small or
+     * single-thread executor cannot deadlock against the reader. Events arrive with backpressure;
+     * the publisher completes after the run's terminal event and fails with
+     * {@link ProtoweftException} on a malformed or truncated stream. Cancelling the subscription
+     * closes the HTTP stream at once, even while the agent sends nothing.
      */
     public Flow.Publisher<AgUiEvent> publisher(RunAgentInput input, Executor executor) {
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(executor, "executor");
         return subscriber -> {
+            Objects.requireNonNull(subscriber, "subscriber");
             SubmissionPublisher<AgUiEvent> out = new SubmissionPublisher<>(executor, Flow.defaultBufferSize());
-            out.subscribe(subscriber);
             Call call = call(input);
-            executor.execute(() -> {
+            out.subscribe(new CancellingSubscriber(subscriber, call));
+            Thread reader = new Thread(() -> {
                 try {
                     RunResult result = call.execute(event -> {
-                        if (!out.hasSubscribers()) {
-                            call.cancel();
-                        } else {
+                        if (out.hasSubscribers()) {
                             out.submit(event);
                         }
                     });
@@ -149,8 +150,46 @@ public final class AgUiClient {
                 } catch (RuntimeException e) {
                     out.closeExceptionally(e);
                 }
-            });
+            }, "protoweft-agui-reader");
+            reader.setDaemon(true);
+            reader.start();
         };
+    }
+
+    /** Passes everything through, and makes {@code cancel()} also close the run's stream. */
+    private record CancellingSubscriber(Flow.Subscriber<? super AgUiEvent> delegate, Call call)
+            implements Flow.Subscriber<AgUiEvent> {
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            delegate.onSubscribe(new Flow.Subscription() {
+                @Override
+                public void request(long n) {
+                    subscription.request(n);
+                }
+
+                @Override
+                public void cancel() {
+                    subscription.cancel();
+                    call.cancel();
+                }
+            });
+        }
+
+        @Override
+        public void onNext(AgUiEvent item) {
+            delegate.onNext(item);
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            delegate.onError(throwable);
+        }
+
+        @Override
+        public void onComplete() {
+            delegate.onComplete();
+        }
     }
 
     Consumer<String> warningSink() {

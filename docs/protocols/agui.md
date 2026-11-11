@@ -177,7 +177,9 @@ event:
 `cancelled()`, `error()` (the agent's `RUN_ERROR`), or `truncated()`. Truncated means the stream
 ended without an outcome, which is never reported as success. `pendingToolCalls()` lists the calls
 the application must answer. `call(input)` returns a `Call` you can `cancel()` from another thread,
-and `publisher(input, executor)` offers the run as a `Flow.Publisher` with backpressure. Outgoing
+and `publisher(input, executor)` offers the run as a `Flow.Publisher` with backpressure. The
+stream is read on its own thread, and the executor only delivers events, so any executor works.
+Cancelling the subscription closes the stream at once. Outgoing
 input never carries activity messages and always declares a protocol version.
 
 ### A conversation: `AgUiThread`
@@ -250,6 +252,7 @@ registry.register("planner", remote);   // offers one tool, "ask"
 | tool calls the client does not run | `INPUT_REQUIRED`; the next message's text answers them |
 | `RUN_ERROR` | `FAILED` |
 | cancelled run / stream ended early | `CANCELED` / `UNKNOWN` |
+| the automatic-run limit hit with work left | `WORKING`; the next message continues the turn instead of being added |
 
 The conversation id is both the task id and the context id. `getTask` is unsupported (AG-UI has no
 tasks); `cancel` closes the stream of the run in flight; `thread(taskId)` gives the `AgUiThread`.
