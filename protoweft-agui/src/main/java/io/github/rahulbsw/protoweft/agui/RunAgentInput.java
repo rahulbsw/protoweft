@@ -36,12 +36,17 @@ public record RunAgentInput(String threadId, String runId, String protocolVersio
     /**
      * A tool the application offers and executes itself.
      *
-     * @param parameters JSON Schema of the arguments, or {@code null} for none
+     * @param parameters JSON Schema of the arguments: an object schema ({@code Map}), a boolean
+     *                   schema ({@code false} accepts no arguments, {@code true} any), or
+     *                   {@code null} for none
      */
-    public record Tool(String name, String description, Map<String, Object> parameters, Map<String, Object> metadata) {
+    public record Tool(String name, String description, Object parameters, Map<String, Object> metadata) {
         public Tool {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(description, "description");
+            if (parameters != null && !(parameters instanceof Map) && !(parameters instanceof Boolean)) {
+                throw new IllegalArgumentException("parameters must be a JSON Schema: an object or a boolean");
+            }
         }
     }
 

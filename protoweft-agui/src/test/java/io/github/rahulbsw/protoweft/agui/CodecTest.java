@@ -39,6 +39,19 @@ class CodecTest {
     }
 
     @Test
+    void booleanToolSchemasKeepTheirMeaning() {
+        RunAgentInput in = new RunAgentInput("t", "r", "1.0", null, null, List.of(),
+                List.of(new RunAgentInput.Tool("ping", "No arguments allowed", false, null),
+                        new RunAgentInput.Tool("any", "Anything goes", true, null)), null, null, null);
+        Map<String, Object> json = Codec.input(in);
+        assertThat(OfficialSchema.errors("RunAgentInput", json)).isEmpty();
+        RunAgentInput back = Codec.input(new Decoder(), Json.parse(Json.write(json)), "input");
+        assertThat(back.tools()).extracting(RunAgentInput.Tool::parameters).containsExactly(false, true);
+        assertThatThrownBy(() -> new RunAgentInput.Tool("x", "y", "not a schema", null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void absentOptionalFieldsAreOmittedNotNull() {
         String json = Json.write(EventCodec.encode(new TextMessageStart("m", null, null, Envelope.NONE)));
         assertThat(json).isEqualTo("{\"type\":\"TEXT_MESSAGE_START\",\"messageId\":\"m\"}");

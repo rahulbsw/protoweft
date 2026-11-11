@@ -81,9 +81,7 @@ final class Codec {
                     if (parameters != null && !(parameters instanceof Map) && !(parameters instanceof Boolean)) {
                         throw new AgUiFormatException(p + ".parameters must be a JSON Schema");
                     }
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> schema = parameters instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
-                    return new Tool(t.string("name"), t.string("description"), schema, t.optObject("metadata"));
+                    return new Tool(t.string("name"), t.string("description"), parameters, t.optObject("metadata"));
                 }),
                 o.optItems("context", (item, p) -> {
                     Decoder.Obj c = d.object(item, p, Set.of("description", "value"));

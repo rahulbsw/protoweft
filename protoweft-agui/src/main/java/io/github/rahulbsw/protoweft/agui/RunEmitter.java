@@ -83,18 +83,34 @@ final class RunEmitter extends EmitterScope implements AgUiRun {
             disconnected = true;
             hook = onDisconnect;
         }
-        if (hook != null) {
-            try {
-                hook.run();
-            } catch (RuntimeException e) {
-                LOG.log(System.Logger.Level.WARNING, "AG-UI disconnect hook failed", e);
-            }
+        runHook(hook);
+    }
+
+    /**
+     * Runs {@code hook} when the client goes away, exactly once. If the client is already gone (for
+     * example the {@code RUN_STARTED} write failed before the agent registered its hook), the hook
+     * runs now.
+     */
+    void onDisconnect(Runnable hook) {
+        boolean alreadyGone;
+        synchronized (this) {
+            this.onDisconnect = hook;
+            alreadyGone = disconnected;
+        }
+        if (alreadyGone) {
+            runHook(hook);
         }
     }
 
-    /** Runs {@code hook} when the client goes away (at most once). */
-    synchronized void onDisconnect(Runnable hook) {
-        this.onDisconnect = hook;
+    private static void runHook(Runnable hook) {
+        if (hook == null) {
+            return;
+        }
+        try {
+            hook.run();
+        } catch (RuntimeException e) {
+            LOG.log(System.Logger.Level.WARNING, "AG-UI disconnect hook failed", e);
+        }
     }
 
     synchronized boolean ended() {

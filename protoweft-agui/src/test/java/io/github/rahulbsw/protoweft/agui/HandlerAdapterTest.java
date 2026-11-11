@@ -173,6 +173,29 @@ class HandlerAdapterTest {
         assertThat(cancelled).containsExactly("thread-1");
     }
 
+    @Test
+    void aDisconnectBeforeTheHandlerStartsStillCallsOnCancel() throws Exception {
+        List<String> cancelled = new ArrayList<>();
+        AgentHandler handler = new AgentHandler() {
+            @Override
+            public void handle(AgentRequest request, AgentTaskContext task) {
+                assertThat(task.isCancelled()).isTrue();
+            }
+
+            @Override
+            public void onCancel(String taskId) {
+                cancelled.add(taskId);
+            }
+        };
+        RunEmitter emitter = new RunEmitter(ask("x"), CallerIdentity.ANONYMOUS, e -> {
+            throw new IOException("client gone before RUN_STARTED");
+        });
+        emitter.start();                       // the write fails: disconnected, no hook yet
+        AgUi.agent(handler).run(ask("x"), emitter);
+        emitter.disconnected();                // a later signal must not fire it again
+        assertThat(cancelled).containsExactly("thread-1");
+    }
+
     /** A task context from some other protocol. */
     private static final class NotAgUi implements AgentTaskContext {
         public String taskId() { return "t"; }
