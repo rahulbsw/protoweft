@@ -214,7 +214,8 @@ tokenizer over the same `tokenizer.json`.
   100-character rule, `encode`/`encodePair` layout, the longest-first cases, greedy matching on a
   toy vocabulary.
 - `WordPieceTokenizerFuzzTest` (Jazzer `@FuzzTest`, regression inputs in a normal build;
-  CONTRIBUTING.md "Fuzzing"): any text, lone surrogates included, tokenizes without an exception
+  CONTRIBUTING.md "Fuzzing"; `encodePairStructured` takes a `FuzzedDataProvider` for two
+  independent strings and `maxLength` 3..600): any text, lone surrogates included, tokenizes without an exception
   to ids inside the bge vocabulary; `encode` and `encodePair` keep the `[CLS]`/`[SEP]` layout and
   token types, never exceed `maxLength`, keep each part's first pieces and follow the documented
   longest-first rule.

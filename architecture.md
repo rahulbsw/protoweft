@@ -164,6 +164,16 @@ Dependency rules, enforced by module boundaries:
   environment. The release attaches a CycloneDX SBOM of the libraries' runtime dependencies and
   build-provenance attestations. Every dependency and plugin is checked against
   `gradle/verification-metadata.xml` (SHA-256 and PGP). Owner-only steps are in `RELEASING.md`.
+- **Repository security is checked continuously, and its rules are met as Scorecard reads them.**
+  CodeQL (`security-extended`, Java and workflows), Jazzer fuzzing of every untrusted-input parser
+  (regression seeds in each build, a CI fuzz job), OpenSSF Scorecard, Dependabot (Actions, Gradle,
+  Cargo), hash-pinned actions and Python installs, and branch protection on `main` (pull
+  requests, one approval, required checks; the sole maintainer merges with admin bypass). Two
+  layouts exist only because of how Scorecard detects things (`ossf/scorecard`
+  `checks/raw/fuzzing.go`, `binary_artifact.go`): at least one Jazzer target takes a
+  `FuzzedDataProvider` (the only Java fuzzing it recognises), and Gradle wrapper validation runs
+  in its own seconds-long workflow, since the jar is exempt only once validation has succeeded on
+  the commit being scanned.
 - **Spring Boot 4.x only.** 3.5 is out of OSS support and uses Jackson 2. Server endpoints are
   opt-in per protocol.
 - **Claims follow measurement.** Retrieval quality and model-in-the-loop effects of discovery are

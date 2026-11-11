@@ -1,0 +1,20 @@
+# Validates gradle-wrapper.jar against Gradle's published checksums. Kept in its own small workflow
+# so it finishes within seconds of a push: OpenSSF Scorecard only exempts the jar from its
+# Binary-Artifacts check when this validation has already succeeded on the commit it scans.
+name: Gradle wrapper
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Gradle wrapper
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1

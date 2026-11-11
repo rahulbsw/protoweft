@@ -1,5 +1,6 @@
 package io.github.rahulbsw.protoweft.discovery.embeddings;
 
+import com.code_intelligence.jazzer.api.FuzzedDataProvider;
 import com.code_intelligence.jazzer.junit.FuzzTest;
 
 import java.nio.ByteBuffer;
@@ -52,9 +53,26 @@ class WordPieceTokenizerFuzzTest {
         int nul = text.indexOf('\0');
         String first = nul < 0 ? text : text.substring(0, nul);
         String second = nul < 0 ? "" : text.substring(nul + 1);
+        checkPair(first, second, 3, 3 + lastByte(input) % 64);
+    }
+
+    /**
+     * The same invariants with structured input: two independent strings (any UTF-16, lone
+     * surrogates included) and any {@code maxLength} from 3 to 600, beyond the byte-level target's
+     * 3..66.
+     */
+    @FuzzTest(maxDuration = "2m")
+    void encodePairStructured(FuzzedDataProvider data) {
+        int max = data.consumeInt(3, 600);
+        String first = data.consumeString(2_000);
+        String second = data.consumeRemainingAsString();
+        checkPair(first, second, max);
+    }
+
+    private static void checkPair(String first, String second, int... maxLengths) {
         int[] a = BGE.tokenIds(first);
         int[] b = BGE.tokenIds(second);
-        for (int max : new int[] {3, 3 + lastByte(input) % 64}) {
+        for (int max : maxLengths) {
             WordPieceTokenizer.Encoding enc = BGE.encodePair(first, second, max);
             int[] ids = enc.ids();
             int[] types = enc.typeIds();
