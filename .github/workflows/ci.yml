@@ -77,8 +77,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Compile the fuzz tests
         run: >-
-          ./gradlew --console=plain :protoweft-rap:testClasses :protoweft-utcp:testClasses
-          :protoweft-oauth:testClasses :protoweft-discovery-embeddings:testClasses
+          ./gradlew --console=plain :protoweft-rap:fuzzClasses :protoweft-utcp:fuzzClasses
+          :protoweft-oauth:fuzzClasses :protoweft-discovery-embeddings:fuzzClasses
       # One fuzz test per Gradle run (Jazzer fuzzes a single test per JVM), each for
       # JAZZER_MAX_DURATION. --rerun keeps the build cache from replaying an earlier result.
       - name: Fuzz each target
@@ -99,7 +99,7 @@ jobs:
             protoweft-discovery-embeddings:io.github.rahulbsw.protoweft.discovery.embeddings.WordPieceTokenizerFuzzTest.encodePairStructured
           do
             echo "::group::${target#*:}"
-            ./gradlew --console=plain ":${target%%:*}:test" --tests "${target#*:}" --rerun || status=1
+            ./gradlew --console=plain ":${target%%:*}:fuzzTest" --tests "${target#*:}" --rerun || status=1
             echo "::endgroup::"
           done
           exit $status
@@ -109,8 +109,13 @@ jobs:
         with:
           name: fuzz-findings
           path: |
-            **/src/test/resources/**/crash-*
-            **/src/test/resources/**/timeout-*
-            **/src/test/resources/**/oom-*
-            **/build/test-results/test/*FuzzTest.xml
+            # Jazzer 0.30.0 writes findings to src/test/resources/<package>/<Class>Inputs/<method>/
+            # when the module has src/test/resources, else to the module root (FuzzTestExecutor).
+            protoweft-*/src/test/resources/**/crash-*
+            protoweft-*/src/test/resources/**/timeout-*
+            protoweft-*/src/test/resources/**/oom-*
+            protoweft-*/crash-*
+            protoweft-*/timeout-*
+            protoweft-*/oom-*
+            **/build/test-results/fuzzTest/*FuzzTest.xml
             **/build/reports/tests/

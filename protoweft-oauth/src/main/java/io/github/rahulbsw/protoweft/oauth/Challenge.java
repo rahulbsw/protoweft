@@ -19,7 +19,27 @@ public record Challenge(URI resourceMetadata, String scope, String error, String
     public static final Challenge NONE = new Challenge(null, null, null, null);
 
     public Challenge {
-        scope = scope == null || scope.isBlank() || scope.trim().isEmpty() ? null : scope.trim();
+        scope = scope == null || trimmed(scope).isEmpty() ? null : trimmed(scope);
+    }
+
+    /**
+     * {@code value} without leading or trailing control characters or whitespace of any kind
+     * (Unicode spaces included): {@code trim()} alone keeps U+2003, {@code strip()} alone keeps NUL.
+     */
+    static String trimmed(String value) {
+        int start = 0;
+        int end = value.length();
+        while (start < end && ignorable(value.charAt(start))) {
+            start++;
+        }
+        while (end > start && ignorable(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(start, end);
+    }
+
+    private static boolean ignorable(char c) {
+        return c <= ' ' || Character.isWhitespace(c) || Character.isSpaceChar(c);
     }
 
     /**

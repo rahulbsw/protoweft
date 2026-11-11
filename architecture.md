@@ -170,10 +170,13 @@ Dependency rules, enforced by module boundaries:
   Cargo), hash-pinned actions and Python installs, and branch protection on `main` (pull
   requests, one approval, required checks; the sole maintainer merges with admin bypass). Two
   layouts exist only because of how Scorecard detects things (`ossf/scorecard`
-  `checks/raw/fuzzing.go`, `binary_artifact.go`): at least one Jazzer target takes a
-  `FuzzedDataProvider` (the only Java fuzzing it recognises), and Gradle wrapper validation runs
-  in its own seconds-long workflow, since the jar is exempt only once validation has succeeded on
-  the commit being scanned.
+  `checks/raw/fuzzing.go`, `checks/fileparser/listing.go`, `binary_artifact.go`): fuzz tests live
+  in their own `src/fuzz` source set with a `fuzzTest` task wired into `check`, because Scorecard
+  skips every `src/test/` path (reported as ossf/scorecard#5458), and at least one Jazzer target
+  takes a `FuzzedDataProvider` (the only Java fuzzing it recognises); the separate source set also
+  keeps Jazzer's agent out of the unit-test JVM. Gradle wrapper validation runs in its own
+  seconds-long workflow, since the jar is exempt only once validation has succeeded on the commit
+  being scanned.
 - **Spring Boot 4.x only.** 3.5 is out of OSS support and uses Jackson 2. Server endpoints are
   opt-in per protocol.
 - **Claims follow measurement.** Retrieval quality and model-in-the-loop effects of discovery are

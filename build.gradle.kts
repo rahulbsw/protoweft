@@ -145,6 +145,27 @@ configure(subprojects.filter { it.buildFile.exists() && it.name != "protoweft-bo
         }
     }
 
+    // Jazzer fuzz tests live in src/fuzz (not src/test): their own JVM, so Jazzer's agent can't
+    // touch the unit tests, and OpenSSF Scorecard can see them (it skips src/test/). `check`
+    // replays the seed corpora; JAZZER_FUZZ=1 turns a run into fuzzing (CONTRIBUTING.md).
+    if (file("src/fuzz/java").isDirectory) {
+        val sourceSets = the<SourceSetContainer>()
+        val fuzz = sourceSets.create("fuzz") {
+            compileClasspath += sourceSets["main"].output + sourceSets["test"].output
+            runtimeClasspath += output + compileClasspath
+        }
+        configurations[fuzz.implementationConfigurationName].extendsFrom(configurations["testImplementation"])
+        configurations[fuzz.runtimeOnlyConfigurationName].extendsFrom(configurations["testRuntimeOnly"])
+        val fuzzTest = tasks.register<Test>("fuzzTest") {
+            description = "Replays the Jazzer seed corpora (fuzzes with JAZZER_FUZZ=1)."
+            group = "verification"
+            testClassesDirs = fuzz.output.classesDirs
+            classpath = fuzz.runtimeClasspath
+            shouldRunAfter("test")
+        }
+        tasks.named("check") { dependsOn(fuzzTest) }
+    }
+
     tasks.withType<Javadoc>().configureEach {
         options.encoding = "UTF-8"
         (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
