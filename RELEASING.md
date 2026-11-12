@@ -4,64 +4,127 @@ Releases publish every `protoweft-*` library and `protoweft-bom` to Maven Centra
 `io.github.rahulbsw`. Examples, the evaluation harness, the conformance apps and
 `protoweft-argi-neutral` are never published.
 
-Publishing is gated: the release workflow runs only for a version tag, and it waits for approval
-on the `maven-central` GitHub environment.
+- **Releases** start from the Actions tab with a version number. They publish only after your
+  approval on the `maven-central` environment, because a Maven Central release can never be
+  changed or deleted.
+- **Snapshots** of `main` (`version` in `gradle.properties`, always `-SNAPSHOT`) are published on
+  every push to `main`, to the Central Portal snapshot repository.
 
-## One-time setup (repository owner)
+## Setup
 
-1. **Central Portal account and namespace.** `io.github.rahulbsw` is a GitHub namespace, so no
-   domain is involved ([Central docs](https://central.sonatype.org/register/namespace/)).
-   - Sign up at <https://central.sonatype.com> **with the GitHub account `rahulbsw`**. Central then
-     grants `io.github.rahulbsw` automatically; check it under your username menu → **View
-     Namespaces**.
-   - If it isn't there (for example, the account was created another way): **Add Namespace**,
-     enter `io.github.rahulbsw`, copy the verification key, create a temporary **public** GitHub
-     repository `rahulbsw/<verification-key>`, then press **Verify**. Delete that repository once
-     the namespace shows as verified.
-2. **Portal user token.** In the Portal, open **View Account → Generate User Token**. Keep the
-   username/password pair it produces; it is not your login.
-3. **Signing key.**
-   ```bash
-   gpg --quick-generate-key "Rahul Jain (Protoweft releases)" ed25519 sign 2y
-   gpg --keyserver keys.openpgp.org --send-keys <KEY_ID>
-   gpg --export-secret-keys --armor <KEY_ID>      # value for SIGNING_KEY
-   ```
-4. **GitHub repository `rahulbsw/protoweft`:**
-   - Create an environment named `maven-central`, and add yourself as a required reviewer.
-   - Add these environment secrets:
+Done once, for repository `rahulbsw/protoweft`.
 
-     | Secret | Value |
-     |---|---|
-     | `MAVEN_CENTRAL_USERNAME` | user token username |
-     | `MAVEN_CENTRAL_PASSWORD` | user token password |
-     | `SIGNING_KEY` | ASCII-armored private key |
-     | `SIGNING_KEY_PASSWORD` | its passphrase |
-   - Under **Settings → Pages**, set the source to **GitHub Actions**. The docs then deploy to
-     <https://rahulbsw.github.io/github/rahulbsw/protoweft/>.
+| What | Where | State |
+|---|---|---|
+| Central Portal user token (not your login) | repository secrets `MAVEN_ARTIFACTORY_USERNAME`, `MAVEN_ARTIFACTORY_TOKEN` | set |
+| Release signing key, Ed25519, fingerprint `7D1F 6067 10F8 071A 5AB3 D49F 2256 22B1 DCFB 8C54`, expires 2028-11-11 | `maven-central` environment secrets `SIGNING_KEY` (ASCII-armored private key) and `SIGNING_KEY_PASSWORD` | set |
+| Public half of the signing key | keyserver.ubuntu.com (served in full) and keys.openpgp.org (served without its name, as for any key with no verified email), both checked by Central | uploaded |
+| Environment `maven-central` | Settings → Environments: you as required reviewer, protected branches only | set |
+| Actions may create pull requests (for the follow-up PR) | Settings → Actions → General → Workflow permissions | on |
+| **SNAPSHOTs enabled for `io.github.rahulbsw`** | [Central Portal namespaces](https://central.sonatype.com/publishing/namespaces) → the namespace's menu → **Enable SNAPSHOTs** | needed before the first snapshot |
+
+The signing key's private half and its passphrase are also kept on the owner's machine: the key
+in the GnuPG keyring, the passphrase in the macOS Keychain under "Protoweft release signing key
+passphrase". The secrets hold the only other copies.
+
+### Replacing a secret
+
+- **Central token:** in the Portal, **View Account → Generate User Token**, then set both
+  `MAVEN_ARTIFACTORY_*` secrets to the new pair.
+- **Signing key** (before it expires, or if it leaks):
+  ```bash
+  gpg --quick-generate-key "Rahul Jain (Protoweft releases)" ed25519 sign 2y
+  gpg --armor --export <FINGERPRINT> > key.asc
+  curl --data-urlencode keytext@key.asc https://keyserver.ubuntu.com/pks/add
+  curl -H 'Content-Type: application/json' \
+    --data "$(jq -n --rawfile k key.asc '{keytext: $k}')" https://keys.openpgp.org/vks/v1/upload
+  gpg --export-secret-keys --armor <FINGERPRINT> | gh secret set SIGNING_KEY --env maven-central
+  gh secret set SIGNING_KEY_PASSWORD --env maven-central   # paste the passphrase
+  ```
+  To extend the current key instead, run `gpg --quick-set-expire <FINGERPRINT> 2y`, re-upload the
+  public key, and update `SIGNING_KEY`.
 
 ## Cutting a release
 
-1. Move the `[Unreleased]` entries in `CHANGELOG.md` under the new version.
-2. Check locally that publishing works:
-   `./gradlew build publishToMavenLocal -Pversion=<version>`. This is unsigned and touches only
-   `~/.m2`.
-3. Tag and push: `git tag v<version> && git push origin v<version>`.
-4. Approve the `maven-central` deployment in the Actions tab. The workflow then:
-   - builds and tests;
-   - signs and uploads to the Central Portal, and releases automatically after validation;
-   - attests build provenance for the jars;
-   - creates the GitHub release.
-5. Check <https://central.sonatype.com/publishing/deployments>. Artifacts usually appear on Maven
-   Central within 30 minutes.
+1. Check that the `[Unreleased]` section of `CHANGELOG.md` lists what ships. The release notes are
+   taken from it, and a final release refuses an empty section.
+2. In **Actions → Release → Run workflow** (on `main`), enter the version without a leading `v`:
+   `0.1.0`, or a pre-release such as `0.1.0-rc.1` (`-alpha.N`, `-beta.N` and `-rc.N` are
+   accepted).
+3. **Verify** checks the version: neither the tag `v<version>` nor the version on Maven Central
+   may exist yet. It then builds and tests `main`'s head, and prepares the notes.
+4. **Approve** the `maven-central` deployment when asked. **Publish** then signs and uploads to the
+   Central Portal, and releases once Central has validated the deployment. It does nothing else.
+   **GitHub release** then:
+   - attests build provenance and the SBOM;
+   - creates the tag `v<version>` and the GitHub release (marked pre-release for `-alpha`, `-beta`
+     and `-rc`), with the jars and the SBOM attached.
+5. For a final release, **Follow-up** opens the PR "Record release <version> and start <next>"
+   against current `main`. It moves the released notes under `## [<version>] - <date>`. Entries
+   merged since the release stay under `[Unreleased]`, and so does a released entry edited since;
+   check those in the PR. It also sets `version=<next>` (patch + 1, `-SNAPSHOT`) in
+   `gradle.properties`. A PR opened by the workflow's token can't start
+   other workflows, so the required checks don't run on it: close and reopen the PR to run them, or
+   merge with admin bypass. To move to a new minor version instead, edit `gradle.properties` in
+   that PR before merging.
+6. Artifacts appear on Maven Central within about 30 minutes; deployments are listed at
+   <https://central.sonatype.com/publishing/deployments>.
 
-The first release should be a release candidate (for example `v0.1.0-rc1`). The publishing
-plugin (`com.vanniktech.maven.publish` 0.37.0) is documented as tested up to Gradle 9.7, and this
-build uses 9.8.2.
+### When a run fails
+
+A Maven Central release can't be undone or repeated, so what to do depends on where the run
+stopped:
+
+| Failed job | State | What to do |
+|---|---|---|
+| **Verify**, or a rejected approval | Nothing published, no tag. | Fix the cause, then run Release again with the same version. |
+| **Publish** | Usually nothing published. If the failure came after the upload (for example while waiting for validation), Central may still have accepted the deployment. | Check <https://central.sonatype.com/publishing/deployments>. *No deployment, or `FAILED`:* fix the cause and run Release again; a `FAILED` deployment can be dropped there. *`VALIDATED`:* press **Publish** there, or **Drop** it and run again. *`PUBLISHING` or `PUBLISHED`:* the version is released, so don't run again; finish by hand (below). |
+| **GitHub release** (attestations, tag or release) | Published on Central, no tag yet. | Actions → that run → **Re-run failed jobs**. It retries this job and Follow-up, not Publish. |
+| **Follow-up** | Released, tagged; no follow-up PR. | **Re-run failed jobs**, or make the CHANGELOG and `gradle.properties` change in a PR by hand. |
+
+Use **Re-run failed jobs**, never **Re-run all jobs**. The latter repeats **Publish**, which would
+try to upload the version again, and replaces the artifacts the later jobs read.
+
+Running Release again for a version Central already has stops in **Verify**, as long as Maven
+Central already serves it. Central would reject the upload anyway.
+
+Finishing by hand after a **Publish** failure that still released: create the tag and the release
+from the run's commit. This release has no attestations.
+
+```bash
+gh release create v<version> --target <commit> --title "Protoweft <version>" --notes-file <notes>
+```
+
+`<notes>` is the run's `release-notes` artifact, or the CHANGELOG section. Then open the
+follow-up PR by hand, as **Follow-up** would have.
+
+The first release should be a release candidate.
+
+To check publishing locally without signing or uploading:
+`./gradlew build publishToMavenLocal -Pversion=<version>`.
+
+## Snapshots
+
+`.github/workflows/snapshot.yml` publishes `main`'s snapshot on every push to `main` (and on
+demand). Snapshots are unsigned and unvalidated, they are overwritten by each push, and Central
+deletes them after 90 days. To use one:
+
+```kotlin
+repositories {
+    maven("https://central.sonatype.com/repository/maven-snapshots/") {
+        content { includeGroup("io.github.rahulbsw") }
+    }
+    mavenCentral()
+}
+dependencies {
+    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+}
+```
 
 ## What every published artifact carries
 
 - Main, sources and Javadoc jars, plus a Gradle module metadata file.
-- `.asc` signatures and checksums, added by the plugin at upload.
+- `.asc` signatures (releases) and checksums, added by the plugin at upload.
 - A POM with name, description, url, the MIT license, the developer and SCM. CI checks this on
   every build by publishing to Maven Local.
 - An `Automatic-Module-Name` of `io.github.rahulbsw.protoweft.<module>`.

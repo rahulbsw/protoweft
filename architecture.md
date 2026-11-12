@@ -179,8 +179,13 @@ Dependency rules, enforced by module boundaries:
   inline A2A file names — which led to `Content.Resource` and `Data.name`.
 - **Release only through the gate.** `com.vanniktech.maven.publish` publishes the `protoweft-*`
   libraries and the BOM (never examples, evals, conformance apps or `argi-neutral`), signed, to
-  Maven Central, from `.github/workflows/release.yml` behind the protected `maven-central`
-  environment. The release attaches a CycloneDX SBOM of the libraries' runtime dependencies and
+  Maven Central, from `.github/workflows/release.yml`. The owner starts it with a version on
+  `main`. Build and tests run first; the signing key lives only in the protected `maven-central`
+  environment, whose approval gates publishing. A Central release is permanent. The workflow then
+  creates the tag and the GitHub release. `main` accepts only pull requests, so the changelog move
+  and the next `-SNAPSHOT` version come back as a PR, never a direct push. Every push to `main`
+  also publishes its unsigned `-SNAPSHOT` to the Central Portal snapshot repository
+  (`snapshot.yml`). The release attaches a CycloneDX SBOM of the libraries' runtime dependencies and
   build-provenance attestations. Every dependency and plugin is checked against
   `gradle/verification-metadata.xml` (SHA-256 and PGP). Owner-only steps are in `RELEASING.md`.
 - **Repository security is checked continuously, and its rules are met as Scorecard reads them.**
