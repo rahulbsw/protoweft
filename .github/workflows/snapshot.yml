@@ -2,8 +2,9 @@ name: Snapshot
 
 # Publishes main's -SNAPSHOT (the version in gradle.properties) of every protoweft-* library and the
 # BOM to the Central Portal snapshot repository, https://central.sonatype.com/repository/maven-snapshots/,
-# on every push to main. Snapshots are unsigned and unvalidated, and Central deletes them after 90
-# days. The namespace must have SNAPSHOTs enabled on the Central Portal (see RELEASING.md).
+# on every push to main (a burst of merges collapses into one run). Snapshots are unsigned and
+# unvalidated, and Central deletes them after 90 days. The namespace must have SNAPSHOTs enabled
+# on the Central Portal (see RELEASING.md).
 on:
   push:
     branches: [main]
@@ -39,7 +40,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Publish to the Central Portal snapshot repository
         # Merges to main have already passed the required checks, so the tests are not rerun here.
-        run: ./gradlew publishToMavenCentral --no-configuration-cache --console=plain
+        # Kept light, because Central rate-limits by egress IP and GitHub's runners share theirs
+        # (429 Too Many Requests; repeated bursts escalate to longer blocks, see
+        # https://central.sonatype.org/faq/429-error/): one module at a time (--no-parallel), and
+        # md5 and sha1 checksums only (Gradle's sha256/sha512 add 14 of 35 uploads per module and
+        # Central does not need them). No automatic retry: Sonatype advises against retrying
+        # harder. A throttled run is re-run by hand later; the next push publishes anyway.
+        run: >-
+          ./gradlew publishToMavenCentral --no-parallel --no-configuration-cache --console=plain
+          -Dorg.gradle.internal.publish.checksums.insecure=true
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_ARTIFACTORY_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_ARTIFACTORY_TOKEN }}

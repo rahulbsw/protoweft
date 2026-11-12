@@ -108,7 +108,16 @@ To check publishing locally without signing or uploading:
 
 `.github/workflows/snapshot.yml` publishes `main`'s snapshot on every push to `main` (and on
 demand). Snapshots are unsigned and unvalidated, they are overwritten by each push, and Central
-deletes them after 90 days. To use one:
+deletes them after 90 days.
+
+Central rate-limits by egress IP, and GitHub's hosted runners share theirs, so a snapshot run can
+fail with `429 Too Many Requests` partway through. The job keeps uploads light (one module at a
+time, md5 and sha1 checksums only) and doesn't retry by itself: repeated bursts make Central's
+blocks longer ([429 FAQ](https://central.sonatype.org/faq/429-error/)). If a run is throttled,
+leave it. The next push to `main` publishes again, or re-run it by hand after an hour or so. A
+throttled run can leave some modules of the snapshot older than others until then.
+
+To use one:
 
 ```kotlin
 repositories {
