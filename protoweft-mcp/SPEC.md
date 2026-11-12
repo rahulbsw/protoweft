@@ -19,13 +19,15 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
   list-change notifications through MCP-specific methods.
 - **Server:** `McpToolServer` serves any core `ToolSource` (`LocalTools`, `ToolRegistry`, a
   connector) to MCP clients, plus optional `McpResources` and `McpPrompts`, with logging,
-  progress and completion.
+  progress and completion. Streamable HTTP is served either with sessions (`Http`) or
+  **stateless** (`StatelessHttp`), the latter for horizontal scaling behind a plain load balancer
+  with no session affinity.
 
 ## Boundary
 
 - Public API: `McpClientConnector` (with `Builder` for stdio and `HttpBuilder` for HTTP),
-  `McpToolServer` (with `Http` and `Stdio`), `McpFeatures` (feature ids), and the resource and
-  prompt types:
+  `McpToolServer` (with `Http`, `StatelessHttp` and `Stdio`), `McpFeatures` (feature ids), and the
+  resource and prompt types:
   - authoring: `McpResources`, `McpPrompts`, the handler interfaces `McpResourceHandler`,
     `McpPromptHandler`, `McpCompleter` and their request records, and the annotations
     `@McpResource`, `@McpResourceTemplate`, `@McpPrompt`, `@McpComplete`;
@@ -42,6 +44,11 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
   endpoint is named `mcp` for the default path `/mcp`, and `mcp:<path>` for any other path. The
   servlet API is `compileOnly` because the host provides it. Stdio serving doesn't need the
   servlet API at runtime, and a test checks this.
+- `McpToolServer.StatelessHttp` is the same `ServerEndpointProvider` contract over the SDK's
+  `HttpServletStatelessServerTransport`: one async `ServletEndpoint`, the same endpoint naming,
+  the same `InboundAuthenticator` and caller propagation (the authenticated caller is read from
+  the `McpTransportContext`, not an exchange). It issues no `Mcp-Session-Id` and holds no session,
+  so any instance serves any request. It has no session sweeper to capture, unlike `Http`.
 
 ## Decisions
 
@@ -49,7 +56,16 @@ MCP Java SDK (`io.modelcontextprotocol.sdk:mcp`, pinned to **2.1.0**, the latest
   `ComplianceReport` are read from the SDK transport in use (`protocolVersions()`):
   - stdio, client and server: `2024-11-05` through `2025-11-25`.
   - Streamable HTTP, client and server: `2025-03-26` through `2025-11-25`. Streamable HTTP
-    doesn't exist in `2024-11-05`.
+    doesn't exist in `2024-11-05`. The stateless HTTP server reads its revisions from the SDK's
+    `HttpServletStatelessServerTransport` the same way.
+- **Stateless is a transport, not a wire revision.** `StatelessHttp` runs on the existing
+  `2025-*` revisions using the SDK's stateless transport; it does not depend on the `2026-07-28`
+  revision (unbuilt). Because there is no session, it cannot carry the session-scoped features:
+  its `ComplianceReport` lists `transport/stateless-http` as supported and `resources/subscribe`,
+  `logging` and `progress` as unsupported (in addition to the other transports and the features
+  no role implements). `McpFeatures` computes this by removing those three from the common set for
+  the stateless transport. A progress- or log-emitting tool still runs; those callbacks are no-ops
+  (`ToolProgress.NOOP`).
 
   The SDK version comes from a resource generated from `gradle.properties`. The client's
   negotiated revision is the one in the server's `initialize` result. A server negotiates per

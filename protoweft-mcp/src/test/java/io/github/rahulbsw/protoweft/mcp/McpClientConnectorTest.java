@@ -55,8 +55,8 @@ class McpClientConnectorTest {
                 McpFeatures.LOGGING, McpFeatures.PROGRESS, McpFeatures.CONTENT_RESOURCE, McpFeatures.TOOLS_LIST_CHANGED,
                 McpFeatures.RESOURCES_LIST_CHANGED, McpFeatures.PROMPTS_LIST_CHANGED);
         assertThat(report.unsupported()).containsExactlyInAnyOrder(McpFeatures.TRANSPORT_STREAMABLE_HTTP,
-                McpFeatures.TRANSPORT_SSE, McpFeatures.AUTHORIZATION, McpFeatures.CANCELLATION, McpFeatures.SAMPLING,
-                McpFeatures.ROOTS, McpFeatures.ELICITATION);
+                McpFeatures.TRANSPORT_STATELESS_HTTP, McpFeatures.TRANSPORT_SSE, McpFeatures.AUTHORIZATION,
+                McpFeatures.CANCELLATION, McpFeatures.SAMPLING, McpFeatures.ROOTS, McpFeatures.ELICITATION);
     }
 
     @Test
