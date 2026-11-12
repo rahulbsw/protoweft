@@ -73,6 +73,21 @@ public class ProtoweftServerProperties {
         /** What the agent does, published in its capabilities document. */
         private String description;
 
+        /**
+         * Answer in AG-UI's HTTP + Protobuf binding when a client's {@code Accept} admits it (a
+         * wildcard does too). Takes effect only with protobuf-java (4.36.2 or newer) on the
+         * classpath; false always answers SSE.
+         */
+        private boolean protobuf = true;
+
+        public boolean isProtobuf() {
+            return protobuf;
+        }
+
+        public void setProtobuf(boolean protobuf) {
+            this.protobuf = protobuf;
+        }
+
         public boolean isEnabled() {
             return enabled;
         }

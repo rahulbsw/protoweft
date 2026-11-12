@@ -117,7 +117,8 @@ What Protoweft provides:
     tool server for the app's own tools, with subscriptions (event streams), OAuth and user-choice
     prompts, cancellation, thread closure, and state that can survive a restart.
   - **AG-UI**: an agent server that serves any agent to AG-UI frontends (every event family, shared
-    state, interrupts, the frontend's own tools, opt-in CORS), and a client that holds AG-UI
+    state, interrupts, the frontend's own tools, opt-in CORS) over both HTTP bindings (SSE, and
+    Protobuf when the application adds protobuf-java), and a client that holds AG-UI
     conversations with remote agents and can offer them Protoweft tools, running only read-only ones
     without the application's approval.
 - **Hosting:** the same endpoints in embedded Jetty or Spring Boot, each behind the same
@@ -156,7 +157,7 @@ What Protoweft provides:
   Protoweft wraps it rather than re-deriving the wire format. (UTCP, RAP and AG-UI have no official
   Java SDK, so their connectors are implemented directly from the specifications. AG-UI has a
   community Java SDK; it is not used, to keep third-party runtime dependencies out of users'
-  applications.)
+  applications. Its optional Protobuf binding uses protobuf-java only when the application adds it.)
 - **Not a lowest-common-denominator façade.** The core does not force the protocols into a single
   unified model where their domains genuinely differ (e.g. A2A tasks vs. tool calls).
 - **No guarantee of full feature coverage** for any protocol; coverage is declared per connector.

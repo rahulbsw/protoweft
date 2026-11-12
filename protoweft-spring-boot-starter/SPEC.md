@@ -72,7 +72,7 @@ Nothing here is needed outside Spring. Every capability comes from `protoweft-co
 | `protoweft.mcp.clients.<name>` | `command` + `args` + `env` (stdio) **or** `url` + `endpoint` (`/mcp`) + `headers` (HTTP) · `request-timeout` |
 | `protoweft.utcp.manuals.<name>` | `url` **or** `file` · `headers` · `variables` · `discovery-timeout` · `call-timeout` |
 | `protoweft.a2a.agents.<name>` | `url` · `timeout` · `streaming` (true) |
-| `protoweft.agui.agents.<name>` | `url` · `response-timeout` (connector: 60 s) |
+| `protoweft.agui.agents.<name>` | `url` · `response-timeout` (connector: 60 s) · `protobuf` (`false`) |
 | `protoweft.rap.servers.<name>` | `url` · `additional-urls` · `timeout` (connector: 10 min) · `request-timeout` (connector: 30 s) · `thread-id` |
 | `protoweft.rap` | `callback.public-base-url` · `callback.listener.enabled` (false) · `callback.listener.host` (`127.0.0.1`) · `callback.listener.port` (0) · `store.dir` |
 | `protoweft.server` | `auth-filter-order` (0) |
@@ -80,7 +80,7 @@ Nothing here is needed outside Spring. Every capability comes from `protoweft-co
 | `protoweft.server.utcp` | `enabled` · `base-url` · `expose` · `manual-version` · `api-key-header` + `api-key-variable` |
 | `protoweft.discovery` | `enabled` (false) · `fallback` (`progressive`\|`all-schemas`\|`none`) · `sources.<name>.required-scopes` · `expose-mcp` (false) · `mcp-path` (`/mcp-discovery`) |
 | `protoweft.server.a2a` | `enabled` · `public-url` · `path` (`/a2a`) · `name` · `description` · `version` · `skills[]` · `streaming` · `push-notifications` · `agent-timeout` |
-| `protoweft.server.agui` | `enabled` · `path` (`/agui`) · `allowed-origins` · `name` · `description` · `from-chat-client` |
+| `protoweft.server.agui` | `enabled` · `path` (`/agui`) · `allowed-origins` · `name` · `description` · `from-chat-client` · `protobuf` (`true`) |
 | `protoweft.server.rap` | `enabled` · `base-path` (`/rap`) · `base-url` · `expose` · `name` (`protoweft`) · `description` · `allowed-callback-hosts` · `choice-timeout` |
 
 `<name>` is the registry source name, so tools appear as `<name>.<tool>`; an A2A or AG-UI agent
@@ -244,9 +244,11 @@ The checks:
     application can resume `recoveredSubscriptions()` after a restart.
 - **AG-UI (`protoweft-agui`).** `protoweft.server.agui.enabled` serves an `AgUiAgent` bean, else
   the `AgentHandler` bean through `AgUi.agent`, else fails naming the property. `name` and
-  `description` become the capabilities document's `identity`; `allowed-origins` turns on CORS.
-  `AgUiConnectorFactory` builds an `AgUiClientConnector` per `protoweft.agui.agents.<name>`,
-  with the application's `CredentialProvider`.
+  `description` become the capabilities document's `identity`; `allowed-origins` turns on CORS;
+  `protobuf` maps to `AgUiAgentServer.builder().protobuf(…)`, which takes effect only with
+  protobuf-java on the classpath. `AgUiConnectorFactory` builds an `AgUiClientConnector` per
+  `protoweft.agui.agents.<name>`, with the application's `CredentialProvider` and `protobuf` as
+  `preferProtobuf`. The defaults (server on, client off) are `protoweft-agui`'s.
 - **Actuator.**
   - Health `protoweft` reports connector lifecycle state; it doesn't probe peers on every check.
     It is DOWN if any connector failed, OUT_OF_SERVICE while any is pending, and UP otherwise.
@@ -374,7 +376,9 @@ Not implemented:
 - **Real Tomcat, AG-UI (in `ProtoweftHttpTest`):** the echo agent is served at `/agui` behind the
   authenticator (anonymous run → 401), a preflight from the allowed origin passes (204 with the
   CORS header), the capabilities carry the configured name, and an AG-UI connector declared in
-  properties calls the app's own agent as `ui.ask`. `from-chat-client` for AG-UI yields one
+  properties calls the app's own agent as `ui.ask`, over the Protobuf binding
+  (`protoweft.agui.agents.ui.protobuf=true`; protobuf-java arrives through a2a-java), with
+  `httpBinary: true` in the capabilities. `from-chat-client` for AG-UI yields one
   `AgentHandler`, also together with A2A's.
 - **Real Tomcat with Spring Security:** HTTP Basic on `/mcp` rejects anonymous MCP clients, and
   the authenticated user reaches the tool as the caller, which proves the filter order.

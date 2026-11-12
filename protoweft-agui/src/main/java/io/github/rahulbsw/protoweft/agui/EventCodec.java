@@ -77,7 +77,6 @@ final class EventCodec {
             m.put("messageId", e.messageId());
             m.put("toolCallId", e.toolCallId());
             m.put("content", Codec.content(e.content()));
-            m.put("role", "tool");
         } else if (event instanceof ReasoningStart e) {
             m.put("messageId", e.messageId());
         } else if (event instanceof ReasoningEnd e) {

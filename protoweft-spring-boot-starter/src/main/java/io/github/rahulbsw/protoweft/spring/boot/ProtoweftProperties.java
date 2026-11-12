@@ -88,6 +88,20 @@ public class ProtoweftProperties {
         /** How long to wait for a run's response to start (connector default: 60 seconds). */
         private Duration responseTimeout;
 
+        /**
+         * Ask the agent for AG-UI's HTTP + Protobuf binding (smaller, but drops what its schema does
+         * not model); needs protobuf-java 4.36.2 or newer. Responses in either binding are read.
+         */
+        private boolean protobuf;
+
+        public boolean isProtobuf() {
+            return protobuf;
+        }
+
+        public void setProtobuf(boolean protobuf) {
+            this.protobuf = protobuf;
+        }
+
         public String getUrl() {
             return url;
         }

@@ -39,6 +39,12 @@ All notable changes to Protoweft are documented here. The format follows
   is sent. `AgUi.agent(handler)` serves any core `AgentHandler`. No runtime dependency beyond
   Jackson 3; tests validate against the official JSON Schema, and the run-input, event and JSON
   Patch parsers are fuzzed.
+  The optional HTTP + Protobuf binding works when the application adds protobuf-java (4.36.2 or
+  newer; `compileOnly` here). The server answers in it whenever `Accept` admits it (on by default,
+  `protobuf(false)` / `protoweft.server.agui.protobuf` to turn it off). Clients opt in with
+  `preferProtobuf(true)` (`protoweft.agui.agents.<name>.protobuf`). Encoding reproduces the
+  official byte corpus exactly; the checker and the interop run cover both bindings, including
+  the official TypeScript encoder.
 - **Hosting.** `protoweft-server` (servlet endpoints plus an inbound-auth filter) and
   `protoweft-server-jetty` (an embedded Jetty 12 host).
 - **MCP (`protoweft-mcp`, MCP Java SDK 2.1.0).** A client over stdio and Streamable HTTP. A tool

@@ -171,7 +171,8 @@ class AgUiServerTest {
         assertThat(resp.status()).isEqualTo(200);
         Object doc = Json.parse(resp.body());
         assertThat(OfficialSchema.errors("AgentCapabilities", doc)).isEmpty();
-        assertThat(doc).isEqualTo(Map.of("transport", Map.of("streaming", true, "httpBinary", false),
+        // protobuf-java is on the test classpath, so the binary binding is on (ProtoBindingTest covers it).
+        assertThat(doc).isEqualTo(Map.of("transport", Map.of("streaming", true, "httpBinary", true),
                 "identity", Map.of("name", "Weather"), "reasoning", Map.of("supported", true)));
         assertThat(TestClient.request("GET", url).status()).isEqualTo(405);
     }
@@ -240,7 +241,8 @@ class AgUiServerTest {
         assertThat(server.compliance().protocol()).isEqualTo(ProtocolId.AGUI);
         assertThat(server.compliance().wireRevisions()).containsExactly("1.0");
         assertThat(server.compliance().supports(AgUiFeatures.BINDING_SSE)).isTrue();
-        assertThat(server.compliance().unsupported()).containsExactly(AgUiFeatures.BINDING_PROTOBUF);
+        assertThat(server.compliance().supports(AgUiFeatures.BINDING_PROTOBUF)).isTrue();
+        assertThat(server.compliance().unsupported()).isEmpty();
         server.close();
     }
 }

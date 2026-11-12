@@ -33,7 +33,7 @@ compatibility matrix. Each module's own decisions live in its `SPEC.md`, linked 
 | | `protoweft-a2a` | A2A client and full-lifecycle agent server, JSON-RPC binding (a2a-java 1.5.0.Final) | `protoweft-a2a` |
 | | `protoweft-utcp` | UTCP client and manual provider, implemented from spec 1.1 | `protoweft-utcp` |
 | | `protoweft-rap` | RAP client (callback endpoint mounted or built-in) and tool server, durable store; implemented from the unversioned spec at Infinity `e1a3e4b` | `protoweft-rap` |
-| | `protoweft-agui` | AG-UI client (with a tool bridge) and agent server over HTTP + SSE, implemented from spec 1.0 | `protoweft-agui` |
+| | `protoweft-agui` | AG-UI client (with a tool bridge) and agent server over HTTP + SSE and HTTP + Protobuf, implemented from spec 1.0 | `protoweft-agui` |
 | Security | `protoweft-oauth` | Protocol-neutral OAuth 2.1: an `HttpAuthorizer` client and resource-server pieces (Nimbus) | `protoweft-oauth` |
 | Discovery | `protoweft-discovery` | Capability catalog, hybrid search, fallback, sessions, generic meta-tools, raw provider payloads | `protoweft-discovery` |
 | | `protoweft-discovery-embeddings` | Offline bge-small `Embedder` and a pure-Java WordPiece tokenizer on ONNX Runtime alone | `protoweft-discovery-embeddings` |
@@ -56,7 +56,9 @@ Dependency rules, enforced by module boundaries:
 - `server` depends on `core` and on the servlet API (compileOnly). Only `server-jetty` brings a
   container.
 - Each protocol module depends on `core`, on `server` (for its endpoints), and on exactly its own
-  protocol SDK (or none, for UTCP, RAP and AG-UI).
+  protocol SDK (or none, for UTCP, RAP and AG-UI). AG-UI's optional binary binding takes
+  protobuf-java `compileOnly`: applications add it to enable the binding, and without it the module
+  loads and speaks SSE (`protoweft-agui`).
 - `discovery` depends on `core` only. Its embedding and provider modules add one library each
   (ONNX Runtime for embeddings, plus the model artifact, which holds only data files).
 - `oauth` depends on `core`, `server` and Nimbus. Protocol modules depend only on core's
@@ -208,7 +210,7 @@ Dependency rules, enforced by module boundaries:
 | **A2A** | `1.0` (prior `0.3.0`, `0.2.6`, `0.1.0`) | `org.a2aproject.sdk` **1.5.0.Final** (spec 1.0) | Client and full-lifecycle server over JSON-RPC; A2A TCK `1.0.0.alpha3` MUST level passes with an empty baseline. Not built: gRPC and HTTP+JSON bindings, card signatures, multi-tenancy |
 | **UTCP** | **`1.1`** (`1.0` manuals accepted) | none (Python, TypeScript and Go only) | Client (http, text and file manuals; http tools; api_key, basic and oauth2 auth) and manual provider. Not built: YAML, OpenAPI conversion, non-HTTP tool templates |
 | **RAP** | unversioned; recorded as `infinity@e1a3e4b` | none (Rust `rap-protocol`/`rap-client` 0.2.0 and JS `rap-js` only) | Client and tool server: toolset discovery, invocation, text and image results, subscriptions, OAuth and user-choice prompts, cancellation, thread closure, durable state; interop tested both ways against Hydro's JS and Rust implementations at `e1a3e4b` (`scripts/interop/rap.sh`). Not built: view updates, migration, `display_as`, `displayScript`, argument validation against `inputSchema` |
-| **AG-UI** | **`1.0`** (in-band `MAJOR.MINOR`) | none official (TypeScript, Python, .NET first-party; community Java SDK not used) | Agent server over HTTP + SSE: all 31 event types, interrupts, frontend tools, version negotiation, opt-in CORS, `GET <path>/capabilities` (a Protoweft convention); every event checked against the spec's sequence rules before sending; checked by `AgUiConformance` and by interop with the official TypeScript (`@ag-ui/client` 1.0.4) and Python (`ag-ui-protocol` 1.0.0) SDKs in CI. Client: the consumer pipeline (drop and strip with warnings, chunk expansion, verification), conversations with state, interrupts and resume checks, an opt-in tool bridge with consent, `AgentConnector` with an `ask` tool. Not built: the HTTP + Protobuf binding |
+| **AG-UI** | **`1.0`** (in-band `MAJOR.MINOR`) | none official (TypeScript, Python, .NET first-party; community Java SDK not used) | Agent server over HTTP + SSE and, with protobuf-java (≥ 4.36.2) on the classpath, HTTP + Protobuf (byte-identical to the official corpus): all 31 event types, interrupts, frontend tools, version negotiation, opt-in CORS, `GET <path>/capabilities` (a Protoweft convention); every event checked against the spec's sequence rules before sending; checked by `AgUiConformance` and by interop with the official TypeScript (`@ag-ui/client` 1.0.4) and Python (`ag-ui-protocol` 1.0.0) SDKs in CI. Client: the consumer pipeline (drop and strip with warnings, chunk expansion, verification), conversations with state, interrupts and resume checks, an opt-in tool bridge with consent, `AgentConnector` with an `ask` tool; Protobuf on request. Interop for the binary binding: the official TypeScript client and encoder |
 
 Frameworks: LangChain4j 1.23.0, Spring AI 2.0.2, ARGI 2.1.0-RC1 (plus ARGI main at
 `a869538` for `protoweft-argi-neutral`), Spring Boot 4.1.2.

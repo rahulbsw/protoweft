@@ -68,5 +68,19 @@ class OfficialPythonAgentInteropTest {
     void theOfficialAgentPassesTheConformanceChecker() {
         AgUiConformance.Report report = AgUiConformance.builder(URI.create(URL)).build().run();
         assertThat(report.passed()).as(report.text()).isTrue();
+        // The Python SDK always answers SSE, so the binary binding's checks do not apply.
+        assertThat(report.results()).filteredOn(r -> r.id().equals("binding/protobuf-frames"))
+                .singleElement().extracting(AgUiConformance.Result::status).isEqualTo(AgUiConformance.Status.SKIP);
+    }
+
+    @Test
+    void aClientAskingForProtobufGetsItsRunOverSse() {
+        List<String> warnings = new CopyOnWriteArrayList<>();
+        AgUiThread thread = AgUiThread.builder(AgUiClient.builder(URL).preferProtobuf(true).warnings(warnings::add).build())
+                .build();
+        AgUiThread.Turn turn = thread.send("hi");
+        assertThat(turn.status()).isEqualTo(AgUiThread.Status.COMPLETED);
+        assertThat(turn.text()).isEqualTo("you said: hi");
+        assertThat(warnings).isEmpty();
     }
 }

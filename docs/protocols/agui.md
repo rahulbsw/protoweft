@@ -9,15 +9,17 @@ Where MCP connects agents to tools and A2A connects agents to each other, AG-UI 
 people. Frontends such as [CopilotKit](https://github.com/CopilotKit/CopilotKit) speak it.
 
 - **Server:** `AgUiAgentServer` serves a Java agent to any AG-UI frontend over the HTTP + SSE
-  binding.
+  binding, and over the HTTP + Protobuf binding when you add protobuf-java.
 - **Client:** `AgUiClient`, `AgUiThread` and `AgUiClientConnector` call remote AG-UI agents
   (LangGraph, CrewAI, Mastra, Google ADK, Pydantic AI, …) from Java, and can offer them Protoweft
   tools (MCP, UTCP, RAP, local `@AgentTool` methods) to call.
 
 AG-UI's first-party SDKs are TypeScript, Python and .NET. Protoweft implements
 [specification 1.0](https://docs.ag-ui.com/spec/1.0) directly, with **no runtime dependency
-beyond the Jackson 3 the other modules already use**. Its tests check every event against the
-official JSON Schema.
+beyond the Jackson 3 the other modules already use**. The optional
+[Protobuf binding](#the-protobuf-binding) needs protobuf-java, which you add only if you want it.
+Its tests check every event against the official JSON Schema, and every binary event against the
+official byte corpus.
 
 ## Serving an agent
 
@@ -134,16 +136,46 @@ See the [property reference](../integrations/spring-boot.md#property-reference).
 | `executor(ExecutorService)` | a cached daemon pool owned by the server | runs agents |
 | `observations(ObservationHandler)` | none | one observation per run (`agent/run`) |
 | `endpointName(String)` | `agui` | unique per host |
+| `protobuf(boolean)` | `true` | answer in the [Protobuf binding](#the-protobuf-binding) when the client asks for it (needs protobuf-java) |
 
 ### HTTP behaviour
 
 - `POST <path>` with `Content-Type: application/json` and an `Accept` that admits
-  `text/event-stream` answers `200 text/event-stream`, one JSON event per `data:` line.
+  `text/event-stream` answers `200 text/event-stream`, one JSON event per `data:` line. If
+  `Accept` admits `application/vnd.ag-ui.event+proto`, the answer may be Protobuf frames instead
+  (see below).
 - Input rejected before the run starts gets a JSON error and no stream: 400 for malformed input or
   a protocol major version other than 1, 406, 413, 415.
 - A client that declares a newer `1.x` is served (the stream declares `1.0`). Fields the
   specification does not describe are ignored, with a warning in the log.
 - Authentication is the host's `InboundAuthenticator`, as for every Protoweft endpoint.
+
+### The Protobuf binding
+
+AG-UI's optional binary binding takes the same JSON request and answers with length-prefixed
+Protobuf frames (`application/vnd.ag-ui.event+proto`), which are smaller than SSE. To enable it, add
+protobuf-java, version 4.36.2 or newer:
+
+```kotlin
+implementation("com.google.protobuf:protobuf-java:4.36.2")
+```
+
+- **Server:** with protobuf-java present, the server answers in Protobuf whenever the request's
+  `Accept` admits the media type. As the specification says, a wildcard such as `*/*` admits it
+  too, so a plain `curl` gets binary. A request with no `Accept` header gets SSE. Turn the binding
+  off with `.protobuf(false)` (`protoweft.server.agui.protobuf=false`); the capabilities document
+  reports `"httpBinary"` accordingly.
+- **Client:** `AgUiClient.builder(url).preferProtobuf(true)` asks agents for Protobuf. It is off by
+  default, and either way the client reads whichever binding the agent answers with. Agents
+  without the binding (the official Python SDK, for one) answer SSE. In Spring Boot, set
+  `protoweft.agui.agents.<name>.protobuf=true`.
+- **What the binary wire loses**, as the specification warns: numbers inside open JSON (state,
+  metadata, tool arguments) travel as 64-bit floats, so integers beyond 2^53 lose precision.
+  Unknown fields and JSON Patch extension members are dropped. SSE has none of these limits.
+
+Without protobuf-java everything works over SSE. The server ignores the binary media type (406 if
+a client accepts nothing else), and `preferProtobuf(true)` fails at `build()`, naming the missing
+dependency.
 
 ### Browsers and CORS
 
@@ -298,6 +330,9 @@ assertThat(report.passed()).as(report.text()).isTrue();
 It sends a few runs and checks:
 
 - **The binding:** 200 with `text/event-stream`, LF framing, one event per `data:` frame.
+- **The Protobuf binding, if the agent offers it:** the exact media type, well-formed frames, and
+  the event and lifecycle checks below again on the binary stream (`protobuf/…`). An agent that
+  answers SSE to a request naming both bindings doesn't offer it, and those checks report `SKIP`.
 - **Event shapes:** only shapes the specification describes, with absent fields omitted rather
   than `null`. A producer must not rely on consumers stripping extras, so extras fail here.
 - **The run lifecycle:** ordering, a terminal event, and the input's thread and run ids on every
@@ -337,7 +372,7 @@ const runtime = new CopilotRuntime({
 | | Server | Client |
 |---|---|---|
 | HTTP + SSE binding | yes | yes |
-| HTTP + Protobuf binding | no | no |
+| HTTP + Protobuf binding | yes, with protobuf-java (on by default) | yes, with protobuf-java (opt-in) |
 | All 31 event types, all eight families | yes | yes |
 | Chunk events | never sent | expanded |
 | Interrupt and resume | yes | yes, with coverage and expiry checks |

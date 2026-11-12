@@ -10,11 +10,13 @@ import java.util.List;
 final class ConsumerPipeline {
 
     private final Decoder decoder;
+    private final List<String> warnings;
     private final ChunkExpander expander = new ChunkExpander();
     private final StreamVerifier verifier = new StreamVerifier();
 
     ConsumerPipeline(List<String> warnings) {
         this.decoder = new Decoder(warnings);
+        this.warnings = warnings;
     }
 
     /**
@@ -23,7 +25,20 @@ final class ConsumerPipeline {
      * @throws AgUiFormatException if the payload is malformed or breaks the sequence rules
      */
     List<AgUiEvent> accept(String data) {
-        AgUiEvent event = EventCodec.decode(decoder, Json.parse(data));
+        return accept(Json.parse(data));
+    }
+
+    /**
+     * The events one Protobuf frame stands for: decoded to the same JSON form, then the same stages.
+     * A frame for an event type this version does not know stands for none (warned).
+     */
+    List<AgUiEvent> acceptFrame(byte[] frame) {
+        Object json = ProtoBinding.decode(frame, warnings);
+        return json == null ? List.of() : accept(json);
+    }
+
+    private List<AgUiEvent> accept(Object json) {
+        AgUiEvent event = EventCodec.decode(decoder, json);
         if (event == null) {
             return List.of();
         }

@@ -12,6 +12,12 @@ public final class AgUiProtocol {
     /** The SSE binding's response media type. */
     public static final String EVENT_STREAM = "text/event-stream";
 
+    /**
+     * The HTTP + Protobuf binding's response media type: length-prefixed protobuf frames. Served
+     * and read only when protobuf-java is on the classpath.
+     */
+    public static final String EVENT_PROTOBUF = "application/vnd.ag-ui.event+proto";
+
     private AgUiProtocol() {
     }
 

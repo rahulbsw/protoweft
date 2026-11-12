@@ -1,10 +1,17 @@
 // Agent-User Interaction Protocol (AG-UI) client and agent server, implemented from spec 1.0 with no
-// third-party runtime dependency beyond the Jackson 3 the other modules already use.
+// third-party runtime dependency beyond the Jackson 3 the other modules already use. The HTTP +
+// Protobuf binding uses protobuf-java when the application adds it (compileOnly here).
+plugins {
+    id("com.google.protobuf") version "0.10.1"
+}
+
 dependencies {
     api(project(":protoweft-core"))
     api(project(":protoweft-server"))
     implementation("tools.jackson.core:jackson-databind:${project.property("jackson3Version")}")
     compileOnly("jakarta.servlet:jakarta.servlet-api:${project.property("servletApiVersion")}")
+    compileOnly("com.google.protobuf:protobuf-java:${project.property("protobufVersion")}")
+    testImplementation("com.google.protobuf:protobuf-java:${project.property("protobufVersion")}")
 
     testImplementation(project(":protoweft-server-jetty"))
     testImplementation(platform("org.junit:junit-bom:${project.property("junitVersion")}"))
@@ -33,4 +40,55 @@ configurations.matching { it.name.startsWith("test") || it.name.startsWith("fuzz
             useVersion(project.property("jackson3Version").toString())
         }
     }
+}
+
+// The official AG-UI wire schema, vendored unmodified (ProtoCorpusTest pins the hashes). The files
+// declare no java_package, so a copy with one added is what protoc compiles: generated classes go
+// to an internal package instead of a bare top-level `ag_ui`.
+val prepareAguiProto = tasks.register<Copy>("prepareAguiProto") {
+    from("src/main/agui-proto")
+    into(layout.buildDirectory.dir("agui-proto"))
+    filter { line ->
+        if (line == "package ag_ui;") {
+            line + "\noption java_package = \"io.github.rahulbsw.protoweft.agui.internal.proto\";"
+        } else {
+            line
+        }
+    }
+}
+
+sourceSets.main {
+    proto {
+        setSrcDirs(listOf(prepareAguiProto))
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${project.property("protobufVersion")}"
+    }
+}
+
+// The schema is compiled in, not shipped: .proto files at the jar root could clash with another
+// library's copies of the same files.
+tasks.jar {
+    exclude("*.proto")
+}
+
+// Most applications won't add protobuf-java: NoProtobufTest runs on a classpath without it (the
+// generated classes stay, as in the published jar) and checks that everything still works over SSE.
+val testWithoutProtobuf = tasks.register<Test>("testWithoutProtobuf") {
+    description = "Runs NoProtobufTest with protobuf-java removed from the classpath."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath.filter { !it.name.startsWith("protobuf-java") }
+    useJUnitPlatform()
+    // Only this class file is scanned: discovering the others would load protobuf types.
+    include("**/NoProtobufTest.class")
+}
+tasks.test {
+    filter { excludeTestsMatching("*.NoProtobufTest") }
+}
+tasks.check {
+    dependsOn(testWithoutProtobuf)
 }

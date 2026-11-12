@@ -13,7 +13,8 @@ parent: protoweft-architecture
 Speaks AG-UI, the agent ↔ user-facing-application protocol, in both roles:
 
 - **Server (built):** serves an agent to any AG-UI frontend (CopilotKit, chat platforms, terminal
-  clients) over the HTTP + SSE binding. Agents are native `AgUiAgent`s or any core `AgentHandler`.
+  clients) over both HTTP bindings: SSE (required) and Protobuf (optional, with protobuf-java).
+  Agents are native `AgUiAgent`s or any core `AgentHandler`.
 - **Client (built):** calls remote AG-UI agents from Java (`AgUiClient` per run, `AgUiThread` per
   conversation, `AgUiClientConnector` behind the neutral `AgentConnector`), with an opt-in bridge
   that offers Protoweft tools to them.
@@ -24,6 +25,11 @@ Speaks AG-UI, the agent ↔ user-facing-application protocol, in both roles:
   dependency**: there is no official Java SDK, the community one (`com.ag-ui.community` 0.1.x) is
   not used, and everything AG-UI needs that the JDK lacks is written here (SSE framing, RFC 6902
   JSON Patch, the event model). Logging is `java.lang.System.Logger`.
+- **The one exception, optional (decided with the user):** `com.google.protobuf:protobuf-java` is
+  `compileOnly`, for the HTTP + Protobuf binding only. Applications that want the binding add it,
+  and everyone else keeps the JDK + Jackson boundary. The user chose generated code over a
+  hand-written wire codec: less code to own, and the official byte corpus checks it either way.
+  Details under "HTTP + Protobuf binding".
 - Test-only: `com.networknt:json-schema-validator` (Jackson 3 based) validates produced JSON
   against the official schema, vendored as `src/test/resources/.../schema-1.0.json` and pinned by
   SHA-256 in `OfficialSchema`. Tests run on the shipped Jackson version (the build pins
@@ -59,17 +65,21 @@ Speaks AG-UI, the agent ↔ user-facing-application protocol, in both roles:
   round trip exactly. Found by fuzzing: as `double`, `1e400` became infinity and was re-sent as the
   string `"Infinity"`. Producers may not emit non-finite numbers (`IllegalArgumentException`).
 - Nesting deeper than 200 levels is rejected.
+- `TOOL_CALL_RESULT` carries no `role` (optional in the schema, and the record has none). It used to
+  be written as the constant `"tool"`, which broke byte parity with the official Protobuf corpus,
+  whose canonical events have no `role`.
 
 ### Server
 
 - `AgUiAgentServer.builder(AgUiAgent)` → one async servlet behind `InboundAuthFilter`, path
   `/agui` by default. A core handler is served as `builder(AgUi.agent(handler))`; there is no
   `builder(AgentHandler)` overload because implicitly typed lambdas would be ambiguous.
-- `POST <path>`: `application/json` required (415), `Accept` must admit `text/event-stream`
-  (406), body limit 4 MiB by default (413), malformed input or another major `protocolVersion`
+- `POST <path>`: `application/json` required (415), `Accept` must admit a binding the server
+  answers in (406; see "HTTP + Protobuf binding"), body limit 4 MiB by default (413), malformed input or another major `protocolVersion`
   → 400 JSON error before any stream. A newer `1.x` is served with a warning; unknown members are
   stripped with a warning. Then `200 text/event-stream`, `Cache-Control: no-cache`,
-  `X-Accel-Buffering: no`, one compact JSON event per `data:` line, LF framing.
+  `X-Accel-Buffering: no`, `Vary: Accept`, one compact JSON event per `data:` line, LF framing
+  (or the binary binding's frames).
 - `RUN_STARTED` is sent before the agent is called and declares `protocolVersion` `1.0`.
 - Every emitted event passes `StreamVerifier` (run lifecycle, open/close of messages, tool calls,
   reasoning spans and messages, per-owner steps, subagent lifecycle, attribution of
@@ -92,7 +102,7 @@ Speaks AG-UI, the agent ↔ user-facing-application protocol, in both roles:
 - **Capabilities endpoint (deviation, chosen by the user):** `GET <path>/capabilities` serves the
   spec's `AgentCapabilities` document. The spec defines the document but no way to retrieve it,
   so this path is a Protoweft convention, reported as feature `protoweft/capabilities-endpoint`.
-  `transport` defaults to `{"streaming": true, "httpBinary": false}`; groups are validated against
+  `transport` defaults to `{"streaming": true, "httpBinary": <binding on>}`; groups are validated against
   the spec's group names.
 
 ### Serving core agent handlers (`AgUi.agent`)
@@ -186,11 +196,67 @@ contract has no words for (state, activity, reasoning, subagents, the applicatio
   `WORKING`, text deltas as `response` artifact chunks, final status. The descriptor comes from
   the builder or the capabilities document's `identity`.
 
+### HTTP + Protobuf binding
+
+The spec's optional binding (`basic/transports/http-protobuf`): the same JSON POST, answered with
+frames of a 4-byte big-endian length followed by one `ag_ui.Event` envelope.
+
+- **Dependency** (user's choices): protobuf-java `compileOnly` at the 4.36.x line `protoweft-a2a`
+  already ships (`protobufVersion`). Generated code needs a runtime at least as new as its `protoc`,
+  so applications need protobuf-java ≥ 4.36.2; 3.25.x is not supported. The classes are generated
+  during the build by the Gradle protobuf plugin with `protoc` of the same version (both
+  hash-verified), not checked in, from the official `events/types/patch.proto`. Those files are
+  vendored unmodified under `src/main/agui-proto` (ag-ui @ `07802ae`, `@ag-ui/proto` 1.0.4,
+  SHA-256 pinned by `ProtoCorpusTest`). A build step adds
+  `java_package = "…agui.internal.proto"`, because the files declare none and the classes would
+  otherwise land in a bare top-level `ag_ui` package. The jar ships no `.proto` files, and no public
+  API exposes a protobuf type.
+- **Availability gate:** only `ProtoCodec` and `ProtoWire` touch protobuf, reached through
+  `ProtoBinding`, which loads without it. If protobuf-java is missing, or too old to initialise the
+  generated classes, the binding is unavailable and the reason is logged once. The server then
+  answers SSE, `httpBinary` is `false`, and `binding/http-protobuf` is reported unsupported. A
+  client that asks for Protobuf fails at `build()`, naming the dependency.
+- **Server negotiation:** Protobuf when `Accept` admits `application/vnd.ag-ui.event+proto` with
+  q > 0 and the binding is on. Wildcards admit it too, as the spec says, so a bare `*/*` client
+  gets frames (accepted by the user with the default). Within one header, the most specific
+  matching range sets the quality (RFC 9110); the two media types' qualities are not compared
+  with each other. Otherwise the server answers SSE if `Accept` admits it, and 406 if not. **No
+  `Accept` gets SSE** (unconfirmed: this follows the official TypeScript encoder rather than
+  reading a missing header as `*/*`). `Content-Type` is exactly the media type.
+  `builder().protobuf(false)`, or the starter's `protoweft.server.agui.protobuf=false`, turns the
+  binding off. It is on by default (user).
+- **Client:** off by default (user), because SSE is lossless. `preferProtobuf(true)` sends
+  `…+proto, text/event-stream`. The response's `Content-Type` picks the parser either way, so an
+  agent that ignores the request still works. The frame reader tolerates any chunking and refuses
+  a frame over `maxEventBytes` before reading it.
+- **Codec: translate, don't re-validate.** A frame is turned into the same JSON form an SSE event
+  has and handed to the same `Decoder`, so stripping, warnings and fatal values are the SSE rules
+  (the spec's "same pipeline"). Encoding goes `EventCodec` JSON → message. `ProtoWire` maps fields
+  generically by `json_name` (`Value`/`Struct` for open JSON, enums by name, an unknown enum
+  number as its decimal string for the decoder to judge). `ProtoCodec` holds the AG-UI reshaping,
+  mirroring `@ag-ui/proto`, whose output is the corpus:
+  - the base fields nest under `baseEvent`, and its type must match the envelope arm;
+  - outcomes are flattened to a string plus lists;
+  - message content travels as a string, as `contentParts`, or as `activityContent`, by role, with
+    the official layer's exclusivity rules;
+  - content parts and sources become oneofs;
+  - empty `usage`/`toolCalls` lists are dropped.
+- **Errors:**
+  - A frame naming only unknown envelope arms is dropped with a warning (as an unknown type on SSE).
+  - An empty frame, bytes that don't parse, two different arms, or a missing or mismatched base
+    are fatal (`AgUiFormatException`).
+  - A body ending mid-frame is a truncated run.
+  - The recursion limit allows the same 200 JSON nesting levels as SSE.
+- **Narrowing (the spec's own):** numbers inside open JSON travel as `double`, so integers beyond
+  2^53 lose precision. Unknown fields and JSON Patch extension members don't survive, and an
+  absent list reads as empty in `RunAgentInput` (`tools`, `context`, `resume`).
+
 ### Conformance checker (`AgUiConformance`)
 
 AG-UI has no official conformance suite, so the module ships one for producers (decided with the
 user: inside the module, public, with a `main`, offered as the JBang alias `agui-conformance`, no
-dependency beyond Jackson 3). It sends runs to any agent URL and reports 12 checks with stable ids:
+dependency beyond Jackson 3, plus protobuf-java for the binary checks). It sends runs to any agent
+URL and reports 19 checks with stable ids:
 
 - **Binding:** `binding/run-starts`, `binding/lf-framing`, `binding/one-event-per-frame`.
 - **Event shapes:** `events/described-shapes`, using the module's own decoder in strict mode. Any
@@ -203,6 +269,13 @@ dependency beyond Jackson 3). It sends runs to any agent URL and reports 12 chec
 - **Version:** `version/declared`, `version/newer-minor-served`.
 - **Input:** `input/unknown-member-served`, `input/malformed-rejected`,
   `input/missing-required-rejected`.
+- **Binary binding:** `binding/protobuf-content-type` (exactly the media type) and
+  `binding/protobuf-frames` (every frame decodes, and the body ends on a frame boundary). The event
+  and lifecycle checks run again on the binary run as `protobuf/…`, judged by the same
+  `ConformanceStream` as the SSE run. An agent that answers SSE to a request naming both bindings
+  doesn't offer the binary one, so these checks report `SKIP`. So does a checker without
+  protobuf-java. `binding/run-starts` already covers the binding's MUST, that an SSE-only
+  `Accept` gets SSE.
 
 Rejecting another major version is left unchecked, because the spec makes it optional (MAY). A
 stream that is only `RUN_ERROR` (the run failed before it started) is valid, so the identity and
@@ -221,7 +294,8 @@ processing model on input; subagent attribution and lifecycle.
 ## Deviations and gaps
 
 - `GET <path>/capabilities` (above).
-- Not built: the HTTP + Protobuf binding, SSE keep-alive comments from the server, the
+- The binary binding's narrowing (above).
+- Not built: SSE keep-alive comments from the server, the
   downgrade path for peers older than 1.0 (no translation shims; such peers' streams are judged by
   1.0 rules).
 - The tool bridge's argument check is structural, not a full JSON Schema validator.
@@ -232,7 +306,8 @@ processing model on input; subagent attribution and lifecycle.
 
 `AgUiFeatures` lists the feature ids. The server reports every event family, interrupts, frontend
 tools, version negotiation, CORS and the capabilities endpoint as supported; the client adds chunk
-expansion and the tool bridge. Both report `binding/http-protobuf` as unsupported. Tests assert it.
+expansion and the tool bridge. `binding/http-protobuf` is supported when the binding is available
+(and, on the server, on), and unsupported otherwise. Tests assert both.
 
 ## Verification
 
@@ -254,7 +329,14 @@ expansion and the tool bridge. Both report `binding/http-protobuf` as unsupporte
 - The checker passes a Protoweft server and catches each kind of broken producer (CR framing,
   `null` and unknown members, sequence errors, missing terminal event and version, wrong identity,
   bad frames) in `AgUiConformanceTest`.
-- Jazzer fuzz targets for the run-input and event parsers, the client's whole reading path (raw
+- The binary binding: all 98 events of the official corpus encode byte for byte and decode back
+  (`ProtoCorpusTest`; corpus and `.proto` files pinned by SHA-256). Framing, chunking, truncation,
+  size limit, malformed and future envelopes, and same-warnings-as-SSE are covered by
+  `ProtoCodecTest`. Negotiation, server frames equal to the SSE run, the client reading either
+  binding, and the binding turned off are covered by `ProtoBindingTest`. `NoProtobufTest`, run by
+  `testWithoutProtobuf` with protobuf-java removed from the classpath, covers everything without it.
+- Jazzer fuzz targets for the run-input and event parsers, the binary frame decoder
+  (`ProtoFuzzTest`, seeded with the corpus), the client's whole reading path (raw
   bytes through SSE, decoding, chunk expansion, verification) and JSON Patch, with regression
   seeds (including the fuzzer's finds: huge numbers, token counts beyond 2^53−1), in the CI fuzz
   job.
@@ -268,13 +350,20 @@ expansion and the tool bridge. Both report `binding/http-protobuf` as unsupporte
 - **Direction A: official TypeScript client → Protoweft server.** `@ag-ui/client` 1.0.4, whose own
   enforcement stage validates every stream, drives `conformance/agui-sut`. It covers every event
   family, state applied as `{"turns": 2}`, a frontend tool round trip, and interrupt then resume.
-  Result: passes.
+  The same run is repeated over Protobuf: `HttpAgent` subclassed through its `requestInit` hook to
+  ask for it, with the response type recorded. Result: passes.
 - **Direction B: Protoweft client → official Python SDK.** `interop/agui/python/server.py` is an
   agent on `ag-ui-protocol` 1.0.0 that streams replies as `TEXT_MESSAGE_CHUNK`.
   `OfficialPythonAgentInteropTest` (gated by `AGUI_INTEROP_PYTHON_URL`) runs `AgUiThread` against
   it, covering chunk expansion, state, the frontend tool and interrupt/resume, plus
-  `AgUiClientConnector` and the checker. Result: passes, with no warnings. The official agent
-  passing all 12 checks also cross-checks the checker.
+  `AgUiClientConnector` and the checker. A client asking for Protobuf gets its run over SSE, because
+  the Python SDK has no binary binding. Result: passes, with no warnings. The official agent passes
+  every check, with the binary ones skipped, which also cross-checks the checker.
+- **Direction B, binary: Protoweft client → official TypeScript encoder.**
+  `interop/agui/ts/encoder-agent.mjs` writes its stream with `@ag-ui/encoder` 1.0.4, which
+  negotiates from `Accept` and encodes with `@ag-ui/proto`. `OfficialTypeScriptEncoderInteropTest`
+  (gated by `AGUI_INTEROP_TS_ENCODER_URL`) reads it with an opted-in `AgUiThread` and runs the
+  checker, which passes all seven binary checks. Result: passes.
 - **Browser smoke (local, not in CI).** The `examples/agui-web` page runs in Chrome against
   `conformance/agui-sut`: streamed text, a tool card, shared state, and a frontend tool round trip.
 
@@ -283,5 +372,7 @@ expansion and the tool bridge. Both report `binding/http-protobuf` as unsupporte
 - [AG-UI specification 1.0](https://docs.ag-ui.com/spec/1.0) and its
   [schema](https://docs.ag-ui.com/spec/1.0/schema.json) (SHA-256
   `4b5c93226838a0e72d88e6c5df20633c686c49fcb75d9be2815c6cbf9e48e71a`), read 2026-11-11.
+- The HTTP + Protobuf binding (`spec/1.0/basic/transports/http-protobuf`), its wire schema and
+  byte corpus at ag-ui-protocol/ag-ui `07802ae` (`@ag-ui/proto` 1.0.4), read 2026-11-11.
 - RFC 6902 (JSON Patch), RFC 6901 (JSON Pointer), the WHATWG Server-Sent Events grammar, the Fetch
   standard's CORS protocol.

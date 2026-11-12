@@ -18,6 +18,7 @@ final class AgUiConnectorFactory implements ConnectorFactory {
         properties.getAgui().getAgents().forEach((name, a) -> out.put(name, AgUiClientConnector.builder(a.getUrl())
                 .client(b -> {
                     b.credentials(credentials);
+                    b.preferProtobuf(a.isProtobuf());
                     if (a.getResponseTimeout() != null) {
                         b.responseTimeout(a.getResponseTimeout());
                     }
