@@ -6,11 +6,13 @@ import io.github.rahulbsw.protoweft.core.ProtocolId;
 import io.github.rahulbsw.protoweft.core.observe.ObservationHandler;
 import io.github.rahulbsw.protoweft.core.observe.ObservationHandler.Observation;
 import io.github.rahulbsw.protoweft.core.server.CallerIdentity;
+import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpAsyncServerExchange;
 import io.modelcontextprotocol.server.McpServerFeatures.AsyncCompletionSpecification;
 import io.modelcontextprotocol.server.McpServerFeatures.AsyncPromptSpecification;
 import io.modelcontextprotocol.server.McpServerFeatures.AsyncResourceSpecification;
 import io.modelcontextprotocol.server.McpServerFeatures.AsyncResourceTemplateSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.util.DefaultMcpUriTemplateManager;
@@ -43,16 +45,13 @@ final class ServerAuthoring {
         this.requestTimeout = requestTimeout;
     }
 
+    // ---- Stateful (session) specifications: handlers read the caller from the exchange ----
+
     List<AsyncResourceSpecification> resources(McpResources resources) {
         List<AsyncResourceSpecification> specs = new ArrayList<>();
         for (McpResources.Fixed r : resources.fixed()) {
-            McpResourceInfo info = r.info();
-            McpSchema.Resource resource = McpSchema.Resource.builder(info.uri(), info.name()).title(info.title())
-                    .description(info.description()).mimeType(info.mimeType()).build();
-            specs.add(new AsyncResourceSpecification(resource, (exchange, request) -> run("resources/read",
-                    request.uri(), () -> McpSchema.ReadResourceResult.builder(contents(r.handler().read(
-                            new McpResourceRequest(request.uri(), Map.of(), caller(exchange))),
-                            request.uri(), info.mimeType())).build())));
+            specs.add(new AsyncResourceSpecification(resourceOf(r.info()),
+                    (exchange, request) -> readFixed(r, caller(exchange), request)));
         }
         return specs;
     }
@@ -60,14 +59,9 @@ final class ServerAuthoring {
     List<AsyncResourceTemplateSpecification> templates(McpResources resources) {
         List<AsyncResourceTemplateSpecification> specs = new ArrayList<>();
         for (McpResources.Template t : resources.templateEntries()) {
-            McpTemplateInfo info = t.info();
-            McpSchema.ResourceTemplate template = McpSchema.ResourceTemplate.builder(info.uriTemplate(), info.name())
-                    .title(info.title()).description(info.description()).mimeType(info.mimeType()).build();
-            DefaultMcpUriTemplateManager matcher = new DefaultMcpUriTemplateManager(info.uriTemplate());
-            specs.add(new AsyncResourceTemplateSpecification(template, (exchange, request) -> run("resources/read",
-                    request.uri(), () -> McpSchema.ReadResourceResult.builder(contents(t.handler().read(
-                            new McpResourceRequest(request.uri(), decoded(matcher.extractVariableValues(request.uri())),
-                                    caller(exchange))), request.uri(), info.mimeType())).build())));
+            DefaultMcpUriTemplateManager matcher = new DefaultMcpUriTemplateManager(t.info().uriTemplate());
+            specs.add(new AsyncResourceTemplateSpecification(templateOf(t.info()),
+                    (exchange, request) -> readTemplate(t, matcher, caller(exchange), request)));
         }
         return specs;
     }
@@ -75,24 +69,8 @@ final class ServerAuthoring {
     List<AsyncPromptSpecification> prompts(McpPrompts prompts) {
         List<AsyncPromptSpecification> specs = new ArrayList<>();
         for (McpPrompts.Entry entry : prompts.entries()) {
-            McpPromptInfo info = entry.info();
-            List<McpSchema.PromptArgument> arguments = info.arguments().stream()
-                    .map(a -> McpSchema.PromptArgument.builder(a.name()).title(a.title()).description(a.description())
-                            .required(a.required()).build())
-                    .toList();
-            McpSchema.Prompt prompt = McpSchema.Prompt.builder(info.name()).title(info.title())
-                    .description(info.description()).arguments(arguments).build();
-            specs.add(new AsyncPromptSpecification(prompt, (exchange, request) -> run("prompts/get", info.name(), () -> {
-                Map<String, String> args = strings(request.arguments());
-                for (McpPromptArgument a : info.arguments()) {
-                    if (a.required() && args.get(a.name()) == null) {
-                        throw new ProtoweftException(ErrorCategory.INVALID_ARGUMENTS, ProtocolId.MCP,
-                                "missing required argument '" + a.name() + "' for prompt " + info.name());
-                    }
-                }
-                return promptResult(entry.handler().render(new McpPromptRequest(info.name(), args, caller(exchange))),
-                        info.description());
-            })));
+            specs.add(new AsyncPromptSpecification(promptOf(entry.info()),
+                    (exchange, request) -> getPrompt(entry, caller(exchange), request)));
         }
         return specs;
     }
@@ -101,24 +79,126 @@ final class ServerAuthoring {
         List<AsyncCompletionSpecification> specs = new ArrayList<>();
         if (prompts != null) {
             prompts.completers().forEach((name, byArgument) -> specs.add(new AsyncCompletionSpecification(
-                    new McpSchema.PromptReference(name), (exchange, request) -> complete(byArgument, exchange, request))));
+                    new McpSchema.PromptReference(name),
+                    (exchange, request) -> complete(byArgument, caller(exchange), request))));
         }
         if (resources != null) {
             resources.completers().forEach((uriTemplate, byVariable) -> specs.add(new AsyncCompletionSpecification(
                     new McpSchema.ResourceReference(uriTemplate),
-                    (exchange, request) -> complete(byVariable, exchange, request))));
+                    (exchange, request) -> complete(byVariable, caller(exchange), request))));
         }
         return specs;
     }
 
-    private Mono<McpSchema.CompleteResult> complete(Map<String, McpCompleter> completers,
-                                                    McpAsyncServerExchange exchange, McpSchema.CompleteRequest request) {
+    // ---- Stateless specifications: handlers read the caller from the transport context ----
+
+    List<McpStatelessServerFeatures.AsyncResourceSpecification> statelessResources(McpResources resources) {
+        List<McpStatelessServerFeatures.AsyncResourceSpecification> specs = new ArrayList<>();
+        for (McpResources.Fixed r : resources.fixed()) {
+            specs.add(new McpStatelessServerFeatures.AsyncResourceSpecification(resourceOf(r.info()),
+                    (context, request) -> readFixed(r, caller(context), request)));
+        }
+        return specs;
+    }
+
+    List<McpStatelessServerFeatures.AsyncResourceTemplateSpecification> statelessTemplates(McpResources resources) {
+        List<McpStatelessServerFeatures.AsyncResourceTemplateSpecification> specs = new ArrayList<>();
+        for (McpResources.Template t : resources.templateEntries()) {
+            DefaultMcpUriTemplateManager matcher = new DefaultMcpUriTemplateManager(t.info().uriTemplate());
+            specs.add(new McpStatelessServerFeatures.AsyncResourceTemplateSpecification(templateOf(t.info()),
+                    (context, request) -> readTemplate(t, matcher, caller(context), request)));
+        }
+        return specs;
+    }
+
+    List<McpStatelessServerFeatures.AsyncPromptSpecification> statelessPrompts(McpPrompts prompts) {
+        List<McpStatelessServerFeatures.AsyncPromptSpecification> specs = new ArrayList<>();
+        for (McpPrompts.Entry entry : prompts.entries()) {
+            specs.add(new McpStatelessServerFeatures.AsyncPromptSpecification(promptOf(entry.info()),
+                    (context, request) -> getPrompt(entry, caller(context), request)));
+        }
+        return specs;
+    }
+
+    List<McpStatelessServerFeatures.AsyncCompletionSpecification> statelessCompletions(McpResources resources,
+                                                                                      McpPrompts prompts) {
+        List<McpStatelessServerFeatures.AsyncCompletionSpecification> specs = new ArrayList<>();
+        if (prompts != null) {
+            prompts.completers().forEach((name, byArgument) -> specs.add(
+                    new McpStatelessServerFeatures.AsyncCompletionSpecification(new McpSchema.PromptReference(name),
+                            (context, request) -> complete(byArgument, caller(context), request))));
+        }
+        if (resources != null) {
+            resources.completers().forEach((uriTemplate, byVariable) -> specs.add(
+                    new McpStatelessServerFeatures.AsyncCompletionSpecification(
+                            new McpSchema.ResourceReference(uriTemplate),
+                            (context, request) -> complete(byVariable, caller(context), request))));
+        }
+        return specs;
+    }
+
+    // ---- Transport-independent logic, keyed by the resolved caller ----
+
+    private static McpSchema.Resource resourceOf(McpResourceInfo info) {
+        return McpSchema.Resource.builder(info.uri(), info.name()).title(info.title())
+                .description(info.description()).mimeType(info.mimeType()).build();
+    }
+
+    private static McpSchema.ResourceTemplate templateOf(McpTemplateInfo info) {
+        return McpSchema.ResourceTemplate.builder(info.uriTemplate(), info.name())
+                .title(info.title()).description(info.description()).mimeType(info.mimeType()).build();
+    }
+
+    private static McpSchema.Prompt promptOf(McpPromptInfo info) {
+        List<McpSchema.PromptArgument> arguments = info.arguments().stream()
+                .map(a -> McpSchema.PromptArgument.builder(a.name()).title(a.title()).description(a.description())
+                        .required(a.required()).build())
+                .toList();
+        return McpSchema.Prompt.builder(info.name()).title(info.title())
+                .description(info.description()).arguments(arguments).build();
+    }
+
+    private Mono<McpSchema.ReadResourceResult> readFixed(McpResources.Fixed r, CallerIdentity caller,
+                                                        McpSchema.ReadResourceRequest request) {
+        McpResourceInfo info = r.info();
+        return run("resources/read", request.uri(), () -> McpSchema.ReadResourceResult.builder(contents(
+                r.handler().read(new McpResourceRequest(request.uri(), Map.of(), caller)),
+                request.uri(), info.mimeType())).build());
+    }
+
+    private Mono<McpSchema.ReadResourceResult> readTemplate(McpResources.Template t, DefaultMcpUriTemplateManager matcher,
+                                                           CallerIdentity caller, McpSchema.ReadResourceRequest request) {
+        McpTemplateInfo info = t.info();
+        return run("resources/read", request.uri(), () -> McpSchema.ReadResourceResult.builder(contents(
+                t.handler().read(new McpResourceRequest(request.uri(),
+                        decoded(matcher.extractVariableValues(request.uri())), caller)),
+                request.uri(), info.mimeType())).build());
+    }
+
+    private Mono<McpSchema.GetPromptResult> getPrompt(McpPrompts.Entry entry, CallerIdentity caller,
+                                                     McpSchema.GetPromptRequest request) {
+        McpPromptInfo info = entry.info();
+        return run("prompts/get", info.name(), () -> {
+            Map<String, String> args = strings(request.arguments());
+            for (McpPromptArgument a : info.arguments()) {
+                if (a.required() && args.get(a.name()) == null) {
+                    throw new ProtoweftException(ErrorCategory.INVALID_ARGUMENTS, ProtocolId.MCP,
+                            "missing required argument '" + a.name() + "' for prompt " + info.name());
+                }
+            }
+            return promptResult(entry.handler().render(new McpPromptRequest(info.name(), args, caller)),
+                    info.description());
+        });
+    }
+
+    private Mono<McpSchema.CompleteResult> complete(Map<String, McpCompleter> completers, CallerIdentity caller,
+                                                    McpSchema.CompleteRequest request) {
         McpCompleter completer = completers.get(request.argument().name());
         String what = McpContent.refName(request.ref()) + "#" + request.argument().name();
         return run("completion/complete", what, () -> {
             List<String> values = completer == null ? List.of() : completer.complete(new McpCompletionRequest(
                     request.argument().name(), request.argument().value(),
-                    request.context() == null ? Map.of() : request.context().arguments(), caller(exchange)));
+                    request.context() == null ? Map.of() : request.context().arguments(), caller));
             List<String> all = values == null ? List.of() : values.stream().filter(Objects::nonNull).toList();
             List<String> page = all.size() > MAX_COMPLETIONS ? all.subList(0, MAX_COMPLETIONS) : all;
             return new McpSchema.CompleteResult(new McpSchema.CompleteResult.CompleteCompletion(
@@ -153,6 +233,10 @@ final class ServerAuthoring {
 
     private static CallerIdentity caller(McpAsyncServerExchange exchange) {
         return ToolServerCore.caller(exchange.transportContext());
+    }
+
+    private static CallerIdentity caller(McpTransportContext context) {
+        return ToolServerCore.caller(context);
     }
 
     /** Converts a resource handler's return value; see {@link McpResourceHandler}. */

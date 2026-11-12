@@ -107,9 +107,11 @@ What Protoweft provides:
   - a neutral agent model covering the full task lifecycle
   - credentials, inbound authentication, observability and one error model
 - **Protocol modules, each with client and server:**
-  - **MCP**, over stdio and Streamable HTTP: tools, resources (with templates and subscriptions),
-    prompts, completion, logging and progress, plus OAuth authorization as a client
-    (machine-to-machine and interactive) and as a protected resource server.
+  - **MCP**, over stdio and Streamable HTTP (with or without sessions): tools, resources (with
+    templates and subscriptions), prompts, completion, logging and progress, plus OAuth
+    authorization as a client (machine-to-machine and interactive) and as a protected resource
+    server. The tool server can also run stateless over Streamable HTTP, so it scales horizontally
+    behind a load balancer with no session affinity.
   - **A2A**: an agent client, plus a full-lifecycle agent server (tasks, streaming, input-required,
     cancel, resubscribe, push notifications, extended card).
   - **UTCP**: a manual client, plus a manual provider for the app's own tools.

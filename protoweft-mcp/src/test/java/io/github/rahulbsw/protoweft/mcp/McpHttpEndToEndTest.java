@@ -289,9 +289,9 @@ class McpHttpEndToEndTest {
                 McpFeatures.RESOURCES, McpFeatures.RESOURCES_SUBSCRIBE, McpFeatures.PROMPTS, McpFeatures.COMPLETION,
                 McpFeatures.LOGGING, McpFeatures.PROGRESS);
         assertThat(report.unsupported()).containsExactlyInAnyOrder(McpFeatures.TRANSPORT_STDIO, McpFeatures.TRANSPORT_SSE,
-                McpFeatures.AUTHORIZATION, McpFeatures.TOOLS_LIST_CHANGED, McpFeatures.RESOURCES_LIST_CHANGED,
-                McpFeatures.PROMPTS_LIST_CHANGED, McpFeatures.CANCELLATION, McpFeatures.SAMPLING, McpFeatures.ROOTS,
-                McpFeatures.ELICITATION);
+                McpFeatures.TRANSPORT_STATELESS_HTTP, McpFeatures.AUTHORIZATION, McpFeatures.TOOLS_LIST_CHANGED,
+                McpFeatures.RESOURCES_LIST_CHANGED, McpFeatures.PROMPTS_LIST_CHANGED, McpFeatures.CANCELLATION,
+                McpFeatures.SAMPLING, McpFeatures.ROOTS, McpFeatures.ELICITATION);
     }
 
     @Test
