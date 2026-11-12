@@ -93,6 +93,7 @@ nav:
   - Examples: examples.md
   - Operations:
       - Troubleshooting: operations/troubleshooting.md
+      - Scaling and deployment: operations/scaling.md
       - Security model: operations/security-model.md
       - Conformance: operations/conformance.md
   - Reference:

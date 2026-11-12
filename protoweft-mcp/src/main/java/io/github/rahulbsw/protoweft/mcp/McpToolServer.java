@@ -12,6 +12,7 @@ import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.transport.DefaultServerTransportSecurityValidator;
+import io.modelcontextprotocol.server.transport.HttpServletStatelessServerTransport;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 
@@ -60,6 +61,17 @@ public final class McpToolServer {
     /** An MCP server for {@code tools} over stdio. */
     public static Stdio stdio(ToolSource tools) {
         return new Stdio(tools);
+    }
+
+    /**
+     * An MCP server for {@code tools} over <strong>stateless</strong> Streamable HTTP, mounted by a
+     * servlet host. It issues no {@code Mcp-Session-Id} and keeps no session, so any instance behind
+     * a load balancer can serve any request — no sticky sessions. It serves tools, resources,
+     * resource templates, prompts and completions, but not the session-scoped features (progress,
+     * logging, resource subscriptions). Use {@link #http(ToolSource)} when you need those.
+     */
+    public static StatelessHttp statelessHttp(ToolSource tools) {
+        return new StatelessHttp(tools);
     }
 
     /** Configuration shared by both transports. */
@@ -230,6 +242,153 @@ public final class McpToolServer {
                         .build());
                 transport = built.value();
                 server = settings.core().build(McpServer.async(transport));
+                String name = "/mcp".equals(path) ? "mcp" : "mcp:" + path;
+                endpoints = List.of(new ServletEndpoint(name, ProtocolId.MCP, List.of(path),
+                        new ClosingServlet(transport, this::close), true));
+            }
+            return endpoints;
+        }
+
+        private void requireConfigurable() {
+            if (endpoints != null) {
+                throw new IllegalStateException("server already built; configure it before endpoints() is called");
+            }
+        }
+    }
+
+    /**
+     * An MCP server over <strong>stateless</strong> Streamable HTTP: every request is independent,
+     * with no {@code Mcp-Session-Id} and no server-held session. Mount it in any servlet host, the
+     * same way as {@link Http}; the host's
+     * {@link io.github.rahulbsw.protoweft.core.server.InboundAuthenticator} runs before every request
+     * and the authenticated caller reaches the tools. Configure it before the host calls
+     * {@link #endpoints()}.
+     *
+     * <p>Because there is no session, this variant cannot report progress or logging to the client,
+     * and resources cannot be subscribed to. Its {@link #compliance()} reflects that.
+     */
+    public static final class StatelessHttp implements ServerEndpointProvider, AutoCloseable {
+
+        private static final List<String> STATELESS_REVISIONS = statelessRevisions();
+
+        private final Settings settings;
+        private HttpServletStatelessServerTransport transport;
+        private ToolServerCore.BuiltStateless server;
+        private String path = "/mcp";
+        private final List<String> allowedOrigins = new ArrayList<>();
+        private List<ServletEndpoint> endpoints;
+
+        private StatelessHttp(ToolSource tools) {
+            this.settings = new Settings(tools);
+        }
+
+        /** The {@code serverInfo} returned during initialization. Default {@code protoweft 0.1.0}. */
+        public synchronized StatelessHttp serverInfo(String name, String version) {
+            requireConfigurable();
+            settings.serverInfo(name, version);
+            return this;
+        }
+
+        /** Observes each {@code tools/call}. */
+        public synchronized StatelessHttp observations(ObservationHandler handler) {
+            requireConfigurable();
+            settings.observations = Objects.requireNonNull(handler, "handler");
+            return this;
+        }
+
+        /**
+         * The longest a {@code tools/call}, {@code resources/read}, {@code prompts/get} or
+         * {@code completion/complete} may run before failing with a JSON-RPC error. Default 60 seconds.
+         */
+        public synchronized StatelessHttp requestTimeout(Duration timeout) {
+            requireConfigurable();
+            settings.requestTimeout(timeout);
+            return this;
+        }
+
+        /** Publishes resources, declaring the {@code resources} capability (without {@code subscribe}). */
+        public synchronized StatelessHttp resources(McpResources resources) {
+            requireConfigurable();
+            settings.resources = Objects.requireNonNull(resources, "resources");
+            return this;
+        }
+
+        /** Publishes prompts, declaring the {@code prompts} capability. */
+        public synchronized StatelessHttp prompts(McpPrompts prompts) {
+            requireConfigurable();
+            settings.prompts = Objects.requireNonNull(prompts, "prompts");
+            return this;
+        }
+
+        /** The endpoint path, for example {@code /mcp} (the default). */
+        public synchronized StatelessHttp endpointPath(String path) {
+            requireConfigurable();
+            Objects.requireNonNull(path, "path");
+            if (!path.startsWith("/") || path.contains("*")) {
+                throw new IllegalArgumentException("path must start with '/' and contain no wildcard: " + path);
+            }
+            this.path = path;
+            return this;
+        }
+
+        /**
+         * Browser origins allowed to call the endpoint, for example {@code https://app.example.com}
+         * ({@code :*} matches any port). Requests carrying any other {@code Origin} header are
+         * rejected with 403, as MCP requires against DNS rebinding. Default: none.
+         */
+        public synchronized StatelessHttp allowedOrigins(String... origins) {
+            requireConfigurable();
+            allowedOrigins.addAll(List.of(origins));
+            return this;
+        }
+
+        /** What this server implements; the revision is negotiated per request, so none is set. */
+        public ComplianceReport compliance() {
+            return ToolServerCore.compliance(McpFeatures.TRANSPORT_STATELESS_HTTP, STATELESS_REVISIONS);
+        }
+
+        /** Closes the stateless server. Safe to call more than once. */
+        @Override
+        public synchronized void close() {
+            if (server != null) {
+                server.close();
+                server = null;
+            }
+            if (transport != null) {
+                try {
+                    transport.closeGracefully().block();
+                } finally {
+                    transport = null;
+                }
+            }
+        }
+
+        private static List<String> statelessRevisions() {
+            HttpServletStatelessServerTransport probe = HttpServletStatelessServerTransport.builder().build();
+            try {
+                return List.copyOf(probe.protocolVersions());
+            } finally {
+                probe.closeGracefully().block();
+            }
+        }
+
+        /**
+         * The single async endpoint, named {@code mcp} for the default path. The first call
+         * builds the server and reads the tool list.
+         *
+         * @throws ProtoweftException with {@code CONFIGURATION} if a tool can't be served over MCP
+         */
+        @Override
+        public synchronized List<ServletEndpoint> endpoints() {
+            if (endpoints == null) {
+                transport = HttpServletStatelessServerTransport.builder()
+                        .messageEndpoint(path)
+                        .contextExtractor(request -> McpTransportContext.create(
+                                Map.of(ToolServerCore.CALLER_KEY, InboundAuthFilter.caller(request))))
+                        .httpHeaderValidator(DefaultServerTransportSecurityValidator.builder()
+                                .allowedOrigins(List.copyOf(allowedOrigins)).build())
+                        .build();
+                server = settings.core().buildStateless(McpServer.async(transport));
                 String name = "/mcp".equals(path) ? "mcp" : "mcp:" + path;
                 endpoints = List.of(new ServletEndpoint(name, ProtocolId.MCP, List.of(path),
                         new ClosingServlet(transport, this::close), true));

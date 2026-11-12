@@ -52,7 +52,11 @@ All notable changes to Protoweft are documented here. The format follows
   tool-annotation mapping. Both roles: resources (templates, subscriptions), prompts, completion,
   logging and progress, authored with `McpResources`/`McpPrompts` builders or `@McpResource`,
   `@McpResourceTemplate`, `@McpPrompt` and `@McpComplete`. The client takes an `HttpAuthorizer`
-  for MCP authorization.
+  for MCP authorization. `McpToolServer.statelessHttp(...)` also serves tools, resources, prompts
+  and completions over **stateless** Streamable HTTP (no `Mcp-Session-Id`, no session), so the tool
+  server scales horizontally with no load-balancer affinity; the session-only features (progress,
+  logging, resource subscriptions) are reported unsupported on that transport. See
+  [Scaling and deployment](docs/operations/scaling.md).
 - **RAP (`protoweft-rap`, Reactive Agent Protocol, implemented from the Hydro spec at Infinity
   `e1a3e4b`).** `RapClientConnector` (toolset discovery, blocking and async invocation, callbacks
   mounted on the app's server or on a built-in listener, subscriptions, OAuth and user-choice

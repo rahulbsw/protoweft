@@ -18,6 +18,8 @@ import io.modelcontextprotocol.server.McpAsyncServer;
 import io.modelcontextprotocol.server.McpAsyncServerExchange;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures.AsyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessAsyncServer;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema;
 import reactor.core.publisher.Mono;
@@ -138,6 +140,56 @@ final class ToolServerCore {
         }
     }
 
+    /**
+     * Builds a stateless SDK server on {@code spec}; the tool list is snapshotted now. The stateless
+     * transport has no session, so there is nothing to bind: no resource-update notifications, no
+     * progress, no logging.
+     */
+    BuiltStateless buildStateless(McpServer.StatelessAsyncSpecification spec) {
+        List<McpStatelessServerFeatures.AsyncToolSpecification> specs = new ArrayList<>();
+        for (ToolSpec tool : tools.listTools()) {
+            Map<String, Object> schema = tool.inputSchema().isEmpty() ? EMPTY_OBJECT_SCHEMA : tool.inputSchema();
+            specs.add(McpStatelessServerFeatures.AsyncToolSpecification.builder()
+                    .tool(toMcpTool(tool, schema))
+                    .callHandler(this::callStateless)
+                    .build());
+        }
+        McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder().tools(false);
+        ServerAuthoring authoring = new ServerAuthoring(observations, requestTimeout);
+        if (resources != null) {
+            capabilities.resources(false, false); // stateless cannot subscribe or notify list changes
+            spec.resources(authoring.statelessResources(resources))
+                    .resourceTemplates(authoring.statelessTemplates(resources));
+        }
+        if (prompts != null) {
+            capabilities.prompts(false);
+            spec.prompts(authoring.statelessPrompts(prompts));
+        }
+        if ((resources != null && !resources.completers().isEmpty())
+                || (prompts != null && !prompts.completers().isEmpty())) {
+            capabilities.completions();
+            spec.completions(authoring.statelessCompletions(resources, prompts));
+        }
+        McpStatelessAsyncServer server;
+        try {
+            server = spec.serverInfo(serverName, serverVersion)
+                    .capabilities(capabilities.build())
+                    .tools(specs)
+                    .build();
+        } catch (IllegalArgumentException e) {
+            throw new ProtoweftException(ErrorCategory.CONFIGURATION, ProtocolId.MCP,
+                    "cannot serve these tools over MCP: " + e.getMessage(), e);
+        }
+        return new BuiltStateless(server);
+    }
+
+    /** A built stateless SDK server. Nothing to unbind: the transport holds no session state. */
+    record BuiltStateless(McpStatelessAsyncServer server) {
+        void close() {
+            server.close();
+        }
+    }
+
     static ComplianceReport compliance(String transportFeature, List<String> wireRevisions) {
         Properties sdk = McpClientConnector.sdkProperties();
         return new ComplianceReport(ProtocolId.MCP, sdk.getProperty("mcp.sdk.name"), sdk.getProperty("mcp.sdk.version"),
@@ -151,8 +203,17 @@ final class ToolServerCore {
     }
 
     private Mono<McpSchema.CallToolResult> call(McpAsyncServerExchange exchange, McpSchema.CallToolRequest request) {
-        CallerIdentity caller = caller(exchange.transportContext());
-        ToolProgress progress = new SessionProgress(exchange, request.progressToken(), request.name());
+        return invoke(caller(exchange.transportContext()),
+                new SessionProgress(exchange, request.progressToken(), request.name()), request);
+    }
+
+    /** Stateless tool call: no session, so no progress or logging callbacks. */
+    private Mono<McpSchema.CallToolResult> callStateless(McpTransportContext context, McpSchema.CallToolRequest request) {
+        return invoke(caller(context), ToolProgress.NOOP, request);
+    }
+
+    private Mono<McpSchema.CallToolResult> invoke(CallerIdentity caller, ToolProgress progress,
+                                                 McpSchema.CallToolRequest request) {
         ToolInvocation invocation = ToolInvocation.of(request.name(), request.arguments());
         Observation observation = new Observation(ProtocolId.MCP, "tools/call", request.name());
         Mono<McpSchema.CallToolResult> work = Mono.fromCallable(() -> toResult(tools.invoke(invocation, caller, progress).dropSubscription()))

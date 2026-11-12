@@ -14,6 +14,7 @@ public final class McpFeatures {
     public static final String LIFECYCLE_VERSION_NEGOTIATION = "lifecycle/version-negotiation";
     public static final String TRANSPORT_STDIO = "transport/stdio";
     public static final String TRANSPORT_STREAMABLE_HTTP = "transport/streamable-http";
+    public static final String TRANSPORT_STATELESS_HTTP = "transport/stateless-http";
     public static final String TRANSPORT_SSE = "transport/sse";
     public static final String AUTHORIZATION = "authorization";
     public static final String TOOLS_LIST = "tools/list";
@@ -58,7 +59,15 @@ public final class McpFeatures {
     private static final Set<String> NOT_IMPLEMENTED = Set.of(
             TRANSPORT_SSE, AUTHORIZATION, CANCELLATION, SAMPLING, ROOTS, ELICITATION);
 
-    private static final Set<String> TRANSPORTS = Set.of(TRANSPORT_STDIO, TRANSPORT_STREAMABLE_HTTP);
+    private static final Set<String> TRANSPORTS = Set.of(TRANSPORT_STDIO, TRANSPORT_STREAMABLE_HTTP,
+            TRANSPORT_STATELESS_HTTP);
+
+    /**
+     * Session-scoped features the stateless HTTP transport cannot carry: there is no session to
+     * subscribe to, log to, or report progress on. The SDK's stateless server returns one response
+     * per request and never calls back to the client.
+     */
+    private static final Set<String> STATELESS_ONLY_UNSUPPORTED = Set.of(RESOURCES_SUBSCRIBE, LOGGING, PROGRESS);
 
     /** What {@code role} implements over {@code transport}. */
     static Set<String> supported(Role role, String transport) {
@@ -68,10 +77,13 @@ public final class McpFeatures {
         if (role == Role.CLIENT) {
             s.addAll(CLIENT_ONLY);
         }
+        if (TRANSPORT_STATELESS_HTTP.equals(transport)) {
+            s.removeAll(STATELESS_ONLY_UNSUPPORTED);
+        }
         return Set.copyOf(s);
     }
 
-    /** What {@code role} does not implement over {@code transport}, including the other transport. */
+    /** What {@code role} does not implement over {@code transport}, including the other transports. */
     static Set<String> unsupported(Role role, String transport) {
         requireTransport(transport);
         Set<String> s = new HashSet<>(NOT_IMPLEMENTED);
@@ -79,6 +91,9 @@ public final class McpFeatures {
         s.remove(transport);
         if (role == Role.SERVER) {
             s.addAll(CLIENT_ONLY);
+        }
+        if (TRANSPORT_STATELESS_HTTP.equals(transport)) {
+            s.addAll(STATELESS_ONLY_UNSUPPORTED);
         }
         return Set.copyOf(s);
     }
