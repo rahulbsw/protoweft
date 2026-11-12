@@ -63,9 +63,10 @@ passphrase". The secrets hold the only other copies.
    against current `main`. It moves the released notes under `## [<version>] - <date>`. Entries
    merged since the release stay under `[Unreleased]`, and so does a released entry edited since;
    check those in the PR. It also sets `version=<next>` (patch + 1, `-SNAPSHOT`) in
-   `gradle.properties`. A PR opened by the workflow's token can't start
-   other workflows, so the required checks don't run on it: close and reopen the PR to run them, or
-   merge with admin bypass. To move to a new minor version instead, edit `gradle.properties` in
+   `gradle.properties`. A PR opened by the workflow's token can't start other workflows, so the
+   required checks don't run on it. They bind admins too, so close and reopen the PR to run them.
+   Once they pass, you can merge it without an approval through the review ruleset's admin bypass.
+   To move to a new minor version instead, edit `gradle.properties` in
    that PR before merging.
 6. Artifacts appear on Maven Central within about 30 minutes; deployments are listed at
    <https://central.sonatype.com/publishing/deployments>.

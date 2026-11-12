@@ -191,8 +191,13 @@ Dependency rules, enforced by module boundaries:
 - **Repository security is checked continuously, and its rules are met as Scorecard reads them.**
   CodeQL (`security-extended`, Java and workflows), Jazzer fuzzing of every untrusted-input parser
   (regression seeds in each build, a CI fuzz job), OpenSSF Scorecard, Dependabot (Actions, Gradle,
-  Cargo), hash-pinned actions and Python installs, and branch protection on `main` (pull
-  requests, one approval, required checks; the sole maintainer merges with admin bypass). Two
+  Cargo), hash-pinned actions and Python installs, and branch protection on `main`. Every
+  change arrives by pull request, and the required checks must pass and the branch must be current
+  for everyone, admins included (classic protection with `enforce_admins`). A ruleset ("Require
+  review on main") requires one approval, dismissed by new pushes, and resolved threads. The
+  repository admin role, held only by the sole maintainer, may bypass that approval when merging a
+  PR: never the checks, and never by pushing directly. GitHub scopes bypasses by who merges, not
+  who wrote the PR, so the admin can merge any PR unapproved; anyone else needs an approval. Two
   layouts exist only because of how Scorecard detects things (`ossf/scorecard`
   `checks/raw/fuzzing.go`, `checks/fileparser/listing.go`, `binary_artifact.go`): fuzz tests live
   in their own `src/fuzz` source set with a `fuzzTest` task wired into `check`, because Scorecard
