@@ -232,7 +232,7 @@ jobs:
           \`## [$VERSION] - $today\` in the CHANGELOG and sets \`version=$NEXT\` for the snapshots main publishes.
 
           Opened by the Release workflow. Its token cannot start other workflows, so the required checks have not
-          run: close and reopen this PR to run them, or merge with admin bypass (the change is CHANGELOG.md and
+          run: close and reopen this PR to run them before merging (the change is CHANGELOG.md and
           gradle.properties only).
           EOF
           gh pr create --base main --head "$branch" --title "Record release $VERSION and start $NEXT" \
