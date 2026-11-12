@@ -6,8 +6,10 @@ name: Release
 #
 #   verify     checks the version, builds and tests main's head, and takes the release notes from
 #              the CHANGELOG's [Unreleased] section;
-#   publish    waits for approval on the maven-central environment, then signs and publishes,
-#              attests the jars and the SBOM, and creates the tag v<version> and the GitHub release;
+#   publish    waits for approval on the maven-central environment, then signs and publishes;
+#   github-release  attests the jars and the SBOM, and creates the tag v<version> and the GitHub
+#              release. Kept apart from publish so a failure here can be retried with "Re-run
+#              failed jobs" without publishing again;
 #   follow-up  (final releases only) opens a PR against current main that moves the released notes
 #              under the version (entries merged since stay under [Unreleased]) and bumps main to
 #              the next -SNAPSHOT. main only accepts pull requests, so the bookkeeping
@@ -56,6 +58,11 @@ jobs:
           if git ls-remote --exit-code --tags "$REPO_URL" "refs/tags/v$VERSION" >/dev/null; then
             echo "::error::Tag v$VERSION already exists: a version is released only once."; exit 1
           fi
+          pom="https://repo1.maven.org/maven2/io/github/rahulbsw/protoweft-bom/$VERSION/protoweft-bom-$VERSION.pom"
+          if curl -sfI --max-time 30 "$pom" >/dev/null; then
+            echo "::error::$VERSION is already on Maven Central. If its run stopped after publishing, use 'Re-run failed jobs' on that run (see RELEASING.md)."
+            exit 1
+          fi
           prerelease=false
           [[ -n "${BASH_REMATCH[4]}" ]] && prerelease=true
           next="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))-SNAPSHOT"
@@ -99,13 +106,10 @@ jobs:
     name: Publish to Maven Central
     needs: verify
     runs-on: ubuntu-latest
-    # Requires the owner's approval; holds the signing key. Maven Central releases are permanent.
+    # Requires the owner's approval; holds the signing key. Maven Central releases are permanent, so
+    # this job does nothing after publishing: the steps that follow live in github-release, which
+    # "Re-run failed jobs" can retry without publishing again.
     environment: maven-central
-    permissions:
-      contents: write           # create the tag and the GitHub release
-      id-token: write           # sign the provenance and SBOM attestations
-      attestations: write       # store the attestations
-      artifact-metadata: write  # record the attested artifacts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -140,6 +144,32 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_ARTIFACTORY_TOKEN }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      - name: Hand the published jars and the SBOM to the GitHub release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-artifacts
+          if-no-files-found: error
+          path: |
+            protoweft-*/build/libs/*.jar
+            build/reports/cyclonedx/bom.json
+
+  github-release:
+    name: Attest, tag and create the GitHub release
+    needs: [verify, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write           # create the tag and the GitHub release
+      id-token: write           # sign the provenance and SBOM attestations
+      attestations: write       # store the attestations
+      artifact-metadata: write  # record the attested artifacts
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+          path: build/release
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -149,10 +179,6 @@ jobs:
         with:
           subject-path: 'protoweft-*/build/libs/*.jar'
           sbom-path: build/reports/cyclonedx/bom.json
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: release-notes
-          path: build/release
       - name: Create the tag and the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -162,13 +188,13 @@ jobs:
         run: |
           flags=()
           [[ "$PRERELEASE" == true ]] && flags+=(--prerelease)
-          gh release create "v$VERSION" --target "$SHA" --title "Protoweft $VERSION" \
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$SHA" --title "Protoweft $VERSION" \
             --notes-file build/release/notes.md "${flags[@]}" \
             protoweft-*/build/libs/*.jar build/reports/cyclonedx/bom.json
 
   follow-up:
     name: Open the follow-up PR
-    needs: [verify, publish]
+    needs: [verify, github-release]
     if: needs.verify.outputs.prerelease == 'false'
     runs-on: ubuntu-latest
     permissions:

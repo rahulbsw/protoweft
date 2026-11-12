@@ -51,25 +51,54 @@ passphrase". The secrets hold the only other copies.
 2. In **Actions → Release → Run workflow** (on `main`), enter the version without a leading `v`:
    `0.1.0`, or a pre-release such as `0.1.0-rc.1` (`-alpha.N`, `-beta.N` and `-rc.N` are
    accepted).
-3. **Verify** checks the version (the tag `v<version>` must not exist yet), builds and tests
-   `main`'s head, and prepares the notes.
-4. **Approve** the `maven-central` deployment when asked. **Publish** then:
-   - signs and uploads to the Central Portal, and releases once Central has validated the
-     deployment;
+3. **Verify** checks the version: neither the tag `v<version>` nor the version on Maven Central
+   may exist yet. It then builds and tests `main`'s head, and prepares the notes.
+4. **Approve** the `maven-central` deployment when asked. **Publish** then signs and uploads to the
+   Central Portal, and releases once Central has validated the deployment. It does nothing else.
+   **GitHub release** then:
    - attests build provenance and the SBOM;
    - creates the tag `v<version>` and the GitHub release (marked pre-release for `-alpha`, `-beta`
      and `-rc`), with the jars and the SBOM attached.
-5. For a final release, **Follow-up** opens the PR "Record release <version> and start <next>". It
-   moves the released notes under `## [<version>] - <date>` and sets `version=<next>`
-   (patch + 1, `-SNAPSHOT`) in `gradle.properties`. A PR opened by the workflow's token can't start
+5. For a final release, **Follow-up** opens the PR "Record release <version> and start <next>"
+   against current `main`. It moves the released notes under `## [<version>] - <date>`. Entries
+   merged since the release stay under `[Unreleased]`, and so does a released entry edited since;
+   check those in the PR. It also sets `version=<next>` (patch + 1, `-SNAPSHOT`) in
+   `gradle.properties`. A PR opened by the workflow's token can't start
    other workflows, so the required checks don't run on it: close and reopen the PR to run them, or
    merge with admin bypass. To move to a new minor version instead, edit `gradle.properties` in
    that PR before merging.
 6. Artifacts appear on Maven Central within about 30 minutes; deployments are listed at
    <https://central.sonatype.com/publishing/deployments>.
 
-If a run fails before **Publish** finishes, nothing is released and no tag exists: fix the cause
-and run it again with the same version. The first release should be a release candidate.
+### When a run fails
+
+A Maven Central release can't be undone or repeated, so what to do depends on where the run
+stopped:
+
+| Failed job | State | What to do |
+|---|---|---|
+| **Verify**, or a rejected approval | Nothing published, no tag. | Fix the cause, then run Release again with the same version. |
+| **Publish** | Usually nothing published. If the failure came after the upload (for example while waiting for validation), Central may still have accepted the deployment. | Check <https://central.sonatype.com/publishing/deployments>. *No deployment, or `FAILED`:* fix the cause and run Release again; a `FAILED` deployment can be dropped there. *`VALIDATED`:* press **Publish** there, or **Drop** it and run again. *`PUBLISHING` or `PUBLISHED`:* the version is released, so don't run again; finish by hand (below). |
+| **GitHub release** (attestations, tag or release) | Published on Central, no tag yet. | Actions → that run → **Re-run failed jobs**. It retries this job and Follow-up, not Publish. |
+| **Follow-up** | Released, tagged; no follow-up PR. | **Re-run failed jobs**, or make the CHANGELOG and `gradle.properties` change in a PR by hand. |
+
+Use **Re-run failed jobs**, never **Re-run all jobs**. The latter repeats **Publish**, which would
+try to upload the version again, and replaces the artifacts the later jobs read.
+
+Running Release again for a version Central already has stops in **Verify**, as long as Maven
+Central already serves it. Central would reject the upload anyway.
+
+Finishing by hand after a **Publish** failure that still released: create the tag and the release
+from the run's commit. This release has no attestations.
+
+```bash
+gh release create v<version> --target <commit> --title "Protoweft <version>" --notes-file <notes>
+```
+
+`<notes>` is the run's `release-notes` artifact, or the CHANGELOG section. Then open the
+follow-up PR by hand, as **Follow-up** would have.
+
+The first release should be a release candidate.
 
 To check publishing locally without signing or uploading:
 `./gradlew build publishToMavenLocal -Pversion=<version>`.
