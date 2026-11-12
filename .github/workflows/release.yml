@@ -8,8 +8,9 @@ name: Release
 #              the CHANGELOG's [Unreleased] section;
 #   publish    waits for approval on the maven-central environment, then signs and publishes,
 #              attests the jars and the SBOM, and creates the tag v<version> and the GitHub release;
-#   follow-up  (final releases only) opens a PR that moves the notes under the version and bumps
-#              main to the next -SNAPSHOT. main only accepts pull requests, so the bookkeeping
+#   follow-up  (final releases only) opens a PR against current main that moves the released notes
+#              under the version (entries merged since stay under [Unreleased]) and bumps main to
+#              the next -SNAPSHOT. main only accepts pull requests, so the bookkeeping
 #              cannot be committed directly.
 on:
   workflow_dispatch:
@@ -69,8 +70,7 @@ jobs:
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           mkdir -p build/release
-          awk '/^## \[Unreleased\]/ { found = 1; next } /^## \[/ { if (found) exit } found' CHANGELOG.md \
-            | sed -e '/./,$!d' > build/release/notes.md
+          python3 scripts/release/changelog.py notes CHANGELOG.md > build/release/notes.md
           if [[ ! -s build/release/notes.md ]]; then
             if [[ "$PRERELEASE" == true ]]; then
               echo "No unreleased changes recorded." > build/release/notes.md
@@ -175,24 +175,26 @@ jobs:
       contents: write       # push the follow-up branch
       pull-requests: write  # open the follow-up PR
     steps:
+      # Current main, not the released commit: entries merged since the release must stay under
+      # [Unreleased], which a three-way merge of a heading insertion would not guarantee.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: main
           persist-credentials: false
-      - name: Move the notes under the version and bump main to the next snapshot
+      - name: Move the released notes under the version and bump main to the next snapshot
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.verify.outputs.version }}
           NEXT: ${{ needs.verify.outputs.next }}
+          SHA: ${{ github.sha }}
         run: |
           branch="release/v$VERSION"
           git switch -c "$branch"
-          # Branched from the released commit, so exactly the released notes move; the PR merges
-          # any changelog entries added to main since.
+          git fetch --depth=1 origin "$SHA"
+          git show "$SHA:CHANGELOG.md" > "$RUNNER_TEMP/released-CHANGELOG.md"
           today="$(date -u +%Y-%m-%d)"
-          awk -v heading="## [$VERSION] - $today" \
-            '!done && /^## \[Unreleased\]/ { print; print ""; print heading; done = 1; next } { print }' \
-            CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
+          python3 scripts/release/changelog.py record --version "$VERSION" --date "$today" \
+            --released "$RUNNER_TEMP/released-CHANGELOG.md" CHANGELOG.md
           sed -i -E "s/^version=.*/version=$NEXT/" gradle.properties
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
