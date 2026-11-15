@@ -118,6 +118,8 @@ Run an example:
 
 ## Documentation
 
+- [Interactive tour](http://github.datasierra.com/protoweft-examples/): every protocol's real
+  traffic, step by step, in the browser
 - [Getting started](docs/getting-started.md)
 - Concepts: [architecture](docs/concepts/architecture.md), [tools](docs/concepts/tools.md),
   [agents](docs/concepts/agents.md), [security](docs/concepts/security.md),

@@ -1,5 +1,7 @@
 # Examples
 
+To see every protocol's traffic in the browser first, try the [interactive tour](tour.md).
+
 The repository has six runnable examples under `examples/`, and two starter templates under
 `templates/`. Run the examples from the repository root with the Gradle wrapper; they need only a
 JDK (17 or newer).
