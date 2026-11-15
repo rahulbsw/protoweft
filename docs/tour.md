@@ -5,9 +5,9 @@ through MCP, UTCP, A2A, RAP and AG-UI chapter by chapter. Every step shows the J
 it, and next to the code, the real HTTP traffic it produced: JSON-RPC calls, Server-Sent Events,
 RAP callbacks.
 
-[Open the tour in its own tab ↗](http://github.datasierra.com/protoweft-examples/){ .md-button .md-button--primary target="_blank" }
+[Open the tour in its own tab ↗](https://github.datasierra.com/protoweft-examples/){ .md-button .md-button--primary target="_blank" }
 
-<iframe src="http://github.datasierra.com/protoweft-examples/" title="Protoweft Tour"
+<iframe src="https://github.datasierra.com/protoweft-examples/" title="Protoweft Tour"
         style="width: 100%; height: 760px; border: 1px solid var(--md-default-fg-color--lightest); border-radius: 8px;"
         loading="lazy"></iframe>
 
