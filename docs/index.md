@@ -108,9 +108,9 @@ Each protocol guide lists exactly what is and isn't covered: [MCP](protocols/mcp
 - **Not a lowest-common-denominator façade.** Tools (MCP, UTCP, RAP) and agents (A2A) stay
   separate concepts in the core API.
 
-!!! note "Pre-release"
-    Protoweft is at `0.1.0-SNAPSHOT` and isn't published to Maven Central yet.
-    [Getting started](getting-started.md) shows how to build it from source.
+!!! note "Available on Maven Central"
+    The latest release is `1.0.0`, group `io.github.rahulbsw`. [Getting started](getting-started.md)
+    shows the dependencies to add.
 
 ## Next steps
 

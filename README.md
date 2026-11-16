@@ -87,27 +87,19 @@ Protoweft is not an LLM framework: it has no model clients, chains, memory or RA
 
 ## Getting started
 
-Requirements: Java 17 or newer. Protoweft `0.1.0-SNAPSHOT` isn't on Maven Central yet; build it
-and install it into your local Maven repository:
-
-```bash
-./gradlew build                 # compile and test everything
-./gradlew publishToMavenLocal   # io.github.rahulbsw:*:0.1.0-SNAPSHOT into ~/.m2
-```
-
-Then, in your project:
+Requirements: Java 17 or newer. Protoweft is on Maven Central; the latest release is `1.0.0`:
 
 ```kotlin
-repositories { mavenLocal(); mavenCentral() }
+repositories { mavenCentral() }
 
 dependencies {
-    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation(platform("io.github.rahulbsw:protoweft-bom:1.0.0"))
     implementation("io.github.rahulbsw:protoweft-mcp")
     implementation("io.github.rahulbsw:protoweft-server-jetty")
 }
 ```
 
-Run an example:
+From a clone of this repository, run an example:
 
 ```bash
 ./gradlew :examples:mcp-client-example:run          # MCP client against a bundled stdio server

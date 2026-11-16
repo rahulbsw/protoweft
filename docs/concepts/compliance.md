@@ -85,7 +85,7 @@ lists every feature id per role.
 | | Client (`UtcpClientConnector`) | Provider (`UtcpManualProvider`) |
 |---|---|---|
 | SDK | `none`: no official Java SDK exists; implemented from the specification | same |
-| `sdkVersion` | the `protoweft-utcp` module version (`0.1.0-SNAPSHOT`) | no report |
+| `sdkVersion` | the `protoweft-utcp` module version (for example `1.0.0`) | no report |
 | Wire revisions | `1.0`, `1.1` (the manual format didn't change; 1.1 client rules apply to both) | serves `utcp_version` `1.1.0` |
 | Negotiated revision | the manual's declared `utcp_version`, as declared and not validated, like the Python reference | — |
 | Reference checked against | python-utcp core `1.2.0`, `utcp-http` `1.1.15` | same |
@@ -95,7 +95,7 @@ lists every feature id per role.
 | | Client (`RapClientConnector`) | Server (`RapToolServer`) |
 |---|---|---|
 | SDK | `none`: no Java SDK exists; implemented from the specification | same |
-| `sdkVersion` | the `protoweft-rap` module version (`0.1.0-SNAPSHOT`) | same |
+| `sdkVersion` | the `protoweft-rap` module version (for example `1.0.0`) | same |
 | Specification | Hydro Infinity's RAP, unversioned; followed at commit `e1a3e4b`, reported as wire revision `infinity@e1a3e4b` | same |
 | Negotiated revision | `infinity@e1a3e4b` after `start()` (RAP negotiates nothing) | not reported |
 | Reference checked against | Rust `rap-protocol`/`rap-client` 0.2.0, JS `rap-js`, example servers `get-time` and `sandbox-core` (code at `e1a3e4b`) | same |

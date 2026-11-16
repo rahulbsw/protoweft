@@ -25,7 +25,7 @@ plugins {
 }
 
 dependencies {
-    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation(platform("io.github.rahulbsw:protoweft-bom:1.0.0"))
     implementation("io.github.rahulbsw:protoweft-spring-boot-starter")
     implementation("io.github.rahulbsw:protoweft-mcp")     // only the protocols you use
     implementation("io.github.rahulbsw:protoweft-utcp")
@@ -37,8 +37,8 @@ dependencies {
 ```
 
 If a protocol is configured but its module is missing, startup fails and names the artifact to
-add. See [Getting started](../getting-started.md#build-protoweft-from-source) for building
-Protoweft into your local Maven repository.
+add. See [Getting started](../getting-started.md#add-the-dependencies) for the repository and
+BOM setup.
 
 ## What gets configured
 

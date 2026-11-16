@@ -11,34 +11,20 @@ own over MCP and UTCP.
   `org.slf4j:slf4j-simple`, which logs to stderr.
 - **Node.js**, only to run the reference MCP servers used in some examples (`npx …`).
 
-## Build Protoweft from source
-
-!!! warning "Not yet on Maven Central"
-    Protoweft `0.1.0-SNAPSHOT` isn't published to Maven Central. Build it from source and install
-    it into your local Maven repository (`~/.m2/repository`):
-
-```bash
-./gradlew publishToMavenLocal
-```
-
-Run this from a clone of the Protoweft repository. It publishes every library module and the BOM
-with group `io.github.rahulbsw` and version `0.1.0-SNAPSHOT`. The examples and `protoweft-argi-neutral`
-aren't published.
-
 ## Add the dependencies
 
-Import the BOM so every Protoweft module has the same version, then add only the modules you use.
+Protoweft is on Maven Central, group `io.github.rahulbsw`, latest release `1.0.0`. Import the BOM so
+every Protoweft module has the same version, then add only the modules you use.
 
 === "Gradle (Kotlin DSL)"
 
     ```kotlin
     repositories {
-        mavenLocal()      // Protoweft, until it is published
-        mavenCentral()    // the protocol SDKs and everything else
+        mavenCentral()
     }
 
     dependencies {
-        implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+        implementation(platform("io.github.rahulbsw:protoweft-bom:1.0.0"))
         implementation("io.github.rahulbsw:protoweft-mcp")
         implementation("io.github.rahulbsw:protoweft-utcp")
         implementation("io.github.rahulbsw:protoweft-server-jetty")   // to host servers in plain Java
@@ -64,7 +50,7 @@ Import the BOM so every Protoweft module has the same version, then add only the
         <dependency>
           <groupId>io.github.rahulbsw</groupId>
           <artifactId>protoweft-bom</artifactId>
-          <version>0.1.0-SNAPSHOT</version>
+          <version>1.0.0</version>
           <type>pom</type>
           <scope>import</scope>
         </dependency>
@@ -87,7 +73,13 @@ Import the BOM so every Protoweft module has the same version, then add only the
     </dependencies>
     ```
 
-    Maven reads `~/.m2/repository` by default, so no extra repository is needed.
+    Maven Central is Maven's default repository, so no repository needs declaring.
+
+To try unreleased changes, use `main`'s `-SNAPSHOT` from the Central snapshot repository
+([RELEASING.md](https://github.com/rahulbsw/protoweft/blob/main/RELEASING.md#snapshots)), or build
+from a clone with `./gradlew publishToMavenLocal` and add `mavenLocal()`. Releases are also on
+[GitHub Packages](https://github.com/rahulbsw/protoweft/packages), which needs a GitHub token even
+to read.
 
 ### Modules
 

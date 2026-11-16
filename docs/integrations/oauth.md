@@ -14,7 +14,7 @@ following the [MCP authorization specification](https://modelcontextprotocol.io/
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation(platform("io.github.rahulbsw:protoweft-bom:1.0.0"))
     implementation("io.github.rahulbsw:protoweft-oauth")
 }
 ```

@@ -12,7 +12,7 @@
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation(platform("io.github.rahulbsw:protoweft-bom:1.0.0"))
     implementation("io.github.rahulbsw:protoweft-langchain4j")   // brings dev.langchain4j:langchain4j
     implementation("io.github.rahulbsw:protoweft-mcp")            // and whichever protocols you use
 }
