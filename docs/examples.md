@@ -1,5 +1,7 @@
 # Examples
 
+To see every protocol's traffic in the browser first, try the [interactive tour](tour.md).
+
 The repository has six runnable examples under `examples/`, and two starter templates under
 `templates/`. Run the examples from the repository root with the Gradle wrapper; they need only a
 JDK (17 or newer).
@@ -240,6 +242,27 @@ generated, as chunks of that artifact. Send the next message with the returned `
 conversation. Every client under `protoweft.mcp.clients` (or `protoweft.utcp.manuals`,
 `protoweft.a2a.agents`) adds its tools to the registry, and the `ChatClient` sees them on its next
 request, for example `--args='--protoweft.mcp.clients.remote.url=http://localhost:3001'`.
+
+### Tools from published MCP servers
+
+Published MCP servers join the same way, with no code changes. For example, the official time
+reference server and `yfmcp`, a community Yahoo Finance server, both started through
+[`uvx`](https://docs.astral.sh/uv/) and needing no API key:
+
+```yaml
+protoweft:
+  mcp:
+    clients:
+      time:   { command: uvx, args: [mcp-server-time] }
+      stocks: { command: uvx, args: ["yfmcp@0.14.1"] }
+```
+
+With any OpenAI-compatible model that does tool calling, the agent then answers questions such as
+"What time is it in New York, and what is NVDA trading at?" with tools from both servers
+(`time__get_current_time`, `stocks__…`). Each server starts with the application, and one that
+fails to start stops it, unless `protoweft.fail-fast=false`. The full walkthrough, with sample
+questions and answers, is in
+[protoweft-examples](https://github.com/rahulbsw/protoweft-examples/tree/main/spring-ai-example#tools-from-published-mcp-servers).
 
 ```bash
 ./gradlew :examples:spring-ai-example:test
