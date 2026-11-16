@@ -182,7 +182,9 @@ Dependency rules, enforced by module boundaries:
   Maven Central, from `.github/workflows/release.yml`. The owner starts it with a version on
   `main`. Build and tests run first; the signing key lives only in the protected `maven-central`
   environment, whose approval gates publishing. A Central release is permanent. The workflow then
-  creates the tag and the GitHub release. `main` accepts only pull requests, so the changelog move
+  publishes the same version, unsigned, to GitHub Packages with its own token (Central stays the
+  primary channel, since GitHub Packages needs a token even to read), and creates the tag and the
+  GitHub release. `main` accepts only pull requests, so the changelog move
   and the next `-SNAPSHOT` version come back as a PR, never a direct push. Every push to `main`
   also publishes its unsigned `-SNAPSHOT` to the Central Portal snapshot repository
   (`snapshot.yml`). The release attaches a CycloneDX SBOM of the libraries' runtime dependencies and

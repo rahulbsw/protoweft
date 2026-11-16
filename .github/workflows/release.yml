@@ -7,6 +7,8 @@ name: Release
 #   verify     checks the version, builds and tests main's head, and takes the release notes from
 #              the CHANGELOG's [Unreleased] section;
 #   publish    waits for approval on the maven-central environment, then signs and publishes;
+#   github-packages  after Maven Central, publishes the same version to GitHub Packages
+#              (https://github.com/rahulbsw/protoweft/packages) with the workflow's own token;
 #   github-release  attests the jars and the SBOM, and creates the tag v<version> and the GitHub
 #              release. Kept apart from publish so a failure here can be retried with "Re-run
 #              failed jobs" without publishing again;
@@ -152,6 +154,33 @@ jobs:
           path: |
             protoweft-*/build/libs/*.jar
             build/reports/cyclonedx/bom.json
+
+  github-packages:
+    name: Publish to GitHub Packages
+    # After Maven Central, so GitHub Packages never holds a version Central doesn't. Unsigned: the
+    # signing key stays in the maven-central environment. Independent of github-release, so a
+    # failure here neither blocks the tag and release nor repeats the Central publish.
+    needs: [verify, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Publish to GitHub Packages
+        run: ./gradlew publishAllPublicationsToGitHubPackagesRepository -Pversion="$VERSION" --no-configuration-cache --console=plain
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          ORG_GRADLE_PROJECT_GitHubPackagesUsername: ${{ github.actor }}
+          ORG_GRADLE_PROJECT_GitHubPackagesPassword: ${{ secrets.GITHUB_TOKEN }}
 
   github-release:
     name: Attest, tag and create the GitHub release

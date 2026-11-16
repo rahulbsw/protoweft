@@ -88,6 +88,21 @@ fun Project.publishToCentral(kind: com.vanniktech.maven.publish.Platform) {
             signAllPublications()
         }
         coordinates(rootProject.property("group") as String, project.name, project.version.toString())
+        // Releases are also published to GitHub Packages (release.yml, job github-packages), which
+        // needs a token to read, even for a public repository; see RELEASING.md.
+        extensions.configure<PublishingExtension> {
+            repositories {
+                maven {
+                    name = "GitHubPackages"
+                    // -PgithubPackagesUrl=file:///tmp/x publishes into a local directory, to inspect a release.
+                    val override = providers.gradleProperty("githubPackagesUrl")
+                    url = uri(override.getOrElse("https://maven.pkg.github.com/rahulbsw/protoweft"))
+                    if (!override.isPresent) {
+                        credentials(PasswordCredentials::class)
+                    }
+                }
+            }
+        }
         configure(kind)
         pom {
             name.set(project.name)

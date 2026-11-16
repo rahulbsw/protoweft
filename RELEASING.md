@@ -7,6 +7,10 @@ Releases publish every `protoweft-*` library and `protoweft-bom` to Maven Centra
 - **Releases** start from the Actions tab with a version number. They publish only after your
   approval on the `maven-central` environment, because a Maven Central release can never be
   changed or deleted.
+- **GitHub Packages** gets each release too, right after Maven Central, at
+  <https://github.com/rahulbsw/protoweft/packages>. It needs no extra secret (the workflow's own
+  token publishes), but reading from it needs a GitHub token even though the repository is
+  public, so Maven Central stays the place to consume releases from.
 - **Snapshots** of `main` (`version` in `gradle.properties`, always `-SNAPSHOT`) are published on
   every push to `main`, to the Central Portal snapshot repository.
 
@@ -55,7 +59,7 @@ passphrase". The secrets hold the only other copies.
    may exist yet. It then builds and tests `main`'s head, and prepares the notes.
 4. **Approve** the `maven-central` deployment when asked. **Publish** then signs and uploads to the
    Central Portal, and releases once Central has validated the deployment. It does nothing else.
-   **GitHub release** then:
+   **GitHub Packages** then publishes the same version there (unsigned), and **GitHub release**:
    - attests build provenance and the SBOM;
    - creates the tag `v<version>` and the GitHub release (marked pre-release for `-alpha`, `-beta`
      and `-rc`), with the jars and the SBOM attached.
@@ -80,6 +84,7 @@ stopped:
 |---|---|---|
 | **Verify**, or a rejected approval | Nothing published, no tag. | Fix the cause, then run Release again with the same version. |
 | **Publish** | Usually nothing published. If the failure came after the upload (for example while waiting for validation), Central may still have accepted the deployment. | Check <https://central.sonatype.com/publishing/deployments>. *No deployment, or `FAILED`:* fix the cause and run Release again; a `FAILED` deployment can be dropped there. *`VALIDATED`:* press **Publish** there, or **Drop** it and run again. *`PUBLISHING` or `PUBLISHED`:* the version is released, so don't run again; finish by hand (below). |
+| **GitHub Packages** | Published on Central; GitHub Packages may hold some modules. | It doesn't block the tag or release. Delete any modules of this version it already uploaded (the repository's **Packages**, each package's version → **Delete**), then **Re-run failed jobs**: GitHub Packages refuses a version that already exists. |
 | **GitHub release** (attestations, tag or release) | Published on Central, no tag yet. | Actions → that run → **Re-run failed jobs**. It retries this job and Follow-up, not Publish. |
 | **Follow-up** | Released, tagged; no follow-up PR. | **Re-run failed jobs**, or make the CHANGELOG and `gradle.properties` change in a PR by hand. |
 
@@ -130,6 +135,27 @@ dependencies {
     implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
 }
 ```
+
+## Using a release from GitHub Packages
+
+Every read needs a token with `read:packages` (a classic personal access token, or
+`GITHUB_TOKEN` inside Actions), even for this public repository:
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven("https://maven.pkg.github.com/rahulbsw/protoweft") {
+        content { includeGroup("io.github.rahulbsw") }
+        credentials {
+            username = providers.gradleProperty("gpr.user").get()   // your GitHub login
+            password = providers.gradleProperty("gpr.token").get()  // a read:packages token
+        }
+    }
+}
+```
+
+To check what a release would publish without uploading anything, publish into a local directory:
+`./gradlew publishAllPublicationsToGitHubPackagesRepository -Pversion=<version> -PgithubPackagesUrl=file:///tmp/repo`.
 
 ## What every published artifact carries
 
