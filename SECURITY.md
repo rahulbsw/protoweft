@@ -12,7 +12,8 @@ We aim to acknowledge reports within five working days.
 
 ## Supported versions
 
-Protoweft is pre-1.0. Only the latest released version receives security fixes.
+Protoweft follows semantic versioning from 1.0.0. Security fixes are made in the latest release line
+(currently 1.x) and published as a new patch release.
 
 ## Security model in brief
 
