@@ -161,6 +161,8 @@ To check what a release would publish without uploading anything, publish into a
 
 - Main, sources and Javadoc jars, plus a Gradle module metadata file.
 - `.asc` signatures (releases) and checksums, added by the plugin at upload.
-- A POM with name, description, url, the MIT license, the developer and SCM. CI checks this on
+- A POM with name, description, url, the MIT license, the developer and SCM, and a version on every
+  dependency (the build's resolved version; `scripts/release/check_poms.py` checks it in CI and in
+  the release's Verify job, before approval, because Maven Central rejects a dependency without one). CI checks this on
   every build by publishing to Maven Local.
 - An `Automatic-Module-Name` of `io.github.rahulbsw.protoweft.<module>`.

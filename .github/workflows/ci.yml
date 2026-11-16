@@ -28,6 +28,9 @@ jobs:
       - name: Check that publishing works (unsigned, local)
         if: matrix.java == '17'
         run: ./gradlew publishToMavenLocal -Pversion=0.0.0-ci --console=plain
+      - name: Check that every published POM is complete (Maven Central rejects dependencies without a version)
+        if: matrix.java == '17'
+        run: python3 scripts/release/check_poms.py ~/.m2/repository 0.0.0-ci
       - name: Build the starter templates against the local publication
         if: matrix.java == '17'
         run: |
