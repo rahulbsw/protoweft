@@ -201,6 +201,18 @@ configure(subprojects.filter { it.buildFile.exists() && it.name != "protoweft-bo
 
 configure(libraryProjects) {
     publishToCentral(JavaLibrary(JavadocJar.Javadoc(), SourcesJar.Sources()))
+    // Publish the versions the build resolved. A few dependencies are declared without a version
+    // so a framework's BOM governs them (for example jackson-databind under Spring AI); Gradle
+    // module metadata copes, but a POM would then lack the version, which Maven consumers can't
+    // resolve and Maven Central rejects (scripts/release/check_poms.py guards this).
+    extensions.configure<PublishingExtension> {
+        publications.withType<MavenPublication>().configureEach {
+            versionMapping {
+                usage("java-api") { fromResolutionOf("runtimeClasspath") }
+                usage("java-runtime") { fromResolutionResult() }
+            }
+        }
+    }
 }
 
 // SBOM (`./gradlew cyclonedxBom` -> build/reports/cyclonedx/bom.json): runtime dependencies of the

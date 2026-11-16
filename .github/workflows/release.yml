@@ -103,6 +103,14 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: ./gradlew build -Pversion="$VERSION" --console=plain
+      - name: Check the POMs Maven Central will validate
+        # Before approval: a rejected deployment otherwise only shows up after publishing starts.
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ./gradlew publishAllPublicationsToGitHubPackagesRepository -Pversion="$VERSION" \
+            -PgithubPackagesUrl="file://$RUNNER_TEMP/release-repo" --console=plain
+          python3 scripts/release/check_poms.py "$RUNNER_TEMP/release-repo" "$VERSION"
 
   publish:
     name: Publish to Maven Central
