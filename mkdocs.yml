@@ -67,6 +67,7 @@ nav:
   - Home: index.md
   - Quickstart: quickstart.md
   - Getting started: getting-started.md
+  - Exposing existing APIs: existing-apis.md
   - Concepts:
       - Architecture: concepts/architecture.md
       - Tools and the registry: concepts/tools.md
