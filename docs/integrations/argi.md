@@ -16,7 +16,7 @@ as `input-required`.
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation(platform("io.github.rahulbsw:protoweft-bom:1.0.0"))
     implementation("io.github.rahulbsw:protoweft-argi")        // brings argi-agent-framework 2.1.0-RC1 and protoweft-spring-ai
     implementation("io.github.rahulbsw:protoweft-discovery")   // only for CatalogToolSelectionInterceptor
     implementation("io.github.rahulbsw:protoweft-a2a")         // to serve agents over A2A

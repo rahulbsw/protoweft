@@ -28,8 +28,8 @@ these entry points:
 
 ## Coordinates
 
-Group `io.github.rahulbsw`, version `0.1.0-SNAPSHOT`, not yet on Maven Central
-([build from source](../getting-started.md#build-protoweft-from-source)).
+Group `io.github.rahulbsw`, latest release `1.0.0`, on Maven Central
+([add the dependencies](../getting-started.md#add-the-dependencies)).
 
 | Artifact | |
 |---|---|

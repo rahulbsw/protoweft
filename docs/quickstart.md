@@ -2,11 +2,6 @@
 
 Three ways to go from nothing to a working Protoweft app. Each needs only JDK 17 or newer.
 
-!!! note "Before the first release"
-    These paths use the published `io.github.rahulbsw` artifacts on Maven Central. Until the first
-    release, build from source first with `./gradlew publishToMavenLocal`, then add `mavenLocal()`
-    to the template's repositories (or pass `--repos local=file://$HOME/.m2/repository` to JBang).
-
 ## 1. Zero setup: JBang (30 seconds)
 
 [JBang](https://www.jbang.dev) runs a single Java file with its dependencies, with no project
