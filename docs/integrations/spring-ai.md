@@ -15,7 +15,7 @@
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.rahulbsw:protoweft-bom:0.1.0-SNAPSHOT"))
+    implementation(platform("io.github.rahulbsw:protoweft-bom:1.0.0"))
     implementation("io.github.rahulbsw:protoweft-spring-ai")    // brings spring-ai-model
     implementation("io.github.rahulbsw:protoweft-mcp")          // and whichever protocols you use
 
