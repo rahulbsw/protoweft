@@ -6,6 +6,8 @@ All notable changes to Protoweft are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-16
+
 ### Added
 - **Core (`protoweft-core`).**
   - Tools: `ToolSource`, `ToolConnector`, a namespaced `ToolRegistry`, and `LocalTools`
