@@ -6,6 +6,9 @@
 [AG-UI](https://docs.ag-ui.com) — behind one protocol-neutral Java 17 API, in both the client and the
 server role, with optional LangChain4j, Spring AI, ARGI and Spring Boot 4 integrations.
 
+> ⭐ If Protoweft helps you build, please [star the repository](https://github.com/rahulbsw/protoweft).
+> It helps others discover the project!
+
 ```java
 public class Weather {
     @AgentTool(description = "Current temperature in a city, in Celsius")

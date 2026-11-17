@@ -9,6 +9,9 @@ interoperability protocols —
 [Agent–User Interaction protocol (AG-UI)](protocols/agui.md) — behind one protocol-neutral Java 17
 API, in both the client and the server role.
 
+> ⭐ If Protoweft helps you build, please [star the repository](https://github.com/rahulbsw/protoweft).
+> It helps others discover the project!
+
 Write a tool once and serve it over MCP, UTCP and RAP. Consume MCP servers, UTCP manuals, RAP tool
 servers and remote A2A and AG-UI agents through a single tool registry. Publish your own agent over
 A2A, or to web frontends over AG-UI. Use all of it from plain
