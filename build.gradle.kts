@@ -7,7 +7,7 @@ import org.cyclonedx.gradle.CyclonedxDirectTask
 
 plugins {
     id("com.vanniktech.maven.publish.base") version "0.37.0" apply false
-    id("org.cyclonedx.bom") version "3.5.1"
+    id("org.cyclonedx.bom") version "3.6.1"
 }
 
 allprojects {
