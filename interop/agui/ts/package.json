@@ -7,8 +7,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ag-ui/client": "1.0.4",
-    "@ag-ui/encoder": "1.0.4"
+    "@ag-ui/client": "1.0.5",
+    "@ag-ui/encoder": "1.0.5"
   },
   "scripts": {
     "interop": "node client.mjs"
